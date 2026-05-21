@@ -1,0 +1,38 @@
+.wrap {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(420px, calc(100vw - 2rem));
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border: 1px solid #fecaca;
+}
+
+.text {
+  flex: 1;
+}
+
+.dismiss {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  opacity: 0.7;
+}
+
+.dismiss:hover {
+  opacity: 1;
+}

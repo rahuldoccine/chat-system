@@ -1,0 +1,216 @@
+.stage {
+  min-width: min(320px, 92vw);
+}
+
+.stageVideo {
+  max-width: min(92vw, 960px);
+  max-height: min(88vh, 720px);
+}
+
+.stageAudio {
+  max-width: min(92vw, 520px);
+  padding: 2.5rem 1.35rem 1.35rem;
+  background: #1e293b;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  max-height: min(80vh, 680px);
+  background: #000;
+}
+
+.audioPlayer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  min-width: min(400px, 92vw);
+  max-width: 100%;
+  padding: 0.25rem 0.15rem 0.15rem;
+  box-sizing: border-box;
+}
+
+.audioTitle {
+  margin: 0;
+  padding: 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #f1f5f9;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Purple voice card — matches in-chat sent voice bubble */
+.audioCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 1.1rem 1rem 0.95rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 48%, #a78bfa 100%);
+  box-shadow:
+    0 12px 32px rgba(99, 102, 241, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-sizing: border-box;
+}
+
+.audioPlayBtn {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  margin-top: 0.1rem;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.95);
+  color: #6366f1;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.audioPlayBtn:hover:not(:disabled) {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.22);
+}
+
+.audioPlayBtn:disabled {
+  opacity: 0.9;
+  cursor: wait;
+}
+
+.audioPlayIcon {
+  margin-left: 2px;
+}
+
+.audioSpinner {
+  animation: audioSpin 0.8s linear infinite;
+  color: #6366f1;
+}
+
+@keyframes audioSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.audioBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.05rem;
+}
+
+.waveArea {
+  position: relative;
+  cursor: pointer;
+  touch-action: none;
+  padding-bottom: 0.2rem;
+  outline: none;
+}
+
+.waveArea:focus-visible {
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.waveBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 44px;
+  padding: 0 2px;
+}
+
+.waveBar {
+  flex: 1;
+  min-width: 3px;
+  max-width: 7px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.38);
+  opacity: 0.65;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+
+.waveBarPlayed {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.waveBarActive {
+  animation: modalWavePulse 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes modalWavePulse {
+  from {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.92);
+  transition: width 0.08s linear;
+}
+
+.audioFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.1rem;
+}
+
+.durationGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.micIcon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.9;
+}
+
+.durationLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.hiddenAudio {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}

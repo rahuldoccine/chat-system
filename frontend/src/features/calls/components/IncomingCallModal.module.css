@@ -1,0 +1,79 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  text-align: center;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 0.75rem;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.35rem;
+}
+
+.sub {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0 0 1.5rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.declineBtn,
+.acceptBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.declineBtn {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.declineBtn:hover {
+  background: #e2e8f0;
+}
+
+.acceptBtn {
+  background: #16a34a;
+  color: white;
+}
+
+.acceptBtn:hover {
+  background: #15803d;
+}

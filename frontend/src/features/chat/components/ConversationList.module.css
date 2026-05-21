@@ -1,0 +1,163 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: white;
+  border-right: 1px solid var(--border);
+}
+
+.header {
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.header h3 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.count {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.item:hover {
+  background-color: rgba(99, 102, 241, 0.03);
+}
+
+.active {
+  background-color: rgba(99, 102, 241, 0.06) !important;
+  border-left-color: var(--primary);
+}
+
+.avatarWrapper {
+  position: relative;
+}
+
+.onlineIndicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--success);
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  background: var(--grad-primary);
+  color: white;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.onlineStatus {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  background: var(--success);
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.lastMsg {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 0.25rem;
+}
+
+.unreadBadge {
+  background: var(--primary);
+  color: white;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0 5px;
+}
+
+.loading, .error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

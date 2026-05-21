@@ -1,0 +1,75 @@
+.meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-bottom: 1px;
+}
+
+.metaInline {
+  margin-left: 0;
+}
+
+.edited {
+  font-size: 0.6rem;
+  font-style: normal;
+  opacity: 0.75;
+}
+
+.time {
+  font-size: 0.65rem;
+  line-height: 1;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.metaMe .time {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.meta:not(.metaMe):not(.metaOnMedia) .time {
+  color: #64748b;
+}
+
+.ticks {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 0;
+}
+
+.ticksDelivered {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ticksRead {
+  color: #93c5fd;
+}
+
+/* Media pill in MessageStream - parent .mediaMeta sets color; inherit here */
+.metaOnMedia .time,
+.metaOnMedia .edited {
+  color: inherit;
+}
+
+.metaOnMedia .ticks {
+  color: inherit;
+  opacity: 0.92;
+}
+
+.metaOnMedia .ticksRead {
+  color: #bfdbfe;
+  opacity: 1;
+}
+
+.pending {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.failed {
+  display: inline-flex;
+  color: #fecaca;
+}

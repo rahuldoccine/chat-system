@@ -1,0 +1,544 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Auth (Sprint 2) ---
+
+model User {
+  id           String @id @default(uuid())
+  email        String @unique
+  passwordHash String
+
+  /// Profile
+  displayName String?
+  username    String? @unique
+  avatarUrl   String?
+
+  /// E2EE: optional public key material + version for rotation (no plaintext message storage)
+  publicKey  String? @db.Text
+  keyVersion Int?
+
+  emailVerifiedAt DateTime?
+  /// Bumped on logout-all / password reset; must match JWT `authVer` claim.
+  authVersion Int @default(0)
+  /// Platform moderator: can review user reports in Settings.
+  isAdmin     Boolean   @default(false)
+  isOnline    Boolean   @default(false)
+  lastSeenAt  DateTime?
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshSessions     RefreshSession[]
+  passwordResetTokens PasswordResetToken[]
+  chatsCreated        Chat[]               @relation("ChatCreatedBy")
+  chatMemberships     ChatMember[]
+  messagesSent        Message[]            @relation("MessageSender")
+  receipts            Receipt[]
+  reactions           Reaction[]
+  friendsAsRequester  Friend[]             @relation("FriendRequester")
+  friendsAsAddressee  Friend[]             @relation("FriendAddressee")
+  blocksIssued        Block[]              @relation("BlockBlocker")
+  blocksReceived      Block[]              @relation("BlockBlocked")
+  reportsFiled        Report[]             @relation("ReportReporter")
+  reportsAgainst      Report[]             @relation("ReportTargetUser")
+  pollsCreated        Poll[]               @relation("PollCreatedBy")
+  pollVotes           PollVote[]
+  callLogsAsInitiator CallLog[]            @relation("CallInitiator")
+  callLogsAsPeer      CallLog[]            @relation("CallPeer")
+  deviceTokens        DeviceToken[]
+  identityKey         UserIdentityKey?
+  deviceKeys          DeviceKey[]
+  keyBackup           KeyBackup?
+  stepUpTokens        StepUpToken[]
+  emailChallenges     EmailChallenge[]
+  userSettings        UserSettings?
+  pinnedMessages      PinnedMessage[]      @relation("PinnedByUser")
+  uploadedFiles       UploadedFile[]
+}
+
+model RefreshSession {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  userAgent  String?
+  ipLast     String?
+  revokedAt  DateTime?
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  @@index([userId])
+}
+
+// --- Chat domain (Sprint 3) ---
+
+enum ChatType {
+  DIRECT
+  GROUP
+}
+
+enum ChatE2eeMode {
+  NONE
+  DM_V1
+}
+
+enum ChatMemberRole {
+  OWNER
+  ADMIN
+  MOD
+  MEMBER
+}
+
+/// Direct chats: set `dmKey` to a stable canonical key (e.g. sorted user ids joined by ":") - @@unique prevents duplicate DMs. Null for GROUP.
+model Chat {
+  id        String   @id @default(uuid())
+  type      ChatType
+  dmKey     String?  @unique
+  title     String?
+  avatarUrl String?
+  e2eeMode  ChatE2eeMode @default(NONE)
+
+  createdById String
+  createdBy   User   @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  lastMessageAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members        ChatMember[]
+  messages       Message[]
+  polls          Poll[]
+  reports        Report[]
+  callLogs       CallLog[]
+  pinnedMessages PinnedMessage[]
+  uploadedFiles  UploadedFile[]
+
+  @@index([updatedAt])
+  @@index([lastMessageAt])
+}
+
+model ChatMember {
+  id     String @id @default(uuid())
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role       ChatMemberRole @default(MEMBER)
+  joinedAt   DateTime       @default(now())
+  mutedUntil DateTime?
+  leftAt     DateTime?
+
+  @@unique([chatId, userId])
+  @@index([userId, leftAt])
+}
+
+enum MessageKind {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+  POLL
+  OTHER
+}
+
+model Message {
+  id       String @id @default(uuid())
+  chatId   String
+  chat     Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  /// Idempotency: same client id cannot be inserted twice per chat
+  clientMessageId String
+  kind            MessageKind @default(TEXT)
+
+  /// Encrypted payload or envelope (E2EE). Plaintext should not be stored for user content.
+  ciphertext  String? @db.Text
+  contentMeta Json?
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  receipts      Receipt[]
+  reactions     Reaction[]
+  reports       Report[]
+  poll          Poll?
+  pinnedInChats PinnedMessage[]
+  uploadedFiles UploadedFile[]
+
+  @@unique([chatId, clientMessageId])
+  @@index([chatId, createdAt(sort: Desc)])
+  @@index([senderId, createdAt])
+}
+
+/// Per-user delivery/read state for a message.
+/// Receipt strategy: **eager** - create one row per (message, recipient) at send time for predictable unread math.
+/// Alternative **lazy**: create rows on first delivery/read (document if you switch later).
+model Receipt {
+  id        String  @id @default(uuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  @@unique([messageId, userId])
+  @@index([userId, readAt])
+}
+
+model Reaction {
+  id        String  @id @default(uuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/// `pairKey` = canonical sorted pair key (e.g. `${min(id1,id2)}:${max(id1,id2)}`) - prevents duplicate friend edges.
+model Friend {
+  id          String       @id @default(uuid())
+  pairKey     String       @unique
+  requesterId String
+  requester   User         @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId String
+  addressee   User         @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      FriendStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  respondedAt DateTime?
+
+  @@index([requesterId])
+  @@index([addresseeId])
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("BlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+  ACTIONED
+}
+
+model Report {
+  id         String @id @default(uuid())
+  reporterId String
+  reporter   User   @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  targetUserId String?
+  targetUser   User?   @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  targetMessageId String?
+  targetMessage   Message? @relation(fields: [targetMessageId], references: [id], onDelete: SetNull)
+
+  chatId String?
+  chat   Chat?   @relation(fields: [chatId], references: [id], onDelete: SetNull)
+
+  reason     String
+  details    String?      @db.Text
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  reviewedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+model Poll {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  messageId String?  @unique
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  question    String
+  closesAt    DateTime?
+  createdById String
+  createdBy   User      @relation("PollCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime  @default(now())
+
+  options PollOption[]
+  votes   PollVote[]
+}
+
+model PollOption {
+  id        String @id @default(uuid())
+  pollId    String
+  poll      Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  label     String
+  sortOrder Int    @default(0)
+
+  votes PollVote[]
+
+  @@index([pollId, sortOrder])
+}
+
+model PollVote {
+  id           String     @id @default(uuid())
+  pollId       String
+  poll         Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pollOptionId String
+  pollOption   PollOption @relation(fields: [pollOptionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([pollId, userId])
+}
+
+enum CallKind {
+  AUDIO
+  VIDEO
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  CONNECTED
+  COMPLETED
+  MISSED
+  FAILED
+}
+
+model CallLog {
+  id          String  @id @default(uuid())
+  chatId      String?
+  chat        Chat?   @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  initiatorId String
+  initiator   User    @relation("CallInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  peerId      String?
+  peer        User?   @relation("CallPeer", fields: [peerId], references: [id], onDelete: SetNull)
+
+  kind      CallKind   @default(AUDIO)
+  status    CallStatus @default(INITIATED)
+  startedAt DateTime   @default(now())
+  endedAt   DateTime?
+  metadata  Json?
+
+  @@index([initiatorId, startedAt])
+  @@index([chatId, startedAt])
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+  UNKNOWN
+}
+
+// --- E2EE key directory + recovery (Sprint 8) ---
+
+model UserIdentityKey {
+  id          String @id @default(uuid())
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey   String @db.Text
+  fingerprint String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  revokedAt DateTime?
+}
+
+model DeviceKey {
+  id        String @id @default(uuid())
+  deviceId  String @unique
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey String @db.Text
+  label     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  revokedAt DateTime?
+
+  signedPreKeys  SignedPreKey[]
+  oneTimePreKeys OneTimePreKey[]
+
+  @@index([userId])
+}
+
+model SignedPreKey {
+  id        String @id @default(uuid())
+  deviceId  String
+  device    DeviceKey @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  keyId     String
+  publicKey String @db.Text
+  signature String @db.Text
+
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  @@unique([deviceId, keyId])
+  @@index([deviceId, revokedAt])
+}
+
+model OneTimePreKey {
+  id        String @id @default(uuid())
+  deviceId  String
+  device    DeviceKey @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  keyId     String
+  publicKey String @db.Text
+
+  createdAt  DateTime @default(now())
+  consumedAt DateTime?
+
+  @@unique([deviceId, keyId])
+  @@index([deviceId, consumedAt])
+}
+
+model KeyBackup {
+  id                       String @id @default(uuid())
+  userId                   String @unique
+  user                     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version                  Int    @default(1)
+  wrapAlg                  String
+  wrappedPrivateKeyMaterial String @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StepUpToken {
+  id        String @id @default(uuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  consumedAt DateTime?
+
+  @@index([userId, expiresAt])
+}
+
+model EmailChallenge {
+  id        String @id @default(uuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int    @default(0)
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, purpose, expiresAt])
+}
+
+model DeviceToken {
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String         @unique
+  platform   DevicePlatform @default(UNKNOWN)
+  createdAt  DateTime       @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+model UserSettings {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notifyPush       Boolean @default(true)
+  notifyEmail      Boolean @default(true)
+  showReadReceipts Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PinnedMessage {
+  id         String   @id @default(uuid())
+  chatId     String
+  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  messageId  String
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  pinnedById String
+  pinnedBy   User     @relation("PinnedByUser", fields: [pinnedById], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([chatId, messageId])
+  @@index([chatId])
+}
+
+enum UploadFileKind {
+  IMAGE
+  DOCUMENT
+  AUDIO
+  VIDEO
+  VOICE
+  OTHER
+}
+
+model UploadedFile {
+  id         String          @id @default(uuid())
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId     String?
+  chat       Chat?           @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  messageId  String?
+  message    Message?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  storageKey String          @unique
+  mimeType   String
+  size       Int
+  kind       UploadFileKind?
+  createdAt  DateTime        @default(now())
+
+  @@index([userId])
+  @@index([chatId])
+  @@index([messageId])
+}

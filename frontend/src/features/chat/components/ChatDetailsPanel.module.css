@@ -1,0 +1,139 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--foreground);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  margin: 0 auto 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+.name {
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.status {
+  color: var(--success);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.statusMuted {
+  color: var(--muted-foreground);
+}
+
+.section {
+  margin-top: 0.5rem;
+}
+
+.sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.infoList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.infoLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-bottom: 0.25rem;
+}
+
+.infoValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  word-break: break-all;
+}
+
+.muteRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+}
+
+.muteLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.muteHint {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: 0.15rem;
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: absolute;
+  inset: 0;
+  background: #cbd5e1;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.toggleSlider::before {
+  content: '';
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toggle input:checked + .toggleSlider {
+  background: var(--primary);
+}
+
+.toggle input:checked + .toggleSlider::before {
+  transform: translateX(20px);
+}
+
+.toggle input:disabled + .toggleSlider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

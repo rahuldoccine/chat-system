@@ -1,0 +1,43 @@
+.wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 0.35rem 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: default;
+  font-family: inherit;
+}
+
+.pill:not(:disabled) {
+  cursor: pointer;
+}
+
+.pill:not(:disabled):hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.missed {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}

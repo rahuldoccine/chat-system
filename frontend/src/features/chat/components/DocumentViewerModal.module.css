@@ -1,0 +1,224 @@
+.documentPanel {
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 920px);
+  height: min(88vh, 900px);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.documentChrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+  padding: 0.6rem 0.85rem 0.6rem 1rem;
+  background: #1e293b;
+  color: #f8fafc;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.documentTitle {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.documentActions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.chromeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.chromeBtn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.documentBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.pdfFrame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: none;
+  background: #ffffff;
+}
+
+.docxScroll {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.docxScroll :global(.docx-wrapper) {
+  background: #ffffff;
+  padding: 0;
+}
+
+.docxScroll :global(section.docx) {
+  box-shadow: none;
+  margin-bottom: 1rem;
+  color: #0f172a;
+}
+
+.state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: #64748b;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.spinner {
+  animation: docViewerSpin 0.8s linear infinite;
+  color: #6366f1;
+}
+
+@keyframes docViewerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.downloadLink {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: #6366f1;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.downloadLink:hover:not(:disabled) {
+  color: #4f46e5;
+}
+
+.downloadLink:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.sheetPreview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.sheetTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.sheetTab {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sheetTab:hover {
+  background: #f1f5f9;
+}
+
+.sheetTabActive {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #ffffff;
+}
+
+.sheetNotice {
+  margin: 0;
+  padding: 0.5rem 1rem 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.sheetTableWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.sheetTable {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 100%;
+  background: #ffffff;
+}
+
+.sheetTable td {
+  border: 1px solid #e2e8f0;
+  padding: 0.35rem 0.55rem;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  color: #0f172a;
+}
+
+.sheetTable tr:first-child td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.sheetEmpty {
+  padding: 2rem;
+  text-align: center;
+  color: #94a3b8;
+}

@@ -1,0 +1,146 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1100;
+  padding: 10vh 1rem 1rem;
+}
+
+.modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: min(70vh, 560px);
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+  color: #64748b;
+  display: inline-flex;
+}
+
+.inputWrap {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--primary, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 120px;
+}
+
+.hint,
+.empty,
+.unavailable {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.unavailable {
+  color: #b45309;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+}
+
+.item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: #f8fafc;
+}
+
+.itemMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.sender {
+  font-weight: 600;
+  color: #334155;
+}
+
+.snippet {
+  font-size: 0.875rem;
+  color: #0f172a;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}

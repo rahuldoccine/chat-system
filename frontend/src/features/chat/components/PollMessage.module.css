@@ -1,0 +1,262 @@
+.wrap {
+  min-width: 240px;
+  max-width: 340px;
+  padding: 0.1rem 0 0;
+  color: inherit;
+}
+
+.question {
+  margin: 0 0 0.65rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: inherit;
+}
+
+.closesHint {
+  margin: -0.35rem 0 0.55rem;
+  font-size: 0.68rem;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.optionItem {
+  margin: 0;
+}
+
+.optionRow {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.45rem 0.15rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.optionRow:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.wrapMe .optionRow:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.optionRow:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.radio {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 0.05rem;
+  border-radius: 50%;
+  border: 2px solid #8696a0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-sizing: border-box;
+}
+
+.wrapMe .radio {
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+.radioSelected {
+  border-color: #6366f1;
+  background: #6366f1;
+}
+
+.wrapMe .radioSelected {
+  border-color: #22c55e;
+  background: #22c55e;
+}
+
+.optionContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.optionTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.optionLabel {
+  font-size: 0.88rem;
+  line-height: 1.3;
+  color: inherit;
+  word-break: break-word;
+}
+
+.optionMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.avatarStack {
+  display: inline-flex;
+  align-items: center;
+}
+
+.voterAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #f1f5f9;
+  margin-left: -8px;
+  box-sizing: border-box;
+}
+
+.voterAvatar:first-child {
+  margin-left: 0;
+}
+
+.wrapMe .voterAvatar {
+  border-color: #8a87bb;
+}
+
+.voteCount {
+  min-width: 1.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  text-align: right;
+}
+
+.wrapMe .voteCount {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.progressTrack {
+  display: block;
+  width: 100%;
+  height: 5px;
+  min-height: 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.wrapMe .progressTrack {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.progressFill {
+  display: block;
+  height: 5px;
+  min-height: 5px;
+  max-height: 5px;
+  border-radius: inherit;
+  background: #6366f1;
+  min-width: 0;
+  transition: width 0.25s ease;
+}
+
+.wrapMe .progressFill {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.progressFillSelected {
+  background: #6366f1;
+}
+
+.wrapMe .progressFillSelected {
+  background: #22c55e;
+}
+
+.footerDivider {
+  height: 1px;
+  margin: 0.35rem 0 0;
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.wrapMe .footerDivider {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.viewVotesBtn {
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.55rem 0.25rem 0.15rem;
+  border: none;
+  background: transparent;
+  color: #6366f1;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.viewVotesBtn:hover {
+  color: #4f46e5;
+}
+
+.wrapMe .viewVotesBtn {
+  color: #e0e7ff;
+}
+
+.wrapMe .viewVotesBtn:hover {
+  color: #fff;
+}
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.retry {
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  color: inherit;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.wrapMe .retry {
+  background: rgba(255, 255, 255, 0.18);
+}

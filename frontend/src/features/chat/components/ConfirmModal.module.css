@@ -1,0 +1,122 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  width: 100%;
+  max-width: 380px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+  padding: 1.25rem 1.35rem 1.15rem;
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.description {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.cancelBtn,
+.confirmBtn,
+.dangerBtn {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+}
+
+.cancelBtn {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.confirmBtn {
+  background: var(--primary, #6366f1);
+  color: white;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.dangerBtn {
+  background: #dc2626;
+  color: white;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.cancelBtn:disabled,
+.confirmBtn:disabled,
+.dangerBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.alertHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.alertIcon {
+  flex-shrink: 0;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.alertTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.alertActions {
+  justify-content: flex-end;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,101 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  isolation: isolate;
+}
+
+.panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Shrink-wraps to the image; checkerboard shows PNG/SVG transparency correctly */
+.stage {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  max-width: min(92vw, 1200px);
+  max-height: min(88vh, 900px);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #f1f5f9 25%, transparent 25%),
+    linear-gradient(-45deg, #f1f5f9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f1f5f9 75%),
+    linear-gradient(-45deg, transparent 75%, #f1f5f9 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+
+.toolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  color: #f8fafc;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.85);
+  transform: scale(1.04);
+}
+
+.iconBtn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.iconSpinner {
+  animation: viewerIconSpin 0.8s linear infinite;
+}
+
+@keyframes viewerIconSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.image {
+  display: block;
+  max-width: min(92vw, 1200px);
+  max-height: min(88vh, 900px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  vertical-align: top;
+  user-select: none;
+  pointer-events: none;
+  background: transparent;
+}

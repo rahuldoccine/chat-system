@@ -1,0 +1,197 @@
+.imageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.65rem;
+}
+
+.imageCard {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border, #e2e8f0);
+  background: white;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  padding: 0;
+  cursor: zoom-in;
+  display: block;
+  width: 100%;
+}
+
+.imageCard:focus-visible {
+  outline: 2px solid var(--primary, #6366f1);
+  outline-offset: 2px;
+}
+
+.imageCard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  padding: 0;
+  background: #f8fafc;
+}
+
+.imageCardPending {
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.imageCardError {
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.imageCard:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+}
+
+.fileList {
+  background: white;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.fileRow:last-child {
+  border-bottom: none;
+}
+
+.fileRow:hover {
+  background: #f8fafc;
+}
+
+.fileBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 0.35rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.badgePdf {
+  background: #e11d48;
+}
+
+.badgeWord {
+  background: #2563eb;
+}
+
+.badgeSheet {
+  background: #16a34a;
+}
+
+.badgeDefault {
+  background: #64748b;
+}
+
+.badgeImage {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.badgeVideo {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+}
+
+.badgeAudio {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.fileMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fileName {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSub {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.fileActions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.fileActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.fileActionBtn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.showMoreDocsBtn {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.65rem auto 0;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary, #6366f1);
+  cursor: pointer;
+  text-align: center;
+}
+
+.showMoreDocsBtn:hover {
+  background: #f8fafc;
+}

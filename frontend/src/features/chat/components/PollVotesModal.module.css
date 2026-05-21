@@ -1,0 +1,132 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+  overscroll-behavior: contain;
+}
+
+.modal {
+  width: 100%;
+  max-width: 400px;
+  max-height: 85vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111b21;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #667781;
+  padding: 0.25rem;
+  border-radius: 8px;
+  display: flex;
+}
+
+.closeBtn:hover {
+  background: #f0f2f5;
+}
+
+.question {
+  margin: 0;
+  padding: 0 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111b21;
+  line-height: 1.4;
+}
+
+.summary {
+  margin: 0.35rem 0 0;
+  padding: 0 1.25rem 0.75rem;
+  font-size: 0.78rem;
+  color: #667781;
+  border-bottom: 1px solid #e9edef;
+}
+
+.sections {
+  padding: 0.5rem 0 0.75rem;
+}
+
+.section {
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.optionLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111b21;
+}
+
+.optionCount {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #008069;
+}
+
+.voterList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.voterRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.voterAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.voterName {
+  font-size: 0.82rem;
+  color: #3b4a54;
+}
+
+.noVotes {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #8696a0;
+}
