@@ -17,6 +17,7 @@ vi.mock("./prisma.js", () => ({
 
 vi.mock("./notification-context-redis.js", () => ({
   isActivelyViewingChatRedis: vi.fn().mockResolvedValue(null),
+  notificationContextExistsInRedis: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../modules/users/users.service.js", () => ({

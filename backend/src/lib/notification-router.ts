@@ -2,7 +2,10 @@ import { loadConfig } from "../config/index.js";
 import { getOrCreateSettings } from "../modules/users/users.service.js";
 import { isActivelyViewingChatLocally } from "../sockets/notification-context-memory.js";
 
-import { isActivelyViewingChatRedis } from "./notification-context-redis.js";
+import {
+  isActivelyViewingChatRedis,
+  notificationContextExistsInRedis,
+} from "./notification-context-redis.js";
 import {
   resolvePushNotificationContent,
   type NewMessageNotificationPayload,
@@ -18,6 +21,11 @@ async function isRecipientActivelyViewingChat(userId: string, chatId: string): P
   const fromRedis = await isActivelyViewingChatRedis(userId, chatId, config);
   if (fromRedis !== null) {
     return fromRedis;
+  }
+  const ctxExists = await notificationContextExistsInRedis(userId, config);
+  // Redis is up but context expired → do not use stale in-memory suppression.
+  if (ctxExists === false) {
+    return false;
   }
   return isActivelyViewingChatLocally(userId, chatId);
 }

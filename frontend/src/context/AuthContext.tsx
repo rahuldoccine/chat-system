@@ -7,7 +7,8 @@ import {
   setAccessToken,
 } from '../api/authSession';
 import { unregisterWebPush } from '../services/push';
-import { ensureE2eeReady } from '../features/e2ee/bootstrap';
+import { ensureE2eeReady, E2eeKeysLockedError } from '../features/e2ee/bootstrap';
+import { clearSessionUnlock } from '../features/e2ee/accountSync';
 
 interface User {
   id: string;
@@ -19,7 +20,9 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (user: unknown, token: string) => void;
+  login: (user: unknown, token: string, password?: string) => Promise<void>;
+  e2eeKeysLocked: boolean;
+  markE2eeUnlocked: () => void;
   applyProfile: (profile: {
     id: string;
     email: string;
@@ -61,11 +64,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => getAccessToken());
   const [isLoading, setIsLoading] = useState(true);
+  const [e2eeKeysLocked, setE2eeKeysLocked] = useState(false);
 
   const clearAuth = useCallback(() => {
+    clearSessionUnlock();
     clearAccessToken();
     setToken(null);
     setUser(null);
+    setE2eeKeysLocked(false);
   }, []);
 
   useEffect(() => {
@@ -96,9 +102,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(accessToken);
         setUser(loadedUser);
         if (loadedUser?.id) {
-          void ensureE2eeReady(loadedUser.id).catch(() => {
-            /* keys upload retried on next session */
-          });
+          try {
+            await ensureE2eeReady(loadedUser.id);
+            setE2eeKeysLocked(false);
+          } catch (err) {
+            if (err instanceof E2eeKeysLockedError) {
+              setE2eeKeysLocked(true);
+            } else {
+              console.warn('[e2ee] ensureE2eeReady on session start failed', err);
+            }
+          }
         }
       } catch {
         if (!cancelled) {
@@ -118,15 +131,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [clearAuth]);
 
-  const login = useCallback((userData: unknown, newToken: string) => {
+  const markE2eeUnlocked = useCallback(() => setE2eeKeysLocked(false), []);
+
+  const login = useCallback(async (userData: unknown, newToken: string, password?: string) => {
     setAccessToken(newToken);
     setToken(newToken);
     const mapped = mapApiUser(userData as Parameters<typeof mapApiUser>[0]);
     setUser(mapped);
+    setE2eeKeysLocked(false);
     if (mapped.id) {
-      void ensureE2eeReady(mapped.id).catch(() => {
-        /* retried on next login */
-      });
+      try {
+        await ensureE2eeReady(mapped.id, { password });
+        setE2eeKeysLocked(false);
+      } catch (err) {
+        if (err instanceof E2eeKeysLockedError) {
+          setE2eeKeysLocked(true);
+          throw err;
+        }
+        console.warn('[e2ee] ensureE2eeReady on login failed', err);
+        throw err;
+      }
     }
   }, []);
 
@@ -194,6 +218,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         token,
         login,
+        e2eeKeysLocked,
+        markE2eeUnlocked,
         applyProfile,
         refreshProfile,
         logout,

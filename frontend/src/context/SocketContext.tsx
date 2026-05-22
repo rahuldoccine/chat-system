@@ -13,6 +13,7 @@ import {
   shutdownTabCoordinator,
   subscribeTabSync,
 } from '../features/sync/tabCoordinator';
+import { probeNetworkReachable, setNetworkDown } from '../features/sync/connectivity';
 
 interface SocketContextType {
   socket: typeof socketService;
@@ -53,7 +54,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handleConnect = () => {
       setIsConnected(true);
       setLastConnectedAt(new Date());
+      setNetworkDown(false);
       broadcastSocketState(true);
+      void probeNetworkReachable(true);
       if (needsConversationSyncRef.current) {
         needsConversationSyncRef.current = false;
         void invalidateConversationList(queryClientRef.current);
@@ -62,6 +65,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const handleDisconnect = () => {
       setIsConnected(false);
+      setNetworkDown(true);
       broadcastSocketState(false);
       needsConversationSyncRef.current = true;
     };

@@ -24,6 +24,13 @@ interface ChatContextType {
   setForwardingMessage: (msg: { id: string; text: string; kind?: string; contentMeta?: unknown } | null) => void;
   registerScrollToBottom: (fn: (() => void) | null) => void;
   scrollToBottom: () => void;
+  activeThreadRootId: string | null;
+  openThread: (rootMessageId: string) => void;
+  closeThread: () => void;
+  threadDrafts: Record<string, string>;
+  setThreadDraft: (key: string, text: string) => void;
+  alsoSendToMain: boolean;
+  setAlsoSendToMain: (value: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -43,7 +50,25 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   } | null>(null);
   const [activeSection, setActiveSection] = useState<ChatSection>('messages');
   const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
+  const [activeThreadRootId, setActiveThreadRootId] = useState<string | null>(null);
+  const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
+  const [alsoSendToMain, setAlsoSendToMain] = useState(false);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
+
+  const openThread = useCallback((rootMessageId: string) => {
+    setActiveThreadRootId(rootMessageId);
+    setDetailsOpen(false);
+    setReplyingTo(null);
+  }, []);
+
+  const closeThread = useCallback(() => {
+    setActiveThreadRootId(null);
+    setAlsoSendToMain(false);
+  }, []);
+
+  const setThreadDraft = useCallback((key: string, text: string) => {
+    setThreadDrafts((prev) => ({ ...prev, [key]: text }));
+  }, []);
 
   const requestScrollToMessage = useCallback((messageId: string) => {
     setActiveSection('messages');
@@ -77,6 +102,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setForwardingMessage(null);
         setActiveSection('messages');
         setPendingScrollToMessageId(null);
+        setActiveThreadRootId(null);
+        setAlsoSendToMain(false);
         if (id) setChatFocusKey((k) => k + 1);
       },
       activeSection,
@@ -96,6 +123,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setForwardingMessage,
       registerScrollToBottom,
       scrollToBottom,
+      activeThreadRootId,
+      openThread,
+      closeThread,
+      threadDrafts,
+      setThreadDraft,
+      alsoSendToMain,
+      setAlsoSendToMain,
     }}>
       {children}
     </ChatContext.Provider>

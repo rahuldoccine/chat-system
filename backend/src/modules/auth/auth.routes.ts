@@ -62,6 +62,15 @@ export function createAuthRouter(config: AppConfig, logger: Logger): Router {
     }),
   );
 
+  router.post(
+    "/change-password",
+    requireAuth,
+    loginLimiter,
+    asyncHandler(async (req, res) => {
+      await handlers.changePassword(req, res);
+    }),
+  );
+
   router.get(
     "/me",
     requireAuth,

@@ -54,6 +54,7 @@ import { retryOutboxMessage } from '../../sync/sendMessage';
 import type { Message, ReplyPreview } from '../types';
 import { buildMessageStreamItems, formatUnreadDividerLabel } from '../utils/messageStreamItems';
 import { getMessageFiles, isVoiceMessage, shouldUseGroupedFileLayout } from '../utils/fileMeta';
+import { getMessagePreviewText } from '../utils/messagePreview';
 import { scrollDebug, scrollMetrics } from '../utils/scrollDebug';
 import {
   useMessageBodies,
@@ -62,8 +63,28 @@ import {
   getDecryptedPollMeta,
   messageWithDecryptedMeta,
 } from '../../e2ee/useMessageBodies';
+import TypingIndicator from './TypingIndicator';
+import { useChatTyping } from '../hooks/useChatTyping';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+function formatThreadLastReply(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return `today at ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 const MessageStream: React.FC = () => {
   const {
@@ -76,6 +97,7 @@ const MessageStream: React.FC = () => {
     pendingScrollToMessageId,
     clearPendingScrollToMessage,
     requestScrollToMessage,
+    openThread,
   } = useChat();
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
@@ -123,7 +145,12 @@ const MessageStream: React.FC = () => {
         type: string;
         e2eeMode?: string;
         title?: string;
-        dmPeer?: { id: string; displayName?: string; email?: string };
+        dmPeer?: {
+          id: string;
+          displayName?: string;
+          email?: string;
+          avatarUrl?: string;
+        };
       }>;
     }
   )?.data?.find((c) => c.id === activeId);
@@ -135,12 +162,24 @@ const MessageStream: React.FC = () => {
 
   const isDirectChat = activeChat?.type === 'DIRECT';
   const { startCall, phase: callPhase } = useCall();
+  const { isPeerTyping, peerTypingCount } = useChatTyping(activeId, user?.id);
 
   const getChatName = () => {
     if (!activeChat) return 'this chat';
     if (activeChat.type === 'GROUP') return activeChat.title || 'this group';
     return activeChat.dmPeer?.displayName || activeChat.dmPeer?.email || 'this person';
   };
+
+  const typingLabel = useMemo(() => {
+    if (!isPeerTyping) return '';
+    if (activeChat?.type === 'DIRECT') {
+      return `${getChatName()} is typing`;
+    }
+    if (peerTypingCount === 1) return 'Someone is typing';
+    return `${peerTypingCount} people are typing`;
+  }, [isPeerTyping, activeChat?.type, peerTypingCount, activeChat]);
+
+  const typingPeer = activeChat?.type === 'DIRECT' ? activeChat.dmPeer : undefined;
 
   const chatInitial = getChatName().charAt(0).toUpperCase();
   const isEmpty = !isLoading && !error && (messages?.length ?? 0) === 0;
@@ -1292,6 +1331,14 @@ const MessageStream: React.FC = () => {
     }
   }, [scrollToBottom]);
 
+  const wasPeerTypingRef = useRef(false);
+  useEffect(() => {
+    if (isPeerTyping && !wasPeerTypingRef.current && followBottomRef.current) {
+      scrollToBottom(false);
+    }
+    wasPeerTypingRef.current = isPeerTyping;
+  }, [isPeerTyping, scrollToBottom]);
+
   const handleMenuAction = useCallback(
     (msg: Message, action: MessageMenuAction) => {
       if (!activeId) return;
@@ -1382,6 +1429,17 @@ const MessageStream: React.FC = () => {
         ref={streamRef}
       >
         {isEmpty ? (
+          <>
+          {isPeerTyping && (
+            <TypingIndicator
+              visible
+              label={typingLabel}
+              userId={typingPeer?.id}
+              avatarUrl={typingPeer?.avatarUrl}
+              displayName={typingPeer?.displayName}
+              email={typingPeer?.email}
+            />
+          )}
           <motion.div
             className={styles.emptyState}
             initial={{ opacity: 0, y: 12 }}
@@ -1411,6 +1469,7 @@ const MessageStream: React.FC = () => {
             </div>
             <p className={styles.emptyFooter}>Type a message below to get started</p>
           </motion.div>
+          </>
         ) : (
           <>
             {!hasPendingUnreads && <div className={styles.spacer} />}
@@ -1594,7 +1653,27 @@ const MessageStream: React.FC = () => {
                             isMe && msg.status === 'error' ? styles.bubbleFailed : ''
                           }`}
                         >
-                        {(msg.replyTo || msg.replyToId) && (
+                        {msg.threadRootId && msg.broadcastToChannel && isDirectChat && (
+                          <div className={styles.threadBroadcastHeader}>
+                            <span>replied to a thread: </span>
+                            <button
+                              type="button"
+                              className={styles.threadBroadcastLink}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (msg.threadRootId) openThread(msg.threadRootId);
+                              }}
+                            >
+                              {(() => {
+                                const root = messages?.find((m) => m.id === msg.threadRootId);
+                                return root
+                                  ? getMessagePreviewText(root, decryptedBodies, user?.id)
+                                  : 'View thread';
+                              })()}
+                            </button>
+                          </div>
+                        )}
+                        {(msg.replyTo || msg.replyToId) && !msg.broadcastToChannel && (
                           <button
                             type="button"
                             className={styles.replyQuote}
@@ -1716,6 +1795,20 @@ const MessageStream: React.FC = () => {
                           )}
                         </div>
                         </div>
+                        {(msg.threadReplyCount ?? 0) > 0 && !msg.threadRootId && isDirectChat && (
+                          <button
+                            type="button"
+                            className={styles.threadSummary}
+                            onClick={() => openThread(msg.id)}
+                          >
+                            {msg.threadReplyCount === 1
+                              ? '1 reply'
+                              : `${msg.threadReplyCount} replies`}
+                            {msg.threadLastReplyAt
+                              ? ` · Last reply ${formatThreadLastReply(msg.threadLastReplyAt)}`
+                              : ''}
+                          </button>
+                        )}
                         {hasReactions && (
                           <div className={styles.reactionsOnBubble}>
                             {msg.reactionsSummary!.map((r) => (
@@ -1770,8 +1863,18 @@ const MessageStream: React.FC = () => {
                         <button
                           type="button"
                           className={styles.actionBtn}
-                          aria-label="Reply"
-                          onClick={() => setReplyingTo(msg.id)}
+                          aria-label={isDirectChat ? 'Reply in thread' : 'Reply'}
+                          onClick={() => {
+                            if (isDirectChat) {
+                              const rootId =
+                                msg.threadRootId && msg.broadcastToChannel
+                                  ? msg.threadRootId
+                                  : msg.id;
+                              openThread(rootId);
+                            } else {
+                              setReplyingTo(msg.id);
+                            }
+                          }}
                         >
                           <Reply size={16} />
                         </button>
@@ -1805,6 +1908,14 @@ const MessageStream: React.FC = () => {
                 </motion.div>
               );
             })}
+            <TypingIndicator
+              visible={isPeerTyping}
+              label={typingLabel}
+              userId={typingPeer?.id}
+              avatarUrl={typingPeer?.avatarUrl}
+              displayName={typingPeer?.displayName}
+              email={typingPeer?.email}
+            />
             <div ref={bottomAnchorRef} className={styles.scrollAnchor} aria-hidden />
           </>
         )}

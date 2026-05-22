@@ -1,6 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../api/axios';
+import { useAuth } from '../../../context/AuthContext';
+import { useMessageBodies } from '../../e2ee/useMessageBodies';
+import { useMessages } from './useChatData';
+import {
+  isMessageDecryptPending,
+  searchMessagesLocally,
+} from '../utils/clientMessageSearch';
 
 export type SearchMessageHit = {
   messageId: string;
@@ -47,4 +54,51 @@ export function useChatMessageSearch(chatId: string | null, query: string, enabl
     enabled: canSearch,
     staleTime: 30_000,
   });
+}
+
+/** Client-side search for E2EE chats (decrypt + match loaded history). */
+export function useE2eeChatMessageSearch(chatId: string | null, query: string, enabled: boolean) {
+  const { user } = useAuth();
+  const trimmed = query.trim();
+  const debouncedQ = useDebouncedValue(trimmed, 300);
+  const active = enabled && Boolean(chatId) && debouncedQ.length >= 1;
+
+  const {
+    data: messages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: messagesLoading,
+  } = useMessages(active ? chatId : null);
+
+  const bodies = useMessageBodies(active && messages?.length ? messages : undefined);
+
+  useEffect(() => {
+    if (!active || !hasNextPage || isFetchingNextPage) return;
+    const t = window.setTimeout(() => {
+      void fetchNextPage();
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [active, hasNextPage, isFetchingNextPage, fetchNextPage, messages?.length]);
+
+  const data = useMemo((): SearchMessagesResponse => {
+    if (!active || !messages?.length || !user?.id) {
+      return { data: [], nextCursor: null };
+    }
+    return {
+      data: searchMessagesLocally(messages, bodies, debouncedQ, user.id),
+      nextCursor: null,
+    };
+  }, [active, messages, bodies, debouncedQ, user?.id]);
+
+  const isDecrypting = useMemo(() => {
+    if (!active || !messages?.length || !user?.id) return false;
+    return messages.some((m) => isMessageDecryptPending(m, bodies, user.id));
+  }, [active, messages, bodies, user?.id]);
+
+  return {
+    data,
+    isLoading: active && (messagesLoading || isDecrypting),
+    isFetching: active && isFetchingNextPage,
+  };
 }

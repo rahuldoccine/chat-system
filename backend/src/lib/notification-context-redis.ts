@@ -50,6 +50,17 @@ export async function setNotificationContextRedis(
   );
 }
 
+/** True when a context key exists; false when missing; null when Redis is unavailable. */
+export async function notificationContextExistsInRedis(
+  userId: string,
+  config: AppConfig,
+): Promise<boolean | null> {
+  const c = await getRedisClient(config);
+  if (!c) return null;
+  const n = await c.exists(`${KEY_PREFIX}${userId}`);
+  return n > 0;
+}
+
 /** Returns null when Redis is unavailable or key is missing (caller falls back to in-memory). */
 export async function isActivelyViewingChatRedis(
   userId: string,

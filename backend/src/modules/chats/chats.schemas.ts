@@ -40,7 +40,16 @@ export const createMessageBodySchema = z.object({
   ciphertext: z.string().max(512_000).optional().nullable(),
   contentMeta: z.record(z.unknown()).optional().nullable(),
   replyToId: z.string().uuid().optional().nullable(),
+  threadRootId: z.string().uuid().optional().nullable(),
+  broadcastToChannel: z.boolean().optional().default(false),
 });
+
+export const listThreadMessagesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+  })
+  .transform((o) => ({ ...o, limit: o.limit ?? 50 }));
 
 export const listChatsQuerySchema = z
   .object({

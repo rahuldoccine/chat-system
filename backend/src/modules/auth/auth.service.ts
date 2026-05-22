@@ -176,6 +176,26 @@ export async function logoutSession(
   await prisma.refreshSession.deleteMany({ where: { tokenHash } });
 }
 
+export async function changePassword(
+  config: AppConfig,
+  userId: string,
+  input: { currentPassword: string; newPassword: string },
+): Promise<void> {
+  const prisma = getPrisma();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+  if (!user || !(await bcrypt.compare(input.currentPassword, user.passwordHash))) {
+    throw new AppError(401, "INVALID_PASSWORD", "Current password is incorrect");
+  }
+  const passwordHash = await bcrypt.hash(input.newPassword, config.bcryptRounds);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash },
+  });
+}
+
 export async function logoutAllSessions(userId: string): Promise<void> {
   const prisma = getPrisma();
   await prisma.$transaction([

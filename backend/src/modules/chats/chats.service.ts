@@ -109,6 +109,10 @@ export function publicMessage(
     ciphertext: string | null;
     contentMeta: unknown;
     replyToId: string | null;
+    threadRootId?: string | null;
+    broadcastToChannel?: boolean;
+    threadReplyCount?: number;
+    threadLastReplyAt?: Date | null;
     editedAt: Date | null;
     deletedAt: Date | null;
     createdAt: Date;
@@ -134,6 +138,10 @@ export function publicMessage(
     contentMeta: m.contentMeta,
     replyToId: m.replyToId,
     replyTo: replyTo ?? null,
+    threadRootId: m.threadRootId ?? null,
+    broadcastToChannel: m.broadcastToChannel ?? false,
+    threadReplyCount: m.threadReplyCount ?? 0,
+    threadLastReplyAt: m.threadLastReplyAt ?? null,
     editedAt: m.editedAt,
     deletedAt: m.deletedAt,
     createdAt: m.createdAt,
@@ -147,6 +155,43 @@ export function publicMessage(
       username: m.sender.username,
     } : undefined,
   };
+}
+
+async function requireDmChatForThreads(chatId: string): Promise<void> {
+  const prisma = getPrisma();
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    select: { type: true },
+  });
+  if (!chat) {
+    throw new AppError(404, "NOT_FOUND", "Chat not found");
+  }
+  if (chat.type !== "DIRECT") {
+    throw new AppError(400, "THREADS_DM_ONLY", "Threads are only supported in direct messages for now");
+  }
+}
+
+async function resolveCanonicalThreadRoot(
+  chatId: string,
+  threadRootId: string,
+): Promise<string> {
+  const prisma = getPrisma();
+  const target = await prisma.message.findFirst({
+    where: { id: threadRootId, chatId, deletedAt: null },
+    select: { id: true, threadRootId: true },
+  });
+  if (!target) {
+    throw new AppError(400, "INVALID_THREAD", "Thread root not in this chat");
+  }
+  const canonicalRootId = target.threadRootId ?? target.id;
+  const root = await prisma.message.findFirst({
+    where: { id: canonicalRootId, chatId, deletedAt: null, threadRootId: null },
+    select: { id: true },
+  });
+  if (!root) {
+    throw new AppError(400, "INVALID_THREAD", "Thread root is invalid");
+  }
+  return canonicalRootId;
 }
 
 function replyPreviewFromRow(
@@ -563,6 +608,7 @@ export async function listMessages(
     where: {
       chatId,
       deletedAt: null,
+      OR: [{ threadRootId: null }, { broadcastToChannel: true }],
       ...cursorWhere,
     },
     take: opts.limit + 1,
@@ -714,6 +760,90 @@ export async function searchMessagesInChat(
   };
 }
 
+function encodeThreadCursor(createdAt: Date, id: string): string {
+  return encodeMessageCursor(createdAt, id);
+}
+
+function decodeThreadCursor(cursor: string): { createdAt: Date; id: string } {
+  const { c, i } = decodeMessageCursor(cursor);
+  return { createdAt: new Date(c), id: i };
+}
+
+export async function listThreadMessages(
+  userId: string,
+  chatId: string,
+  rootMessageId: string,
+  opts: { limit: number; cursor?: string },
+): Promise<{ data: ReturnType<typeof publicMessage>[]; nextCursor: string | null; root: ReturnType<typeof publicMessage> }> {
+  await requireActiveMember(userId, chatId);
+  await requireDmChatForThreads(chatId);
+  const prisma = getPrisma();
+
+  const rootRow = await prisma.message.findFirst({
+    where: { id: rootMessageId, chatId, deletedAt: null, threadRootId: null },
+    include: messageWithSenderInclude,
+  });
+  if (!rootRow) {
+    throw new AppError(404, "NOT_FOUND", "Thread root not found");
+  }
+
+  const cursorWhere =
+    opts.cursor !== undefined && opts.cursor.length > 0
+      ? (() => {
+          const { createdAt, id } = decodeThreadCursor(opts.cursor);
+          const t = createdAt;
+          return {
+            OR: [
+              { createdAt: { gt: t } },
+              { AND: [{ createdAt: t }, { id: { gt: id } }] },
+            ],
+          };
+        })()
+      : {};
+
+  const rows = await prisma.message.findMany({
+    where: {
+      chatId,
+      threadRootId: rootMessageId,
+      deletedAt: null,
+      ...cursorWhere,
+    },
+    take: opts.limit + 1,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    include: messageWithSenderInclude,
+  });
+
+  const page = rows.slice(0, opts.limit);
+  const last = page[page.length - 1];
+  const nextCursor =
+    rows.length > opts.limit && last ? encodeThreadCursor(last.createdAt, last.id) : null;
+
+  const pageIds = page.map((r) => r.id);
+  const summaries = await reactionsSummariesForMessages(prisma, pageIds, userId);
+  const receiptStatuses = await receiptStatusForMessages(prisma, pageIds, userId);
+
+  const rootSums = await reactionsSummariesForMessages(prisma, [rootRow.id], userId);
+  const rootReceipt = await receiptStatusForMessages(prisma, [rootRow.id], userId);
+
+  return {
+    root: publicMessage(
+      rootRow,
+      rootSums.get(rootRow.id) ?? [],
+      rootReceipt.get(rootRow.id),
+      replyPreviewFromRow(rootRow),
+    ),
+    data: page.map((row) =>
+      publicMessage(
+        row,
+        summaries.get(row.id) ?? [],
+        receiptStatuses.get(row.id),
+        replyPreviewFromRow(row),
+      ),
+    ),
+    nextCursor,
+  };
+}
+
 export async function createMessage(
   userId: string,
   chatId: string,
@@ -723,8 +853,14 @@ export async function createMessage(
     ciphertext?: string | null;
     contentMeta?: Record<string, unknown> | null;
     replyToId?: string | null;
+    threadRootId?: string | null;
+    broadcastToChannel?: boolean;
   },
-): Promise<{ message: ReturnType<typeof publicMessage>; idempotent: boolean }> {
+): Promise<{
+  message: ReturnType<typeof publicMessage>;
+  idempotent: boolean;
+  threadUpdated?: { rootMessageId: string; replyCount: number; lastReplyAt: Date };
+}> {
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
 
@@ -764,6 +900,17 @@ export async function createMessage(
       ),
       idempotent: true,
     };
+  }
+
+  let canonicalThreadRootId: string | null = null;
+  let broadcastToChannel = false;
+
+  if (input.threadRootId) {
+    await requireDmChatForThreads(chatId);
+    canonicalThreadRootId = await resolveCanonicalThreadRoot(chatId, input.threadRootId);
+    broadcastToChannel = Boolean(input.broadcastToChannel);
+  } else if (input.broadcastToChannel) {
+    throw new AppError(400, "INVALID_THREAD", "broadcastToChannel requires threadRootId");
   }
 
   if (input.replyToId) {
@@ -824,6 +971,8 @@ export async function createMessage(
               ? Prisma.JsonNull
               : (contentMetaForInsert as Prisma.InputJsonValue),
         replyToId: input.replyToId ?? null,
+        threadRootId: canonicalThreadRootId,
+        broadcastToChannel,
       },
       include: messageWithSenderInclude,
     });
@@ -833,23 +982,43 @@ export async function createMessage(
     if (receipts.length) {
       await tx.receipt.createMany({ data: receipts });
     }
+    let threadUpdated: { rootMessageId: string; replyCount: number; lastReplyAt: Date } | undefined;
+    if (canonicalThreadRootId) {
+      const root = await tx.message.update({
+        where: { id: canonicalThreadRootId },
+        data: {
+          threadReplyCount: { increment: 1 },
+          threadLastReplyAt: msg.createdAt,
+        },
+        select: { id: true, threadReplyCount: true, threadLastReplyAt: true },
+      });
+      threadUpdated = {
+        rootMessageId: root.id,
+        replyCount: root.threadReplyCount,
+        lastReplyAt: root.threadLastReplyAt ?? msg.createdAt,
+      };
+    }
     await tx.chat.update({
       where: { id: chatId },
       data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
     });
-    return msg;
+    return { msg, threadUpdated };
   });
 
-  await bindUploadsToMessage(message.id, chatId, contentMetaForInsert ?? null);
+  await bindUploadsToMessage(message.msg.id, chatId, contentMetaForInsert ?? null);
 
-  const published = publicMessage(message, [], "sent", replyPreviewFromRow(message));
+  const published = publicMessage(message.msg, [], "sent", replyPreviewFromRow(message.msg));
   void notifyNewMessage({ senderId: userId, chatId, message: published }).catch(() => {});
 
   if (schedulePreviewEnrichment) {
-    scheduleMessageLinkPreviewEnrichment(message.id, chatId, textBody);
+    scheduleMessageLinkPreviewEnrichment(message.msg.id, chatId, textBody);
   }
 
-  return { message: published, idempotent: false };
+  return {
+    message: published,
+    idempotent: false,
+    threadUpdated: message.threadUpdated,
+  };
 }
 
 function mergeLinkPreviewIntoMeta(

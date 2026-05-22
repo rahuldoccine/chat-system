@@ -1,0 +1,151 @@
+.panel {
+  width: 360px;
+  min-width: 360px;
+  max-width: 40vw;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  border-left: 1px solid var(--border);
+  background: #ffffff;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 8px;
+  display: inline-flex;
+}
+
+.closeBtn:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+/* Scrollable message list (Slack-style) */
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #f8fafc;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.scrollArea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollArea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollArea::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.scrollArea::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.scrollInner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1rem 1.25rem;
+  min-height: min-content;
+}
+
+.repliesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.replyCount {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  margin-bottom: 0.25rem;
+}
+
+.footer {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: #ffffff;
+  overflow: visible;
+  z-index: 5;
+  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--muted-foreground);
+}
+
+.messageRow {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 92%;
+  width: fit-content;
+}
+
+.messageRowMe {
+  flex-direction: row-reverse;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.bubble {
+  padding: 0.65rem 0.9rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px 16px 16px 16px;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  word-break: break-word;
+}
+
+.bubbleMe {
+  background: linear-gradient(135deg, #6366f1 0%, #8a87bb 100%);
+  color: white;
+  border: none;
+  border-radius: 16px 16px 4px 16px;
+}
+
+.rootBlock {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}

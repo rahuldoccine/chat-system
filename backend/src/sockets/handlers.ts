@@ -204,6 +204,8 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
           ciphertext: body.ciphertext,
           contentMeta: body.contentMeta ?? null,
           replyToId: body.replyToId ?? null,
+          threadRootId: body.threadRootId ?? null,
+          broadcastToChannel: body.broadcastToChannel ?? false,
         });
         // Ensure the sender receives `message:new` even if `chat:subscribe` has not completed yet.
         await socket.join(roomChat(body.chatId));
@@ -215,6 +217,15 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
           idempotent: out.idempotent,
         };
         await emitMessageNewToMembers(io, body.chatId, messagePayload);
+        if (!out.idempotent && out.threadUpdated) {
+          await emitToChatMembers(io, body.chatId, "thread:updated", {
+            v: SOCKET_PROTOCOL_VERSION,
+            chatId: body.chatId,
+            rootMessageId: out.threadUpdated.rootMessageId,
+            replyCount: out.threadUpdated.replyCount,
+            lastReplyAt: out.threadUpdated.lastReplyAt.toISOString(),
+          });
+        }
         ack?.({ ok: true, data: { message: out.message, idempotent: out.idempotent } });
       } catch (err) {
         logger.warn({ err, socketId: socket.id, userId }, "message:send failed");

@@ -21,7 +21,33 @@ describe("messagePreviewBody", () => {
     ).toBe("Voice message");
   });
 
-  it("returns generic label for E2EE DMs", () => {
+  it("uses pushPreview for E2EE DMs when provided", () => {
+    expect(
+      messagePreviewBody(
+        {
+          kind: "TEXT",
+          ciphertext: "encrypted-blob",
+          contentMeta: { e2eeVersion: 1, pushPreview: "hello there" },
+        },
+        true,
+      ),
+    ).toBe("hello there");
+  });
+
+  it("returns media label from pushPreview for E2EE", () => {
+    expect(
+      messagePreviewBody(
+        {
+          kind: "IMAGE",
+          ciphertext: "encrypted-blob",
+          contentMeta: { pushPreview: "Photo" },
+        },
+        true,
+      ),
+    ).toBe("Photo");
+  });
+
+  it("falls back for E2EE DMs without pushPreview", () => {
     expect(
       messagePreviewBody(
         { kind: "TEXT", ciphertext: "encrypted-blob", contentMeta: { e2eeVersion: 1 } },

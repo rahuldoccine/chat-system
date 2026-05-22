@@ -10,6 +10,7 @@ import { isChatMuted } from '../features/chat/utils/mute';
 import UserAvatar from '../features/chat/components/UserAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConnectionStatus from '../features/chat/components/ConnectionStatus';
+import E2eeUnlockBanner from '../features/e2ee/E2eeUnlockBanner';
 import NewDmModal from '../features/chat/components/NewDmModal';
 
 interface MainLayoutProps {
@@ -229,6 +230,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       {/* 3. Main Content */}
       <main className={styles.main}>
+        <E2eeUnlockBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={activeId || 'empty'}

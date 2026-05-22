@@ -60,6 +60,10 @@ export type Message = {
   deletedAt?: string | null;
   replyToId?: string | null;
   replyTo?: ReplyPreview | null;
+  threadRootId?: string | null;
+  broadcastToChannel?: boolean;
+  threadReplyCount?: number;
+  threadLastReplyAt?: string | null;
   reactionsSummary?: MessageReaction[];
   /** Server receipt state for outgoing messages in DMs. */
   receiptStatus?: 'sent' | 'delivered' | 'read';

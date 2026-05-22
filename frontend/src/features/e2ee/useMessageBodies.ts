@@ -3,7 +3,9 @@ import type { Message, LinkPreviewMeta } from '../chat/types';
 import { useAuth } from '../../context/AuthContext';
 import { decryptDirectMessage, isE2eeMessage } from './directChat';
 import { decodeEnvelope, decodePayload, type DmV1Payload } from './protocol';
-import { getSignedPreKeyPrivate, loadKeyMaterial } from './keyStore';
+import { getSignedPreKeyPrivate } from './keyStore';
+import { getLocalKeyMaterial } from './keyAccess';
+import { rememberPeerDevice } from './peerDevice';
 import { aesGcmDecrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
 import * as e2eeApi from './e2eeApi';
 import { getSentPlaintext, getSentPayloadMeta } from './sentPlaintextCache';
@@ -55,11 +57,8 @@ async function decryptPayloadFull(
   const envelope = decodeEnvelope(msg.ciphertext ?? '');
   if (!envelope) return null;
 
-  const material = await loadKeyMaterial(userId);
+  const material = await getLocalKeyMaterial(userId);
   if (!material) return null;
-
-  const spkPrivate = await getSignedPreKeyPrivate(material, envelope.spkId);
-  if (!spkPrivate) return null;
 
   const meta = msg.contentMeta as Record<string, unknown> | undefined;
   let fingerprint =
@@ -73,32 +72,45 @@ async function decryptPayloadFull(
     }
   }
 
-  const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
-  const aesKey = await deriveAesGcmKey(shared, `${fingerprint}:${envelope.spkId}`);
-  try {
-    const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
-    return decodePayload(plainBuf);
-  } catch {
-    return null;
+  const spkIdsToTry = [
+    envelope.spkId,
+    ...material.signedPreKeys.map((k) => k.keyId).filter((id) => id !== envelope.spkId),
+  ];
+
+  for (const spkId of spkIdsToTry) {
+    const spkPrivate = await getSignedPreKeyPrivate(material, spkId);
+    if (!spkPrivate) continue;
+    try {
+      const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
+      const aesKey = await deriveAesGcmKey(shared, `${fingerprint}:${envelope.spkId}`);
+      const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
+      const payload = decodePayload(plainBuf);
+      if (payload) return payload;
+    } catch {
+      /* try next local signed pre-key */
+    }
   }
+  return null;
 }
 
 export function useMessageBodies(
   messages: Message[] | undefined,
 ): Record<string, DecryptedBody> {
-  const { user } = useAuth();
+  const { user, e2eeKeysLocked } = useAuth();
   const [bodies, setBodies] = useState<Record<string, DecryptedBody>>({});
 
   const messagesKey = useMemo(
     () =>
       messages?.length
-        ? messages.map((m) => `${m.id}:${m.ciphertext?.length ?? 0}`).join(',')
+        ? messages
+            .map((m) => `${m.id}:${m.ciphertext?.length ?? 0}:${m.editedAt ?? ''}`)
+            .join(',')
         : '',
     [messages],
   );
 
   useEffect(() => {
-    if (!user?.id || !messages?.length) return;
+    if (!user?.id || !messages?.length || e2eeKeysLocked) return;
     let cancelled = false;
 
     const run = async () => {
@@ -131,9 +143,21 @@ export function useMessageBodies(
         if (payload) {
           const preview = payload.meta?.preview as LinkPreviewMeta | undefined;
           next[msg.id] = { text: payload.text, preview, meta: payload.meta };
+          const senderDeviceId = (msg.contentMeta as Record<string, unknown> | undefined)
+            ?.senderDeviceId;
+          if (typeof senderDeviceId === 'string') {
+            rememberPeerDevice(msg.senderId, senderDeviceId);
+          }
           continue;
         }
         const plain = await decryptDirectMessage(user.id, msg, user.id);
+        if (plain && plain !== '[Unable to decrypt]') {
+          const senderDeviceId = (msg.contentMeta as Record<string, unknown> | undefined)
+            ?.senderDeviceId;
+          if (typeof senderDeviceId === 'string') {
+            rememberPeerDevice(msg.senderId, senderDeviceId);
+          }
+        }
         next[msg.id] = { text: plain ?? '[Unable to decrypt]' };
       }
       if (!cancelled) setBodies((prev) => ({ ...prev, ...next }));
@@ -143,7 +167,7 @@ export function useMessageBodies(
     return () => {
       cancelled = true;
     };
-  }, [messagesKey, user?.id]);
+  }, [messagesKey, user?.id, e2eeKeysLocked]);
 
   return bodies;
 }

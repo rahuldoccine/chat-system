@@ -8,6 +8,7 @@ import {
   createPollBodySchema,
   listChatsQuerySchema,
   listMessagesQuerySchema,
+  listThreadMessagesQuerySchema,
   searchMessagesQuerySchema,
   linkPreviewQuerySchema,
   patchChatE2eeBodySchema,
@@ -134,6 +135,17 @@ export async function listMessages(req: Request, res: Response): Promise<void> {
   res.json(out);
 }
 
+export async function listThreadMessages(req: Request, res: Response): Promise<void> {
+  const q = parseQuery(listThreadMessagesQuerySchema, req.query);
+  const out = await chatsService.listThreadMessages(
+    req.user!.sub,
+    req.params.chatId as string,
+    req.params.rootMessageId as string,
+    { limit: q.limit, cursor: q.cursor },
+  );
+  res.json(out);
+}
+
 export async function searchMessages(req: Request, res: Response): Promise<void> {
   const q = parseQuery(searchMessagesQuerySchema, req.query);
   const out = await chatsService.searchMessagesInChat(
@@ -161,6 +173,8 @@ export async function createMessage(req: Request, res: Response): Promise<void> 
     ciphertext: body.ciphertext,
     contentMeta: body.contentMeta ?? null,
     replyToId: body.replyToId ?? null,
+    threadRootId: body.threadRootId ?? null,
+    broadcastToChannel: body.broadcastToChannel ?? false,
   });
   if (!out.idempotent) {
     const io = getSocketIo();
@@ -171,6 +185,15 @@ export async function createMessage(req: Request, res: Response): Promise<void> 
         message: out.message,
         idempotent: false,
       });
+      if (out.threadUpdated) {
+        await emitToChatMembers(io, chatId, "thread:updated", {
+          v: SOCKET_PROTOCOL_VERSION,
+          chatId,
+          rootMessageId: out.threadUpdated.rootMessageId,
+          replyCount: out.threadUpdated.replyCount,
+          lastReplyAt: out.threadUpdated.lastReplyAt.toISOString(),
+        });
+      }
     }
   }
   res.status(out.idempotent ? 200 : 201).json(out);

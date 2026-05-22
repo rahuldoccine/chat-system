@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import MessageStream from '../features/chat/components/MessageStream';
 import MessageComposer from '../features/chat/components/MessageComposer';
+import { useChatTyping } from '../features/chat/hooks/useChatTyping';
 import ChatSubNav from '../features/chat/components/ChatSubNav';
 import ChatFilesPanel from '../features/chat/components/ChatFilesPanel';
 import ChatPinsPanel from '../features/chat/components/ChatPinsPanel';
@@ -15,6 +16,7 @@ import { formatLastSeen } from '../utils/timeFormat';
 import { MessageSquare, Phone, Video, Info, ArrowLeft, Search } from 'lucide-react';
 import ChatSearchDialog from '../features/chat/components/ChatSearchDialog';
 import ChatDetailsPanel from '../features/chat/components/ChatDetailsPanel';
+import ThreadPanel from '../features/chat/components/ThreadPanel';
 import DmHeaderMenu from '../features/chat/components/DmHeaderMenu';
 import MessagingRestrictedNotice from '../features/chat/components/MessagingRestrictedNotice';
 import { useBlockStatus } from '../features/chat/hooks/useBlockStatus';
@@ -25,14 +27,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const HomePage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { refreshProfile } = useAuth();
-  const { activeId, setActiveId, isDetailsOpen, setDetailsOpen, activeSection, requestScrollToMessage } =
-    useChat();
+  const { refreshProfile, user } = useAuth();
+  const {
+    activeId,
+    setActiveId,
+    isDetailsOpen,
+    setDetailsOpen,
+    activeSection,
+    requestScrollToMessage,
+    activeThreadRootId,
+  } = useChat();
   const [searchOpen, setSearchOpen] = React.useState(false);
   const { data: conversations } = useConversations();
-  const { socket, onlineUsers, isConnected } = useSocket();
+  const { onlineUsers, isConnected } = useSocket();
   const { phase, startCall, isStarting } = useCall();
-  const [typingUsers, setTypingUsers] = React.useState<Record<string, boolean>>({});
+  const { peerTypingCount: typingCount } = useChatTyping(activeId, user?.id);
 
   const activeChat = (conversations as { data?: Chat[] })?.data?.find((c) => c.id === activeId);
 
@@ -87,19 +96,6 @@ const HomePage: React.FC = () => {
   const isPeerOnline = activeChat?.type === 'DIRECT' && activeChat.dmPeer && (activeChat.dmPeer.isOnline || onlineUsers.has(activeChat.dmPeer.id));
 
   React.useEffect(() => {
-    const handleTyping = (data: { chatId: string, userId: string, isTyping: boolean }) => {
-      if (data.chatId === activeId) {
-        setTypingUsers(prev => ({ ...prev, [data.userId]: data.isTyping }));
-      }
-    };
-
-    socket.on('typing:update', handleTyping);
-    return () => socket.off('typing:update', handleTyping);
-  }, [activeId, socket]);
-
-  const typingCount = Object.values(typingUsers).filter(Boolean).length;
-
-  React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k') return;
       if (!activeId) return;
@@ -112,7 +108,7 @@ const HomePage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
         {/* Main Content Area */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
           <AnimatePresence mode="wait">
@@ -351,7 +347,7 @@ const HomePage: React.FC = () => {
                     open={searchOpen}
                     onClose={() => setSearchOpen(false)}
                     onSelectMessage={requestScrollToMessage}
-                    searchUnavailable={
+                    e2eeSearch={
                       activeChat?.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1'
                     }
                   />
@@ -388,9 +384,11 @@ const HomePage: React.FC = () => {
           </AnimatePresence>
         </div>
 
+        {activeId && activeThreadRootId && activeChat?.type === 'DIRECT' && <ThreadPanel />}
+
         {/* Right Sidebar: Details Panel (Animated Toggle) */}
         <AnimatePresence>
-          {activeId && isDetailsOpen && (
+          {activeId && isDetailsOpen && !activeThreadRootId && (
             <motion.div
               initial={{ x: 300, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}

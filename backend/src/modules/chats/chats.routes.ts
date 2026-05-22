@@ -28,6 +28,10 @@ export function createChatsRouter(config: AppConfig): Router {
   router.post("/:chatId/delivered/messages", asyncHandler(chatsController.markMessagesDelivered));
   router.get("/:chatId/messages/search", asyncHandler(chatsController.searchMessages));
   router.get("/:chatId/messages", asyncHandler(chatsController.listMessages));
+  router.get(
+    "/:chatId/threads/:rootMessageId/messages",
+    asyncHandler(chatsController.listThreadMessages),
+  );
   router.post("/:chatId/messages", asyncHandler(chatsController.createMessage));
   router.get("/:chatId/pins", asyncHandler(chatsController.listPins));
   router.post("/:chatId/polls", asyncHandler(chatsController.createPoll));

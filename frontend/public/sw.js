@@ -28,12 +28,19 @@ self.addEventListener('push', (event) => {
   const isIncomingCall =
     typeof payload.messageId === 'string' && payload.messageId.startsWith('call-incoming-');
 
+  // One tag per message so later pushes in the same chat still alert (not silent replace).
+  const tag =
+    payload.messageId ||
+    (isIncomingCall ? 'incoming-call' : payload.chatId) ||
+    undefined;
+
   event.waitUntil(
     self.registration.showNotification(payload.title || 'New message', {
       body: payload.body || 'You have a new message',
       icon: '/vite.svg',
       badge: '/vite.svg',
-      tag: isIncomingCall ? payload.messageId : payload.chatId || undefined,
+      tag,
+      renotify: true,
       requireInteraction: isIncomingCall,
       data: {
         url,

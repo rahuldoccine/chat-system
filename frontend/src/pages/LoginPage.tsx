@@ -42,15 +42,15 @@ const LoginPage: React.FC = () => {
       });
 
       const { user, accessToken } = response.data;
-      
-      login(user, accessToken);
+
+      await login(user, accessToken, data.password);
 
       toast.success('Welcome back!');
-      setIsSubmitting(false);
       navigate('/', { replace: true });
     } catch (error: unknown) {
       const message = getApiErrorMessage(error, 'Email or password is incorrect. Please try again.');
       toast.error(message);
+    } finally {
       setIsSubmitting(false);
     }
   };

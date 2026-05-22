@@ -40,7 +40,7 @@ export async function listUserDevices(userId: string) {
   return prisma.deviceKey.findMany({
     where: { userId, revokedAt: null },
     select: { deviceId: true, publicKey: true, label: true, createdAt: true, updatedAt: true },
-    orderBy: { createdAt: "asc" },
+    orderBy: { updatedAt: "desc" },
   });
 }
 
@@ -64,6 +64,12 @@ export async function publishPreKeys(
   await prisma.$transaction(async (tx) => {
     const spkWhere = { deviceId_keyId: { deviceId, keyId: input.signedPreKey.keyId } };
     const existingSigned = await tx.signedPreKey.findUnique({ where: spkWhere });
+
+    // One active signed pre-key per device so fetchPreKeyBundle cannot return a stale key.
+    await tx.signedPreKey.updateMany({
+      where: { deviceId, keyId: { not: input.signedPreKey.keyId }, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
 
     if (!existingSigned) {
       await tx.signedPreKey.create({

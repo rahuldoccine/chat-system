@@ -12,6 +12,8 @@ export type BuildOptimisticInput = {
   chatId: string;
   text?: string;
   replyToId?: string;
+  threadRootId?: string | null;
+  broadcastToChannel?: boolean;
   kind?: Message['kind'];
   contentMeta?: Message['contentMeta'];
 };
@@ -35,6 +37,8 @@ export function buildOptimisticMessage(user: AuthUser, input: BuildOptimisticInp
     kind: input.kind ?? 'TEXT',
     contentMeta: input.contentMeta,
     replyToId: input.replyToId ?? null,
+    threadRootId: input.threadRootId ?? null,
+    broadcastToChannel: input.broadcastToChannel ?? false,
     receiptStatus: 'sent',
     status: 'sending',
   };

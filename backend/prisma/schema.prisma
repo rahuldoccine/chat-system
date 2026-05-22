@@ -182,6 +182,18 @@ model Message {
   replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   Message[] @relation("MessageReplies")
 
+  /// Slack-style thread: all replies share the root message id (null = top-level / root).
+  threadRootId String?
+  threadRoot   Message?  @relation("MessageThread", fields: [threadRootId], references: [id], onDelete: SetNull)
+  threadReplies Message[] @relation("MessageThread")
+
+  /// When true, a thread reply is also shown in the main DM timeline.
+  broadcastToChannel Boolean @default(false)
+
+  /// Denormalized on root messages only (threadRootId is null).
+  threadReplyCount   Int       @default(0)
+  threadLastReplyAt  DateTime?
+
   editedAt  DateTime?
   deletedAt DateTime?
 
@@ -197,6 +209,7 @@ model Message {
   @@unique([chatId, clientMessageId])
   @@index([chatId, createdAt(sort: Desc)])
   @@index([senderId, createdAt])
+  @@index([chatId, threadRootId, createdAt])
 }
 
 /// Per-user delivery/read state for a message.

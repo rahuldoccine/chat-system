@@ -1,6 +1,9 @@
 import type { Chat } from '../chat/types';
+import { buildPushPreview } from '../chat/utils/pushPreview';
 import { isDmE2eeChat } from './chatE2ee';
+import { ensureE2eeReady, E2eeKeysLockedError } from './bootstrap';
 import { encryptDirectMessage, E2eePeerNotReadyError } from './directChat';
+import { getRememberedPeerDevice } from './peerDevice';
 
 export type OutboundPlainMessage = {
   chatId: string;
@@ -10,6 +13,8 @@ export type OutboundPlainMessage = {
   clientMessageId?: string;
   chat?: Pick<Chat, 'type' | 'e2eeMode' | 'dmPeer'> | null;
   peerUserId?: string;
+  /** Peer device from their latest message in this chat. */
+  preferPeerDeviceId?: string | null;
 };
 
 export type PreparedOutbound = {
@@ -54,6 +59,7 @@ function buildAttachmentRefs(
 export async function prepareOutboundMessage(
   userId: string,
   input: OutboundPlainMessage,
+  offlineMode = false,
 ): Promise<PreparedOutbound> {
   const chat = input.chat;
   const peerUserId =
@@ -73,20 +79,42 @@ export async function prepareOutboundMessage(
   const attachmentRefs = buildAttachmentRefs(plainMeta);
 
   try {
+    await Promise.race([
+      ensureE2eeReady(userId, { offline: offlineMode }),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Encryption setup timed out. Try again.')),
+          offlineMode ? 3_000 : 30_000,
+        );
+      }),
+    ]);
+    const preferPeerDeviceId =
+      input.preferPeerDeviceId ?? getRememberedPeerDevice(peerUserId);
     const encrypted = await encryptDirectMessage(userId, {
       peerUserId,
       plaintext: input.text ?? '',
       contentMeta: plainMeta,
       clientMessageId: input.clientMessageId,
+      preferPeerDeviceId,
+      offline: offlineMode,
+    });
+    const pushPreview = buildPushPreview({
+      text: input.text,
+      kind: input.kind,
+      contentMeta: plainMeta,
     });
     return {
       ciphertext: encrypted.ciphertext,
-      contentMeta: attachmentRefs
-        ? { ...encrypted.contentMeta, attachmentRefs }
-        : encrypted.contentMeta,
+      contentMeta: {
+        ...encrypted.contentMeta,
+        ...(attachmentRefs ? { attachmentRefs } : {}),
+        pushPreview,
+      },
     };
   } catch (err) {
-    if (err instanceof E2eePeerNotReadyError) throw err;
+    if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
+      throw err;
+    }
     throw err;
   }
 }
@@ -98,12 +126,14 @@ export type OutboundPollInput = {
   closesAt?: string | null;
   options: string[];
   clientMessageId?: string;
+  preferPeerDeviceId?: string | null;
 };
 
 /** Encrypt poll question/options for E2EE DMs; server stores vote tallies only. */
 export async function prepareOutboundPoll(
   userId: string,
   input: OutboundPollInput,
+  offlineMode = false,
 ): Promise<PreparedOutbound> {
   const peerUserId =
     input.peerUserId ?? (input.chat?.type === 'DIRECT' ? input.chat.dmPeer?.id : undefined);
@@ -111,9 +141,22 @@ export async function prepareOutboundPoll(
     throw new Error('E2EE poll requires a direct chat peer');
   }
 
+  await Promise.race([
+    ensureE2eeReady(userId, { offline: offlineMode }),
+    new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error('Encryption setup timed out. Try again.')),
+        offlineMode ? 3_000 : 30_000,
+      );
+    }),
+  ]);
+  const preferPeerDeviceId =
+    input.preferPeerDeviceId ?? getRememberedPeerDevice(peerUserId);
   const encrypted = await encryptDirectMessage(userId, {
     peerUserId,
     plaintext: '',
+    preferPeerDeviceId,
+    offline: offlineMode,
     contentMeta: {
       poll: {
         question: input.question.trim(),
@@ -124,8 +167,20 @@ export async function prepareOutboundPoll(
     clientMessageId: input.clientMessageId,
   });
 
+  const pushPreview = buildPushPreview({
+    text: '',
+    kind: 'POLL',
+    contentMeta: {
+      poll: {
+        question: input.question.trim(),
+        closesAt: input.closesAt ?? null,
+        options: input.options.map((label) => ({ label: label.trim() })),
+      },
+    },
+  });
+
   return {
     ciphertext: encrypted.ciphertext,
-    contentMeta: encrypted.contentMeta,
+    contentMeta: { ...encrypted.contentMeta, pushPreview },
   };
 }

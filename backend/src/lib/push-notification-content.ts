@@ -32,16 +32,49 @@ function contentMetaRecord(meta: unknown): Record<string, unknown> | null {
   return meta as Record<string, unknown>;
 }
 
-/** Preview line shown in push body (plaintext chats only). */
+function e2eePushPreviewFromMeta(meta: Record<string, unknown> | null): string | null {
+  const line = meta?.pushPreview;
+  if (typeof line === "string" && line.trim()) {
+    return line.trim();
+  }
+  return null;
+}
+
+function e2eePushPreviewFromAttachmentRefs(meta: Record<string, unknown> | null): string | null {
+  const refs = meta?.attachmentRefs;
+  if (!refs || typeof refs !== "object" || Array.isArray(refs)) return null;
+  const files = (refs as { files?: unknown }).files;
+  if (!Array.isArray(files) || files.length === 0) return null;
+  if (files.length === 1) {
+    const f = files[0];
+    if (f && typeof f === "object") {
+      const name = (f as { filename?: string }).filename?.trim();
+      if (name) return name;
+    }
+    return "File";
+  }
+  return `Sent ${files.length} files`;
+}
+
+/** Preview line shown in push notification body. */
 export function messagePreviewBody(
   message: Pick<NewMessageNotificationPayload, "kind" | "ciphertext" | "contentMeta">,
   isE2eeDm: boolean,
 ): string {
+  const meta = contentMetaRecord(message.contentMeta);
+  const kind = message.kind as MessageKind;
+
   if (isE2eeDm) {
+    const fromClient = e2eePushPreviewFromMeta(meta);
+    if (fromClient) return fromClient;
+    const fromRefs = e2eePushPreviewFromAttachmentRefs(meta);
+    if (fromRefs) return fromRefs;
+    if (kind === "IMAGE") return "Photo";
+    if (kind === "FILE") return "File";
+    if (kind === "POLL") return "Poll";
     return "New message";
   }
 
-  const meta = contentMetaRecord(message.contentMeta);
   if (meta?.voiceNote === true) {
     return "Voice message";
   }
@@ -51,7 +84,6 @@ export function messagePreviewBody(
     return text;
   }
 
-  const kind = message.kind as MessageKind;
   if (kind === "IMAGE") return "Photo";
   if (kind === "FILE") return "File";
   if (kind === "POLL") return "Poll";

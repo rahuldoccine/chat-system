@@ -17,6 +17,7 @@ import {
 import ProfileAvatarUpload from '../features/settings/components/ProfileAvatarUpload';
 import AdminReportsPanel from '../features/settings/components/AdminReportsPanel';
 import E2eeRecoveryPanel from '../features/settings/components/E2eeRecoveryPanel';
+import ChangePasswordForm from '../features/settings/components/ChangePasswordForm';
 import { useProfileSync } from '../features/settings/hooks/useProfileSync';
 import {
   BROWSER_NOTIFICATION_BLOCKED_HINT,
@@ -354,6 +355,14 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </form>
               )}
+            </section>
+
+            <section className={styles.card}>
+              <h3 className={styles.cardTitle}>Password</h3>
+              <p className={styles.mainDescription} style={{ marginTop: 0 }}>
+                Changing your password also updates your encrypted key backup on the server.
+              </p>
+              <ChangePasswordForm />
             </section>
 
             <section className={styles.card}>

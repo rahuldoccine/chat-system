@@ -29,7 +29,13 @@ export const resetPasswordBodySchema = z.object({
   newPassword: passwordSchema,
 });
 
+export const changePasswordBodySchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: passwordSchema,
+});
+
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type LoginBody = z.infer<typeof loginBodySchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
 export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;
+export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>;

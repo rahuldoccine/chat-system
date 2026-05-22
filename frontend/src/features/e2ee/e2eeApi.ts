@@ -11,6 +11,8 @@ export type DeviceRow = {
   deviceId: string;
   publicKey: string;
   label: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type ApiOk<T> = { ok?: boolean; data: T };
@@ -76,6 +78,22 @@ export async function putKeyBackup(
     wrapAlg,
     wrappedPrivateKeyMaterial,
   });
+}
+
+export async function getAccountKeyBackupStatus(): Promise<{ hasBackup: boolean }> {
+  const res = await api.get<ApiOk<{ hasBackup: boolean }>>('/e2ee/backup/status');
+  return unwrap(res.data);
+}
+
+/** Session-authenticated fetch of own wrapped keys (login restore). */
+export async function getAccountKeyBackup(): Promise<{
+  wrapAlg: string;
+  wrappedPrivateKeyMaterial: string;
+}> {
+  const res = await api.get<ApiOk<{ wrapAlg: string; wrappedPrivateKeyMaterial: string }>>(
+    '/e2ee/backup/account',
+  );
+  return unwrap(res.data);
 }
 
 export async function postRecoveryEmailChallenge(): Promise<void> {

@@ -17,33 +17,36 @@
   background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
 }
 
-/* In-chat: tight fit around image, no checkerboard letterboxing */
-.imageContainerEmbedded {
-  display: block;
-  width: fit-content;
-  max-width: min(100%, 420px);
+/* In-chat: shrink-wrap to image; white backdrop so PNG transparency does not show bubble color */
+.imageContainer.imageContainerEmbedded {
+  display: inline-block;
+  width: auto;
+  max-width: min(420px, 100%);
+  min-width: 0;
   margin-bottom: 0;
   border: none;
   border-radius: 10px;
-  background: transparent;
+  background: #ffffff;
   background-image: none;
   box-shadow: none;
   line-height: 0;
+  vertical-align: top;
 }
 
-.imageEmbedded {
+.imageContainer.imageContainerEmbedded .imageEmbedded {
   display: block;
   width: auto;
   height: auto;
-  max-width: min(100%, 420px);
+  max-width: min(420px, 100%);
   max-height: min(420px, 58vh);
   object-fit: contain;
   object-position: center;
-  background: transparent;
+  background: #ffffff;
   border-radius: 10px;
+  vertical-align: top;
 }
 
-.imageGif.imageEmbedded {
+.imageContainer.imageContainerEmbedded .imageGif.imageEmbedded {
   max-height: min(400px, 56vh);
 }
 

@@ -13,6 +13,7 @@ import {
   refreshBodySchema,
   registerBodySchema,
   resetPasswordBodySchema,
+  changePasswordBodySchema,
 } from "./auth.schemas.js";
 import * as authService from "./auth.service.js";
 
@@ -97,6 +98,12 @@ export function createAuthHandlers(config: AppConfig, logger: Logger) {
     resetPassword: async (req: Request, res: Response): Promise<void> => {
       const body = parseBody(resetPasswordBodySchema, req.body);
       await authService.resetPasswordWithToken(config, body);
+      res.status(204).send();
+    },
+
+    changePassword: async (req: Request, res: Response): Promise<void> => {
+      const body = parseBody(changePasswordBodySchema, req.body);
+      await authService.changePassword(config, req.user!.sub, body);
       res.status(204).send();
     },
   };

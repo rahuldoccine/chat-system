@@ -35,6 +35,24 @@ export function createE2eeRecoveryHandlers(config: AppConfig, logger: Logger) {
       const row = await recoveryService.getKeyBackup(req.user!.sub);
       res.status(200).json({ ok: true, data: row });
     },
+
+    /** Whether a wrapped key backup exists (no key material returned). */
+    getBackupStatus: async (req: Request, res: Response) => {
+      const hasBackup = await recoveryService.hasKeyBackup(req.user!.sub);
+      res.status(200).json({ ok: true, data: { hasBackup } });
+    },
+
+    /** Restore keys on a new browser after sign-in (session auth; ciphertext still opaque to server). */
+    getBackupAccount: async (req: Request, res: Response) => {
+      const row = await recoveryService.getKeyBackup(req.user!.sub);
+      res.status(200).json({
+        ok: true,
+        data: {
+          wrapAlg: row.wrapAlg,
+          wrappedPrivateKeyMaterial: row.wrappedPrivateKeyMaterial,
+        },
+      });
+    },
   };
 }
 

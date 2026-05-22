@@ -10,6 +10,8 @@ export type OutboxPayload = {
   ciphertext: string;
   kind: 'TEXT' | 'IMAGE' | 'FILE' | 'OTHER';
   replyToId?: string | null;
+  threadRootId?: string | null;
+  broadcastToChannel?: boolean;
   contentMeta?: unknown;
 };
 

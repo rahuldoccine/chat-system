@@ -33,6 +33,7 @@ import { isDmE2eeChat } from '../../e2ee/chatE2ee';
 import { encryptFileBlob } from '../../e2ee/attachmentCrypto';
 import type { E2eeFileAttachmentKeys } from '../../e2ee/attachmentCrypto';
 import { E2eePeerNotReadyError } from '../../e2ee/directChat';
+import { E2eeKeysLockedError } from '../../e2ee/bootstrap';
 import { useMessageBodies } from '../../e2ee/useMessageBodies';
 import { getMessagePreviewText } from '../utils/messagePreview';
 import { getApiErrorMessage } from '../../settings/hooks/useUserSettings';
@@ -89,7 +90,16 @@ function formatRecordingTime(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const MessageComposer: React.FC = () => {
+type MessageComposerProps = {
+  variant?: 'main' | 'thread';
+  threadRootId?: string;
+};
+
+const MessageComposer: React.FC<MessageComposerProps> = ({
+  variant = 'main',
+  threadRootId,
+}) => {
+  const isThread = variant === 'thread';
   const {
     activeId,
     drafts,
@@ -99,7 +109,17 @@ const MessageComposer: React.FC = () => {
     editingMessage,
     setEditingMessage,
     scrollToBottom,
+    threadDrafts,
+    setThreadDraft,
+    alsoSendToMain,
+    setAlsoSendToMain,
   } = useChat();
+  const threadDraftKey =
+    isThread && activeId && threadRootId ? `${activeId}:${threadRootId}` : null;
+  const threadSendMeta =
+    isThread && threadRootId
+      ? { threadRootId, broadcastToChannel: alsoSendToMain }
+      : {};
   const { socket } = useSocket();
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -207,9 +227,13 @@ const MessageComposer: React.FC = () => {
 
   useEffect(() => {
     if (!editingMessage) {
-      setText(activeId ? drafts[activeId] || '' : '');
+      if (isThread && threadDraftKey) {
+        setText(threadDrafts[threadDraftKey] || '');
+      } else {
+        setText(activeId ? drafts[activeId] || '' : '');
+      }
     }
-  }, [activeId, drafts, editingMessage]);
+  }, [activeId, drafts, threadDrafts, threadDraftKey, editingMessage, isThread]);
 
   useEffect(() => {
     if (voice.error && voice.state === 'error') {
@@ -240,7 +264,14 @@ const MessageComposer: React.FC = () => {
   );
 
   const handleSend = async (opts?: { viaEnter?: boolean }) => {
-    if (!activeId || isSending || isSavingEdit || uploadStatus === 'uploading' || voice.isRecording) {
+    if (
+      !activeId ||
+      (isThread && !threadRootId) ||
+      isSending ||
+      isSavingEdit ||
+      uploadStatus === 'uploading' ||
+      voice.isRecording
+    ) {
       return;
     }
 
@@ -320,10 +351,11 @@ const MessageComposer: React.FC = () => {
         await sendMessageAsync({
           chatId: activeId,
           text: trimmedText,
-          replyToId: replyingTo || undefined,
+          replyToId: isThread ? undefined : replyingTo || undefined,
           kind: allImages ? 'IMAGE' : 'FILE',
           contentMeta: { files: uploadedEntries },
           ...sendCtx,
+          ...threadSendMeta,
         });
 
         scrollToBottom();
@@ -344,16 +376,19 @@ const MessageComposer: React.FC = () => {
         await sendMessageAsync({
           chatId: activeId,
           text: trimmedText,
-          replyToId: replyingTo || undefined,
+          replyToId: isThread ? undefined : replyingTo || undefined,
           kind: 'TEXT',
           contentMeta,
           ...sendCtx,
+          ...threadSendMeta,
         });
         scrollToBottom();
       }
     } catch (err) {
-      if (err instanceof E2eePeerNotReadyError) {
+      if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
         toast.error(err.message);
+      } else if (err instanceof Error && /E2EE keys not initialized/i.test(err.message)) {
+        toast.error('Encryption is not ready. Sign out and sign in again with your password.');
       } else {
         throw err;
       }
@@ -366,8 +401,12 @@ const MessageComposer: React.FC = () => {
 
     setText('');
     setAttachments([]);
-    setDraft(activeId, '');
-    setReplyingTo(null);
+    if (isThread && threadDraftKey) {
+      setThreadDraft(threadDraftKey, '');
+    } else if (activeId) {
+      setDraft(activeId, '');
+    }
+    if (!isThread) setReplyingTo(null);
     setPreviewDismissed(false);
     setLinkDisplayAs('inline');
     resetUpload();
@@ -379,7 +418,11 @@ const MessageComposer: React.FC = () => {
     const val = e.target.value;
     setText(val);
     if (activeId && !editingMessage) {
-      setDraft(activeId, val);
+      if (isThread && threadDraftKey) {
+        setThreadDraft(threadDraftKey, val);
+      } else {
+        setDraft(activeId, val);
+      }
       socket.sendTyping(activeId, true);
       debouncedStopTyping(activeId);
     }
@@ -540,7 +583,7 @@ const MessageComposer: React.FC = () => {
       setReplyingTo(null);
       scrollToBottom();
     } catch (err: unknown) {
-      if (err instanceof E2eePeerNotReadyError) {
+      if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
         toast.error(err.message);
         return;
       }
@@ -565,9 +608,10 @@ const MessageComposer: React.FC = () => {
       await sendMessageAsync({
         chatId: activeId,
         text: '',
-        replyToId: replyingTo || undefined,
+        replyToId: isThread ? undefined : replyingTo || undefined,
         kind: 'IMAGE',
         ...sendCtx,
+        ...threadSendMeta,
         contentMeta: {
           files: [
             {
@@ -631,9 +675,10 @@ const MessageComposer: React.FC = () => {
         await sendMessageAsync({
           chatId: activeId,
           text: '',
-          replyToId: replyingTo || undefined,
+          replyToId: isThread ? undefined : replyingTo || undefined,
           kind: 'FILE',
           ...sendCtx,
+          ...threadSendMeta,
           contentMeta: {
             voiceNote: true,
             durationMs: result.durationMs,
@@ -709,7 +754,7 @@ const MessageComposer: React.FC = () => {
   const voiceBusy = isUploading || voice.isRecording;
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isThread ? styles.containerThread : ''}`}>
       <CreatePollModal
         open={showPollModal}
         onClose={() => setShowPollModal(false)}
@@ -735,7 +780,7 @@ const MessageComposer: React.FC = () => {
           </button>
         </div>
       )}
-      {replyTarget && !editingMessage && (
+      {replyTarget && !editingMessage && !isThread && (
         <div className={styles.replyBar}>
           <div className={styles.replyInfo}>
             <Reply size={14} className={styles.replyIcon} />
@@ -896,10 +941,12 @@ const MessageComposer: React.FC = () => {
                 <Film size={18} />
                 <span>GIF</span>
               </button>
-              <button type="button" role="menuitem" className={styles.plusMenuItem} onClick={openPollModal}>
-                <BarChart2 size={18} />
-                <span>Poll</span>
-              </button>
+              {!isThread && (
+                <button type="button" role="menuitem" className={styles.plusMenuItem} onClick={openPollModal}>
+                  <BarChart2 size={18} />
+                  <span>Poll</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -926,7 +973,9 @@ const MessageComposer: React.FC = () => {
                 ? voice.isRecording
                   ? 'Recording…'
                   : 'Uploading…'
-                : 'Type a message...'
+                : isThread
+                  ? 'Reply...'
+                  : 'Type a message...'
           }
           className={styles.input}
           disabled={voiceBusy}
@@ -993,6 +1042,17 @@ const MessageComposer: React.FC = () => {
           )}
         </button>
       </div>
+
+      {isThread && (
+        <label className={styles.alsoSendRow}>
+          <input
+            type="checkbox"
+            checked={alsoSendToMain}
+            onChange={(e) => setAlsoSendToMain(e.target.checked)}
+          />
+          <span>Also send to direct message</span>
+        </label>
+      )}
     </div>
   );
 };

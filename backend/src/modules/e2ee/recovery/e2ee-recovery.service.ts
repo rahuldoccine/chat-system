@@ -130,3 +130,9 @@ export async function getKeyBackup(userId: string) {
   return row;
 }
 
+export async function hasKeyBackup(userId: string): Promise<boolean> {
+  const prisma = getPrisma();
+  const count = await prisma.keyBackup.count({ where: { userId } });
+  return count > 0;
+}
+

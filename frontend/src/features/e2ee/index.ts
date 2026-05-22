@@ -1,4 +1,4 @@
-export { ensureE2eeReady } from './bootstrap';
+export { ensureE2eeReady, E2eeKeysLockedError } from './bootstrap';
 export { isDmE2eeChat, buildE2eeContentMeta } from './chatE2ee';
 export {
   encryptDirectMessage,

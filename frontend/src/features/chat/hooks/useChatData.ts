@@ -8,13 +8,18 @@ import { patchMessageInCache, removeMessageFromCache } from '../utils/messageCac
 import {
   flattenMessagePages,
   mergeMessageIntoInfiniteCache,
+  mergeMessageIntoThreadCache,
+  threadMessagesQueryKey,
   type MessagePage,
+  type ThreadMessagesCache,
 } from '../utils/messageQueryCache';
-import { sendMessageUnified } from '../../sync/sendMessage';
+import { flushOutbox, sendMessageUnified } from '../../sync/sendMessage';
+import { canAttemptDelivery as canAttemptDeliveryAsync } from '../../sync/connectivity';
 import { buildOptimisticMessage } from '../../sync/optimisticMessage';
-import { linkSentMessageId } from '../../e2ee/sentPlaintextCache';
+import { linkSentMessageId, rememberSentPlaintext, rememberSentPayloadMeta } from '../../e2ee/sentPlaintextCache';
 import { isDmE2eeChat } from '../../e2ee/chatE2ee';
 import { prepareOutboundMessage, prepareOutboundPoll } from '../../e2ee/prepareOutbound';
+import { latestPeerSenderDeviceId } from '../../e2ee/peerDevice';
 
 export const useConversations = () => {
   const { isAuthenticated } = useAuth();
@@ -90,7 +95,37 @@ export const useMessages = (chatId: string | null) => {
   return { ...query, data: messages };
 };
 
-export { mergeMessageIntoInfiniteCache, flattenMessagePages, type MessagePage };
+export const useThreadMessages = (chatId: string | null, rootMessageId: string | null) => {
+  return useQuery({
+    queryKey: threadMessagesQueryKey(chatId ?? '', rootMessageId ?? ''),
+    queryFn: async () => {
+      if (!chatId || !rootMessageId) {
+        return { root: null, replies: [] } as { root: Message | null; replies: Message[] };
+      }
+      const replies: Message[] = [];
+      let cursor: string | undefined;
+      let root: Message | null = null;
+      do {
+        const response = await api.get(`/chats/${chatId}/threads/${rootMessageId}/messages`, {
+          params: { limit: 50, cursor },
+        });
+        const page = response.data as {
+          root: Message;
+          data: Message[];
+          nextCursor: string | null;
+        };
+        root = page.root;
+        replies.push(...page.data);
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      return { root, replies };
+    },
+    enabled: Boolean(chatId && rootMessageId),
+    staleTime: 0,
+  });
+};
+
+export { mergeMessageIntoInfiniteCache, flattenMessagePages, type MessagePage, type ThreadMessagesCache };
 
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
@@ -101,6 +136,8 @@ export const useSendMessage = () => {
       chatId,
       text,
       replyToId,
+      threadRootId,
+      broadcastToChannel,
       kind = 'TEXT',
       contentMeta,
       chat,
@@ -110,6 +147,8 @@ export const useSendMessage = () => {
       chatId: string;
       text?: string;
       replyToId?: string;
+      threadRootId?: string | null;
+      broadcastToChannel?: boolean;
       kind?: 'TEXT' | 'IMAGE' | 'FILE' | 'OTHER';
       contentMeta?: unknown;
       chat?: Chat | null;
@@ -118,29 +157,65 @@ export const useSendMessage = () => {
     }) => {
       const clientMessageId = crypto.randomUUID();
 
+      let preferPeerDeviceId: string | null = null;
+      if (peerUserId) {
+        const cached = queryClient.getQueryData<{ pages: MessagePage[] }>(['messages', chatId]);
+        preferPeerDeviceId = latestPeerSenderDeviceId(
+          flattenMessagePages(cached?.pages),
+          peerUserId,
+        );
+      }
+
       if (user) {
         const optimistic = buildOptimisticMessage(
           { id: user.id, email: user.email, name: user.name, avatar: user.avatar },
-          { clientMessageId, chatId, text, replyToId, kind, contentMeta: contentMeta as Message['contentMeta'] },
+          {
+            clientMessageId,
+            chatId,
+            text,
+            replyToId,
+            threadRootId,
+            broadcastToChannel,
+            kind,
+            contentMeta: contentMeta as Message['contentMeta'],
+          },
         );
-        queryClient.setQueryData(['messages', chatId], (old) =>
-          mergeMessageIntoInfiniteCache(
-            old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-            optimistic,
-          ) ?? old,
-        );
+        if (threadRootId) {
+          queryClient.setQueryData<ThreadMessagesCache>(
+            threadMessagesQueryKey(chatId, threadRootId),
+            (old) => (old ? mergeMessageIntoThreadCache(old, optimistic) : old),
+          );
+          if (broadcastToChannel) {
+            queryClient.setQueryData(['messages', chatId], (old) =>
+              mergeMessageIntoInfiniteCache(
+                old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
+                optimistic,
+              ) ?? old,
+            );
+          }
+        } else {
+          queryClient.setQueryData(['messages', chatId], (old) =>
+            mergeMessageIntoInfiniteCache(
+              old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
+              optimistic,
+            ) ?? old,
+          );
+        }
       }
 
       const result = await sendMessageUnified({
         chatId,
         text,
         replyToId,
+        threadRootId,
+        broadcastToChannel,
         kind,
         contentMeta,
         clientMessageId,
         userId: user?.id,
         chat: chat ?? undefined,
         peerUserId,
+        preferPeerDeviceId,
         preEncrypted,
       });
 
@@ -150,23 +225,66 @@ export const useSendMessage = () => {
 
       return { ...result, chatId, clientMessageId };
     },
-    onSuccess: (data) => {
-      if (data.queued) return;
+    onSuccess: (data, variables) => {
+      const finalized = {
+        ...data.message,
+        clientMessageId: data.clientMessageId,
+        receiptStatus: 'sent' as const,
+        status: data.queued ? ('sending' as const) : undefined,
+      };
+      const threadRootId = variables.threadRootId ?? data.message.threadRootId;
+
+      if (data.queued) {
+        if (threadRootId) {
+          queryClient.setQueryData<ThreadMessagesCache>(
+            threadMessagesQueryKey(data.chatId, threadRootId),
+            (old) => (old ? mergeMessageIntoThreadCache(old, finalized) : old),
+          );
+          if (variables.broadcastToChannel) {
+            queryClient.setQueryData(['messages', data.chatId], (old) =>
+              mergeMessageIntoInfiniteCache(
+                old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
+                finalized,
+              ) ?? old,
+            );
+          }
+        } else {
+          queryClient.setQueryData(['messages', data.chatId], (old) =>
+            mergeMessageIntoInfiniteCache(
+              old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
+              finalized,
+            ) ?? old,
+          );
+        }
+        void canAttemptDeliveryAsync().then((ok) => {
+          if (ok) void flushOutbox();
+        });
+        return;
+      }
       if (user?.id) {
         linkSentMessageId(user.id, data.clientMessageId, data.message.id);
       }
-      queryClient.setQueryData(['messages', data.message.chatId], (old) => {
-        const withReply = mergeMessageIntoInfiniteCache(
-          old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-          {
-            ...data.message,
-            clientMessageId: data.clientMessageId,
-            receiptStatus: 'sent' as const,
-            status: undefined,
-          },
+      if (threadRootId) {
+        queryClient.setQueryData<ThreadMessagesCache>(
+          threadMessagesQueryKey(data.message.chatId, threadRootId),
+          (old) => (old ? mergeMessageIntoThreadCache(old, finalized) : old),
         );
-        return withReply ?? old;
-      });
+        if (data.message.broadcastToChannel) {
+          queryClient.setQueryData(['messages', data.message.chatId], (old) =>
+            mergeMessageIntoInfiniteCache(
+              old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
+              finalized,
+            ) ?? old,
+          );
+        }
+      } else {
+        queryClient.setQueryData(['messages', data.message.chatId], (old) =>
+          mergeMessageIntoInfiniteCache(
+            old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
+            finalized,
+          ) ?? old,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (_err, variables) => {
@@ -206,9 +324,17 @@ export const useCreatePoll = () => {
     }) => {
       if (isDmE2eeChat(input.chat ?? null) && input.userId) {
         const clientMessageId = input.clientMessageId ?? crypto.randomUUID();
+        const cached = queryClient.getQueryData<{ pages: MessagePage[] }>([
+          'messages',
+          input.chatId,
+        ]);
+        const preferPeerDeviceId = input.peerUserId
+          ? latestPeerSenderDeviceId(flattenMessagePages(cached?.pages), input.peerUserId)
+          : null;
         const prepared = await prepareOutboundPoll(input.userId, {
           chat: input.chat,
           peerUserId: input.peerUserId,
+          preferPeerDeviceId,
           question: input.question,
           closesAt: input.closesAt ?? null,
           options: input.options,
@@ -289,7 +415,7 @@ export const useEditMessage = () => {
       });
       return response.data as { message: Message };
     },
-    onSuccess: (data, { chatId, messageId }) => {
+    onSuccess: (data, { chatId, messageId, text, chat }) => {
       const updated = data?.message;
       if (!updated) return;
       const editedAt =
@@ -298,10 +424,25 @@ export const useEditMessage = () => {
             ? updated.editedAt
             : new Date(updated.editedAt as string | number | Date).toISOString()
           : new Date().toISOString();
+
+      if (user?.id && isDmE2eeChat(chat ?? null)) {
+        const cacheKey = updated.clientMessageId ?? messageId;
+        rememberSentPlaintext(user.id, cacheKey, text, updated.id);
+        if (updated.contentMeta && typeof updated.contentMeta === 'object') {
+          const inner = { ...(updated.contentMeta as Record<string, unknown>) };
+          delete inner.e2eeVersion;
+          delete inner.preview;
+          if (Object.keys(inner).length) {
+            rememberSentPayloadMeta(user.id, cacheKey, inner, updated.id);
+          }
+        }
+      }
+
       queryClient.setQueryData(['messages', chatId], (old: unknown) =>
         patchMessageInCache(old as Parameters<typeof patchMessageInCache>[0], messageId, {
           ciphertext: updated.ciphertext ?? '',
           editedAt,
+          contentMeta: updated.contentMeta,
         }),
       );
       queryClient.invalidateQueries({ queryKey: ['conversations'] });

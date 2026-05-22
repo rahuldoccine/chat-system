@@ -47,15 +47,15 @@ const RegisterPage: React.FC = () => {
       });
 
       const { user, accessToken } = response.data;
-      
-      // Auto-login after registration
-      login(user, accessToken);
+
+      await login(user, accessToken, data.password);
 
       toast.success('Account created successfully!');
       navigate('/');
     } catch (error: unknown) {
       const message = getApiErrorMessage(error, "We couldn't create your account. Please try again.");
       toast.error(message);
+    } finally {
       setIsSubmitting(false);
     }
   };

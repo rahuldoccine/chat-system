@@ -1,8 +1,10 @@
 import { wrapKeyBackup, unwrapKeyBackup } from './crypto';
+import { ACCOUNT_BACKUP_WRAP_ALG, unwrapKeyMaterialFromAccount } from './accountEscrow';
 import {
   exportKeyMaterialJson,
   importKeyMaterialJson,
   loadKeyMaterial,
+  saveKeyMaterial,
   type E2eeKeyMaterial,
 } from './keyStore';
 import * as e2eeApi from './e2eeApi';
@@ -24,6 +26,16 @@ export async function restoreFromBackup(
   stepUpToken: string,
 ): Promise<void> {
   const backup = await e2eeApi.getKeyBackup(stepUpToken);
+  if (backup.wrapAlg === ACCOUNT_BACKUP_WRAP_ALG) {
+    const material = await unwrapKeyMaterialFromAccount(
+      backup.wrappedPrivateKeyMaterial,
+      backup.wrapAlg,
+      passphrase,
+      userId,
+    );
+    await saveKeyMaterial(material);
+    return;
+  }
   const json = await unwrapKeyBackup(passphrase, backup.wrappedPrivateKeyMaterial);
   await importKeyMaterialJson(userId, json);
 }

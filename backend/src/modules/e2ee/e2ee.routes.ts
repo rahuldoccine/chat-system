@@ -23,6 +23,8 @@ export function createE2eeRouter(config: AppConfig, logger: Logger): Router {
   router.get("/prekeys/:userId/:deviceId", requireAuth, asyncHandler(e2eeController.getPreKeyBundle));
 
   router.put("/backup", requireAuth, asyncHandler(recovery.putBackup));
+  router.get("/backup/status", requireAuth, asyncHandler(recovery.getBackupStatus));
+  router.get("/backup/account", requireAuth, asyncHandler(recovery.getBackupAccount));
   router.post("/recovery/challenge/email", requireAuth, asyncHandler(recovery.postEmailChallenge));
   router.post("/recovery/verify/email", requireAuth, asyncHandler(recovery.postEmailVerify));
   router.get("/backup", requireAuth, asyncHandler(recovery.getBackup));

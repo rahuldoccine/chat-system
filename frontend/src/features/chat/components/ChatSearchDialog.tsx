@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import styles from './ChatSearchDialog.module.css';
-import { useChatMessageSearch } from '../hooks/useChatMessageSearch';
+import { useChatMessageSearch, useE2eeChatMessageSearch } from '../hooks/useChatMessageSearch';
 import { formatChatTimestamp } from '../../../utils/timeFormat';
 
 type ChatSearchDialogProps = {
@@ -9,8 +9,8 @@ type ChatSearchDialogProps = {
   open: boolean;
   onClose: () => void;
   onSelectMessage: (messageId: string) => void;
-  /** When true, in-chat search is disabled (E2EE direct chats). */
-  searchUnavailable?: boolean;
+  /** When true, search runs on decrypted messages loaded in this chat (E2EE). */
+  e2eeSearch?: boolean;
 };
 
 const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
@@ -18,15 +18,13 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
   open,
   onClose,
   onSelectMessage,
-  searchUnavailable: searchUnavailableProp = false,
+  e2eeSearch = false,
 }) => {
   const [query, setQuery] = React.useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { data, isLoading, isFetching } = useChatMessageSearch(
-    chatId,
-    query,
-    open && !searchUnavailableProp,
-  );
+  const serverSearch = useChatMessageSearch(chatId, query, open && !e2eeSearch);
+  const clientSearch = useE2eeChatMessageSearch(chatId, query, open && e2eeSearch);
+  const { data, isLoading, isFetching } = e2eeSearch ? clientSearch : serverSearch;
 
   useEffect(() => {
     if (!open) {
@@ -50,7 +48,7 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
 
   const hits = data?.data ?? [];
   const showLoading = (isLoading || isFetching) && query.trim().length > 0;
-  const unavailable = searchUnavailableProp || data?.searchUnavailable === true;
+  const serverUnavailable = !e2eeSearch && data?.searchUnavailable === true;
 
   const senderLabel = (hit: (typeof hits)[0]) =>
     hit.sender.displayName || hit.sender.username || hit.sender.email || 'User';
@@ -90,7 +88,7 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
         <div className={styles.body}>
           {query.trim().length === 0 ? (
             <p className={styles.hint}>Type to search messages in this conversation.</p>
-          ) : unavailable ? (
+          ) : serverUnavailable ? (
             <p className={styles.unavailable}>
               Search isn&apos;t available in encrypted chats. Messages are stored securely on your devices only.
             </p>
@@ -100,7 +98,11 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
               Searching…
             </div>
           ) : hits.length === 0 ? (
-            <p className={styles.empty}>No messages match your search.</p>
+            <p className={styles.empty}>
+              {e2eeSearch && isFetching
+                ? 'Loading older messages…'
+                : 'No messages match your search.'}
+            </p>
           ) : (
             <ul className={styles.list}>
               {hits.map((hit) => (

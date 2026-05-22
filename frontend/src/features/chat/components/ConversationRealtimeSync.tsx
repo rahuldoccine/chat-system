@@ -4,7 +4,11 @@ import { useAuth } from '../../../context/AuthContext';
 import { useChat } from '../../../context/ChatContext';
 import { useSocket } from '../../../context/SocketContext';
 import type { Message, PollDetail } from '../types';
-import { mergeMessageIntoInfiniteCache } from '../hooks/useChatData';
+import {
+  applyIncomingMessageToAllCaches,
+  applyThreadUpdatedToMainCache,
+  threadMessagesQueryKey,
+} from '../utils/messageQueryCache';
 import { applyIncomingMessageToConversations } from '../utils/conversationCache';
 import type { ChatUnreadBoundary } from '../hooks/useChatData';
 import {
@@ -30,12 +34,12 @@ const ConversationRealtimeSync: React.FC = () => {
     if (!user?.id) return;
 
     const handleNewMessage = (data: { chatId: string; message: Message }) => {
-      queryClient.setQueryData(['messages', data.chatId], (old) =>
-        mergeMessageIntoInfiniteCache(
-          old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-          data.message,
-        ) ?? old,
-      );
+      applyIncomingMessageToAllCaches(queryClient, data.message);
+      if (data.message.threadRootId) {
+        void queryClient.invalidateQueries({
+          queryKey: threadMessagesQueryKey(data.chatId, data.message.threadRootId),
+        });
+      }
 
       let found = false;
       queryClient.setQueryData(['conversations'], (old) => {
@@ -76,6 +80,15 @@ const ConversationRealtimeSync: React.FC = () => {
       }
     };
 
+    const handleThreadUpdated = (data: {
+      chatId: string;
+      rootMessageId: string;
+      replyCount: number;
+      lastReplyAt: string;
+    }) => {
+      applyThreadUpdatedToMainCache(queryClient, data);
+    };
+
     const handlePollUpdated = (data: { pollId?: string; poll?: PollDetail }) => {
       if (!data.pollId) return;
       if (data.poll) {
@@ -86,6 +99,12 @@ const ConversationRealtimeSync: React.FC = () => {
     };
 
     const handleConnect = () => {
+      void syncOnReconnect(queryClient, activeId).then(() => {
+        broadcastOutboxFlushed();
+      });
+    };
+
+    const handleBrowserOnline = () => {
       void syncOnReconnect(queryClient, activeId).then(() => {
         broadcastOutboxFlushed();
       });
@@ -102,12 +121,16 @@ const ConversationRealtimeSync: React.FC = () => {
 
     socket.on('connect', handleConnect);
     socket.on('message:new', handleNewMessage);
+    socket.on('thread:updated', handleThreadUpdated);
     socket.on('receipt:read', handleReceiptRead);
     socket.on('poll:updated', handlePollUpdated);
+    window.addEventListener('online', handleBrowserOnline);
     return () => {
       unsubTab();
+      window.removeEventListener('online', handleBrowserOnline);
       socket.off('connect', handleConnect);
       socket.off('message:new', handleNewMessage);
+      socket.off('thread:updated', handleThreadUpdated);
       socket.off('receipt:read', handleReceiptRead);
       socket.off('poll:updated', handlePollUpdated);
     };

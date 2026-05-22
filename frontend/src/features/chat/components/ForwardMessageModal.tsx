@@ -7,6 +7,7 @@ import { useConversations, useSendMessage } from '../hooks/useChatData';
 import { useChat } from '../../../context/ChatContext';
 import type { Message } from '../types';
 import { getMessageCopyText } from '../utils/messageCache';
+import { buildForwardSendPayload } from '../utils/forwardMessage';
 
 type ForwardMessageModalProps = {
   message: Message;
@@ -49,21 +50,22 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
   const preview = getMessageCopyText(message, decryptedBodies, user?.id);
 
   const handleForward = () => {
-    if (!selectedId) return;
+    if (!selectedId || !user?.id) return;
     setError(null);
 
-    const text = preview || 'Forwarded message';
-    const kind = message.kind === 'IMAGE' || message.kind === 'FILE' ? message.kind : 'TEXT';
-    const contentMeta =
-      kind !== 'TEXT' && message.contentMeta ? message.contentMeta : undefined;
+    const payload = buildForwardSendPayload(message, decryptedBodies, user.id);
+    if (payload.blocked) {
+      setError(payload.blockedReason ?? 'Attachments are not ready to forward yet.');
+      return;
+    }
 
     const target = chats.find((c) => c.id === selectedId);
     sendMessage(
       {
         chatId: selectedId,
-        text: kind === 'TEXT' ? text : message.ciphertext || text,
-        kind: kind as 'TEXT' | 'IMAGE' | 'FILE',
-        contentMeta,
+        text: payload.text,
+        kind: payload.kind,
+        contentMeta: payload.contentMeta,
         chat: target as import('../types').Chat | undefined,
         peerUserId: target?.type === 'DIRECT' ? target.dmPeer?.id : undefined,
       },

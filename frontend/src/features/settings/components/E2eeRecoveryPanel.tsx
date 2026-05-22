@@ -3,10 +3,11 @@ import { Loader2, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
 import * as e2eeRecovery from '../../e2ee/recovery';
+import { ensureE2eeReady } from '../../e2ee/bootstrap';
 import styles from './E2eeRecoveryPanel.module.css';
 
 const E2eeRecoveryPanel: React.FC = () => {
-  const { user } = useAuth();
+  const { user, markE2eeUnlocked } = useAuth();
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [code, setCode] = useState('');
@@ -67,6 +68,8 @@ const E2eeRecoveryPanel: React.FC = () => {
     setBusy('restore');
     try {
       await e2eeRecovery.restoreFromBackup(user.id, restorePass, stepUpToken);
+      await ensureE2eeReady(user.id);
+      markE2eeUnlocked();
       toast.success('Encryption keys restored on this device');
       setCode('');
       setStepUpToken(null);
@@ -85,8 +88,10 @@ const E2eeRecoveryPanel: React.FC = () => {
         <h3>Account recovery</h3>
       </div>
       <p className={styles.hint}>
-        Direct messages are always end-to-end encrypted. Save a recovery backup so you can restore
-        keys on a new device after email verification.
+        Direct messages are end-to-end encrypted. Your keys are backed up to your account (wrapped
+        with your sign-in password) on each login and when you change your password in Settings.
+        If you used &quot;Forgot password&quot; by email, restore keys here with your recovery
+        passphrase or sign-in password after email verification.
       </p>
 
       <div className={styles.block}>
