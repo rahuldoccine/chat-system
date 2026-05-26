@@ -50,6 +50,33 @@ function isSameMessageRow(existing: Message, incoming: Message): boolean {
   return false;
 }
 
+export function patchMessageInThreadCache(
+  old: ThreadMessagesCache | undefined,
+  messageId: string,
+  patch: Partial<Message>,
+): ThreadMessagesCache | undefined {
+  if (!old) return old;
+  if (old.root.id === messageId) {
+    return { ...old, root: { ...old.root, ...patch } };
+  }
+  return {
+    ...old,
+    replies: old.replies.map((m) => (m.id === messageId ? { ...m, ...patch } : m)),
+  };
+}
+
+export function removeMessageFromThreadCache(
+  old: ThreadMessagesCache | undefined,
+  messageId: string,
+): ThreadMessagesCache | undefined {
+  if (!old) return old;
+  if (old.root.id === messageId) return old;
+  return {
+    ...old,
+    replies: old.replies.filter((m) => m.id !== messageId),
+  };
+}
+
 export function mergeMessageIntoThreadCache(
   old: ThreadMessagesCache | undefined,
   message: Message,

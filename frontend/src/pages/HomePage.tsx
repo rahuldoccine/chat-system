@@ -14,9 +14,10 @@ import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { formatLastSeen } from '../utils/timeFormat';
 import { MessageSquare, Phone, Video, Info, ArrowLeft, Search } from 'lucide-react';
-import ChatSearchDialog from '../features/chat/components/ChatSearchDialog';
+import ChatInMessageSearch from '../features/chat/components/ChatInMessageSearch';
 import ChatDetailsPanel from '../features/chat/components/ChatDetailsPanel';
 import ThreadPanel from '../features/chat/components/ThreadPanel';
+import ConnectionStatusBanner from '../features/chat/components/ConnectionStatusBanner';
 import DmHeaderMenu from '../features/chat/components/DmHeaderMenu';
 import MessagingRestrictedNotice from '../features/chat/components/MessagingRestrictedNotice';
 import { useBlockStatus } from '../features/chat/hooks/useBlockStatus';
@@ -34,10 +35,9 @@ const HomePage: React.FC = () => {
     isDetailsOpen,
     setDetailsOpen,
     activeSection,
-    requestScrollToMessage,
     activeThreadRootId,
+    setInChatSearchOpen,
   } = useChat();
-  const [searchOpen, setSearchOpen] = React.useState(false);
   const { data: conversations } = useConversations();
   const { onlineUsers, isConnected } = useSocket();
   const { phase, startCall, isStarting } = useCall();
@@ -97,20 +97,19 @@ const HomePage: React.FC = () => {
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k') return;
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'f') return;
       if (!activeId) return;
       e.preventDefault();
-      setSearchOpen(true);
+      setInChatSearchOpen(true);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeId]);
+  }, [activeId, setInChatSearchOpen]);
 
   return (
     <MainLayout>
-      <div style={{ display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-        {/* Main Content Area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, maxHeight: '100%', overflow: 'hidden', width: '100%' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minHeight: 0, minWidth: 0 }}>
           <AnimatePresence mode="wait">
             {!activeId ? (
               <motion.div
@@ -258,9 +257,9 @@ const HomePage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', color: 'var(--muted-foreground)' }}>
                     <button
                       type="button"
-                      title="Search in chat (Ctrl+K)"
+                      title="Search in chat (Ctrl+F)"
                       aria-label="Search in chat"
-                      onClick={() => setSearchOpen(true)}
+                      onClick={() => setInChatSearchOpen(true)}
                       style={{
                         border: 'none',
                         background: 'transparent',
@@ -341,19 +340,18 @@ const HomePage: React.FC = () => {
                   </div>
                 </header>
 
+                <ConnectionStatusBanner />
+
+                <ChatSubNav />
+
                 {activeId && (
-                  <ChatSearchDialog
+                  <ChatInMessageSearch
                     chatId={activeId}
-                    open={searchOpen}
-                    onClose={() => setSearchOpen(false)}
-                    onSelectMessage={requestScrollToMessage}
                     e2eeSearch={
                       activeChat?.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1'
                     }
                   />
                 )}
-
-                <ChatSubNav />
 
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
                   <div
@@ -386,7 +384,6 @@ const HomePage: React.FC = () => {
 
         {activeId && activeThreadRootId && activeChat?.type === 'DIRECT' && <ThreadPanel />}
 
-        {/* Right Sidebar: Details Panel (Animated Toggle) */}
         <AnimatePresence>
           {activeId && isDetailsOpen && !activeThreadRootId && (
             <motion.div
@@ -394,14 +391,14 @@ const HomePage: React.FC = () => {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 300, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              style={{ 
-                width: '300px', 
-                borderLeft: '1px solid var(--border)', 
+              style={{
+                width: '300px',
+                borderLeft: '1px solid var(--border)',
                 background: 'var(--card)',
                 padding: '2rem',
                 display: 'flex',
                 flexDirection: 'column',
-                color: 'var(--foreground)'
+                color: 'var(--foreground)',
               }}
             >
               {activeChat && (

@@ -4,6 +4,9 @@ import { parseBody, parseQuery } from "../../validation/validate.js";
 import { getCallLogById, listCallsForUser, patchCallTranscript } from "../../lib/calls/call-service.js";
 import { getCallDirection } from "../../lib/calls/call-helpers.js";
 import { callHistoryQuerySchema, callTranscriptSchema } from "../../sockets/schemas.js";
+import { getSocketIo } from "../../sockets/socket-holder.js";
+import { emitMessageNewToMembers } from "../../sockets/message-broadcast.js";
+import { SOCKET_PROTOCOL_VERSION } from "../../sockets/constants.js";
 
 export async function listMyCalls(req: Request, res: Response) {
   const q = parseQuery(callHistoryQuerySchema, req.query);
@@ -48,6 +51,18 @@ export async function getCall(req: Request, res: Response) {
 export async function updateCallTranscript(req: Request, res: Response) {
   const callId = String(req.params.callId);
   const body = parseBody(callTranscriptSchema, req.body);
-  await patchCallTranscript(req.user!.sub, callId, body.transcript);
-  res.status(200).json({ ok: true });
+  const out = await patchCallTranscript(req.user!.sub, callId, body.transcript, {
+    postToChat: body.postToChat,
+  });
+  if (out.message && out.row.chatId) {
+    const io = getSocketIo();
+    if (io) {
+      await emitMessageNewToMembers(io, out.row.chatId, {
+        v: SOCKET_PROTOCOL_VERSION,
+        chatId: out.row.chatId,
+        message: out.message,
+      });
+    }
+  }
+  res.status(200).json({ ok: true, messageId: out.message?.id ?? null });
 }

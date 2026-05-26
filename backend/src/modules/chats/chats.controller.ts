@@ -146,6 +146,25 @@ export async function listThreadMessages(req: Request, res: Response): Promise<v
   res.json(out);
 }
 
+export async function markThreadRead(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.sub;
+  const chatId = req.params.chatId as string;
+  const rootMessageId = req.params.rootMessageId as string;
+  const out = await chatsService.markThreadAsRead(userId, chatId, rootMessageId);
+  const io = getSocketIo();
+  if (io && out.messageIds.length > 0 && out.shareReadReceipts) {
+    await emitToChatMembers(io, out.chatId, "receipt:read", {
+      v: SOCKET_PROTOCOL_VERSION,
+      chatId: out.chatId,
+      userId,
+      messageIds: out.messageIds,
+      readAt: out.readAt?.toISOString() ?? null,
+    });
+  }
+  res.setHeader("Cache-Control", "no-store");
+  res.json(out);
+}
+
 export async function searchMessages(req: Request, res: Response): Promise<void> {
   const q = parseQuery(searchMessagesQuerySchema, req.query);
   const out = await chatsService.searchMessagesInChat(

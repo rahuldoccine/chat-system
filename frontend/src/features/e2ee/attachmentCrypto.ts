@@ -7,6 +7,7 @@ import { decodeEnvelope, decodePayload } from './protocol';
 import { getSignedPreKeyPrivate, loadKeyMaterial } from './keyStore';
 import * as e2eeApi from './e2eeApi';
 import { isE2eeMessage } from './directChat';
+import { getCachedPayloadMeta } from './decryptMessagePayload';
 
 export type E2eeFileAttachmentKeys = {
   fileKey: string;
@@ -107,14 +108,33 @@ async function decryptMessagePayloadMeta(
 
 async function resolveTransportMeta(
   userId: string,
-  msg: Pick<Message, 'ciphertext' | 'contentMeta' | 'senderId'>,
+  msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
   _viewerId: string,
   transportMeta?: Record<string, unknown>,
 ): Promise<Record<string, unknown> | undefined> {
+  const hasFileKeys = (meta: Record<string, unknown> | undefined) => {
+    const files = meta?.files;
+    if (!Array.isArray(files)) return false;
+    return files.some(
+      (f) =>
+        f &&
+        typeof f === 'object' &&
+        (f as { attachment?: { fileKey?: string } }).attachment?.fileKey,
+    );
+  };
+
+  if (transportMeta && hasFileKeys(transportMeta)) return transportMeta;
+
+  if (isE2eeMessage(msg) && 'id' in msg) {
+    const cached = getCachedPayloadMeta(userId, msg as Message);
+    if (cached && Object.keys(cached).length) return cached;
+  }
+
   if (transportMeta && Object.keys(transportMeta).length) return transportMeta;
-  if (!isE2eeMessage(msg)) return undefined;
+  if (!isE2eeMessage(msg)) return transportMeta;
+
   const fromEnvelope = await decryptMessagePayloadMeta(userId, msg);
-  return fromEnvelope ?? undefined;
+  return fromEnvelope ?? transportMeta;
 }
 
 export async function decryptFileBlob(
@@ -149,7 +169,7 @@ export async function fetchEncryptedFileBytes(
 /** Decrypt one attachment for an E2EE message (multi-file safe). */
 export async function decryptMessageFile(
   userId: string,
-  msg: Pick<Message, 'ciphertext' | 'contentMeta' | 'senderId'>,
+  msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
   file: FileAttachmentMeta,
   viewerId: string,
   token: string | null,

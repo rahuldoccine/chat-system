@@ -31,6 +31,16 @@ interface ChatContextType {
   setThreadDraft: (key: string, text: string) => void;
   alsoSendToMain: boolean;
   setAlsoSendToMain: (value: boolean) => void;
+  threadReplyingTo: string | null;
+  setThreadReplyingTo: (id: string | null) => void;
+  inChatSearchOpen: boolean;
+  setInChatSearchOpen: (open: boolean) => void;
+  inChatSearchQuery: string;
+  setInChatSearchQuery: (query: string) => void;
+  inChatSearchMatchIds: string[];
+  setInChatSearchMatchIds: (ids: string[]) => void;
+  inChatSearchActiveIndex: number;
+  setInChatSearchActiveIndex: (index: number) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -53,17 +63,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeThreadRootId, setActiveThreadRootId] = useState<string | null>(null);
   const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
   const [alsoSendToMain, setAlsoSendToMain] = useState(false);
+  const [threadReplyingTo, setThreadReplyingTo] = useState<string | null>(null);
+  const [inChatSearchOpen, setInChatSearchOpen] = useState(false);
+  const [inChatSearchQuery, setInChatSearchQuery] = useState('');
+  const [inChatSearchMatchIds, setInChatSearchMatchIds] = useState<string[]>([]);
+  const [inChatSearchActiveIndex, setInChatSearchActiveIndex] = useState(0);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
+
+  const clearInChatSearch = useCallback(() => {
+    setInChatSearchOpen(false);
+    setInChatSearchQuery('');
+    setInChatSearchMatchIds([]);
+    setInChatSearchActiveIndex(0);
+  }, []);
 
   const openThread = useCallback((rootMessageId: string) => {
     setActiveThreadRootId(rootMessageId);
     setDetailsOpen(false);
     setReplyingTo(null);
+    setThreadReplyingTo(null);
   }, []);
 
   const closeThread = useCallback(() => {
     setActiveThreadRootId(null);
     setAlsoSendToMain(false);
+    setThreadReplyingTo(null);
   }, []);
 
   const setThreadDraft = useCallback((key: string, text: string) => {
@@ -104,6 +128,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPendingScrollToMessageId(null);
         setActiveThreadRootId(null);
         setAlsoSendToMain(false);
+        setThreadReplyingTo(null);
+        clearInChatSearch();
         if (id) setChatFocusKey((k) => k + 1);
       },
       activeSection,
@@ -130,6 +156,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setThreadDraft,
       alsoSendToMain,
       setAlsoSendToMain,
+      threadReplyingTo,
+      setThreadReplyingTo,
+      inChatSearchOpen,
+      setInChatSearchOpen,
+      inChatSearchQuery,
+      setInChatSearchQuery,
+      inChatSearchMatchIds,
+      setInChatSearchMatchIds,
+      inChatSearchActiveIndex,
+      setInChatSearchActiveIndex,
     }}>
       {children}
     </ChatContext.Provider>

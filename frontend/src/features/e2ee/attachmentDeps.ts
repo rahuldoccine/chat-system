@@ -1,17 +1,20 @@
 import type { FileAttachmentMeta } from '../chat/utils/fileMeta';
 import type { Message } from '../chat/types';
 
-/** Stable key for useEffect deps — avoids re-fetch when parent passes new object refs. */
+export function fileAttachmentIdentityKey(file: FileAttachmentMeta | undefined): string {
+  if (!file) return '';
+  return [file.uploadId ?? '', file.filename ?? '', file.url ?? ''].join('|');
+}
+
 export function fileAttachmentDepKey(file: FileAttachmentMeta | undefined): string {
   if (!file) return '';
   const att = file.attachment;
-  return [
-    file.uploadId ?? '',
-    file.filename ?? '',
-    file.url ?? '',
-    att?.fileKey ?? '',
-    att?.iv ?? '',
-  ].join('|');
+  return [fileAttachmentIdentityKey(file), att?.fileKey ?? '', att?.iv ?? ''].join('|');
+}
+
+export function fileHasDecryptKeys(file: FileAttachmentMeta | undefined): boolean {
+  const att = file?.attachment;
+  return Boolean(att?.fileKey && att?.iv);
 }
 
 export function transportMetaDepKey(meta: Record<string, unknown> | undefined): string {

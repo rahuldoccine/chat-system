@@ -1,0 +1,234 @@
+.row {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.35rem 0.15rem;
+  border-radius: 8px;
+  position: relative;
+}
+
+.row:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  margin-top: 2px;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.senderName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.bubble {
+  display: block;
+  max-width: 100%;
+  padding: 0.5rem 0.75rem 0.35rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #6366f1;
+  border-radius: 0 10px 10px 10px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--foreground);
+  word-break: break-word;
+}
+
+.bubbleMe {
+  background: linear-gradient(135deg, #6366f1 0%, #8a87bb 100%);
+  border: none;
+  border-left: none;
+  border-radius: 12px 12px 4px 12px;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+}
+
+.bubbleMe .text {
+  color: #ffffff;
+}
+
+.bubbleHasMedia {
+  padding-top: 0.4rem;
+}
+
+/* Image / single media: bubble background hugs content (like main chat) */
+.bodyMediaFit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.rowMe .bodyMediaFit {
+  align-items: flex-start;
+}
+
+.bubbleMediaFit {
+  display: inline-block;
+  width: max-content;
+  max-width: min(100%, 22rem);
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.bubbleMediaFit.bubbleMe {
+  padding: 4px;
+}
+
+.bubbleMediaFit:not(.bubbleMe) {
+  padding: 0;
+  border: none;
+  border-left: none;
+  background: transparent;
+}
+
+.bubbleMediaFit.bubbleHasMedia {
+  padding-top: 4px;
+}
+
+.bubbleMediaFit:not(.bubbleMe).bubbleHasMedia {
+  padding-top: 0;
+}
+
+.bubbleMediaFit .mediaBlock {
+  margin-top: 0;
+  width: max-content;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.mediaBlock {
+  margin-top: 0.25rem;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.bubbleFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+  padding-top: 0.15rem;
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.reactionMine {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.rowMe .actions {
+  right: auto;
+  left: 2.5rem;
+}
+
+.actions {
+  position: absolute;
+  top: 0.15rem;
+  right: 0;
+  display: none;
+  align-items: center;
+  gap: 0.15rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.15rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  z-index: 2;
+}
+
+.row:hover .actions,
+.actionsPinned {
+  display: flex;
+}
+
+.actionBtn {
+  border: none;
+  background: transparent;
+  padding: 0.25rem;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.actionBtn:hover {
+  background: #f1f5f9;
+  color: var(--foreground);
+}
+
+.reactionPicker {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.35rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  z-index: 10;
+}
+
+.reactionPickBtn {
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  padding: 0.2rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.reactionPickBtn:hover {
+  background: #f1f5f9;
+}
+
+.menuWrap {
+  position: relative;
+}

@@ -32,6 +32,7 @@ import {
   callIceSchema,
   callOfferSchema,
   callSignalSchema,
+  callTranscriptLineSchema,
   chatSubscribeSchema,
   messageSendSocketSchema,
   notificationContextSchema,
@@ -453,6 +454,28 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
           callId: p.callId,
           signal: p.signal,
           fromUserId: userId,
+        });
+        ack?.({ ok: true });
+      } catch (err) {
+        ack?.(ackError(err));
+      }
+    });
+
+    socket.on("call:transcript", async (payload: unknown, cb?: unknown) => {
+      const ack = ackFn(cb);
+      try {
+        const p = callTranscriptLineSchema.parse(payload);
+        const c = getActiveCall(p.callId);
+        if (!c) throw new AppError(404, "NOT_FOUND", "Call not found");
+        if (c.initiatorId !== userId && c.peerId !== userId) {
+          throw new AppError(403, "FORBIDDEN", "Not in call");
+        }
+        const target = c.initiatorId === userId ? c.peerId : c.initiatorId;
+        io.to(roomUser(target)).emit("call:transcript", {
+          callId: p.callId,
+          fromUserId: userId,
+          t: p.t,
+          text: p.text,
         });
         ack?.({ ok: true });
       } catch (err) {

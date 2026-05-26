@@ -1,119 +1,332 @@
-import React, { useEffect, useRef } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { X, Loader2, MessageSquare, ExternalLink } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
-import { useThreadMessages } from '../hooks/useChatData';
-import { useMessageBodies } from '../../e2ee/useMessageBodies';
-import { getMessagePreviewText } from '../utils/messagePreview';
+import { useSocket } from '../../../context/SocketContext';
+import {
+  useThreadMessages,
+  useAddReaction,
+  useRemoveReaction,
+  useDeleteMessage,
+  usePinnedMessages,
+  useConversations,
+} from '../hooks/useChatData';
+import {
+  useMessageBodies,
+  getMessageDisplayBody,
+  messageWithDecryptedMeta,
+} from '../../e2ee/useMessageBodies';
+import { getAttachmentPreviewLabel } from '../utils/fileMeta';
+import { formatChatTimestamp } from '../../../utils/timeFormat';
 import type { Message } from '../types';
 import UserAvatar from './UserAvatar';
+import LiveUserName from './LiveUserName';
 import MessageComposer from './MessageComposer';
+import ThreadMessageRow from './ThreadMessageRow';
+import type { MessageMenuAction } from './MessageOptionsMenu';
+import ConfirmModal from './ConfirmModal';
+import { patchReactionOnThreadCache } from '../utils/messageReactions';
+import { threadMessagesQueryKey, type ThreadMessagesCache } from '../utils/messageQueryCache';
+import { useMarkThreadAsRead } from '../hooks/useMarkThreadAsRead';
 import styles from './ThreadPanel.module.css';
 import streamStyles from './MessageStream.module.css';
 
 const ThreadPanel: React.FC = () => {
-  const { activeId, activeThreadRootId, closeThread } = useChat();
+  const {
+    activeId,
+    activeThreadRootId,
+    closeThread,
+    requestScrollToMessage,
+    setEditingMessage,
+    setThreadReplyingTo,
+  } = useChat();
   const { user } = useAuth();
-  const { data, isLoading, isError } = useThreadMessages(activeId, activeThreadRootId);
+  const { socket } = useSocket();
+  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const prevReplyCountRef = useRef(0);
 
-  const allMessages = React.useMemo(() => {
+  const { data, isLoading, isFetching, isError } = useThreadMessages(activeId, activeThreadRootId);
+  useMarkThreadAsRead(
+    activeId,
+    activeThreadRootId,
+    Boolean(data?.root),
+    data?.replies?.length ?? 0,
+  );
+  const { data: pinsData } = usePinnedMessages(activeId);
+  const { data: conversationsData } = useConversations();
+  const activeChat = conversationsData?.data?.find((c) => c.id === activeId);
+  const isDirectChat = activeChat?.type === 'DIRECT';
+
+  const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+  const { mutate: addReaction } = useAddReaction();
+  const { mutate: removeReaction } = useRemoveReaction();
+  const { mutate: deleteMessage, isPending: isDeleting } = useDeleteMessage();
+
+  const pinnedIds = useMemo(
+    () => new Set((pinsData?.data ?? []).map((p) => p.messageId)),
+    [pinsData],
+  );
+
+  const allMessages = useMemo(() => {
     if (!data?.root) return [];
     return [data.root, ...(data.replies ?? [])];
   }, [data]);
 
   const decryptedBodies = useMessageBodies(allMessages);
+  const replyCount = data?.replies?.length ?? 0;
+  const showLoadingOverlay = isLoading && !data?.root;
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [data?.replies?.length, activeThreadRootId]);
+    const onScroll = () => {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      stickToBottomRef.current = gap < 48;
+    };
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [activeThreadRootId]);
+
+  useEffect(() => {
+    if (replyCount > prevReplyCountRef.current && stickToBottomRef.current) {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+    prevReplyCountRef.current = replyCount;
+  }, [replyCount, activeThreadRootId]);
+
+  useEffect(() => {
+    prevReplyCountRef.current = 0;
+    stickToBottomRef.current = true;
+    const el = scrollRef.current;
+    if (el && data?.replies?.length) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
+  }, [activeThreadRootId]);
+
+  useEffect(() => {
+    if (!activeId || !activeThreadRootId) return;
+
+    const patchThreadReactions = (
+      messageId: string,
+      emoji: string,
+      op: 'add' | 'remove',
+      actorUserId: string,
+    ) => {
+      queryClient.setQueryData<ThreadMessagesCache>(
+        threadMessagesQueryKey(activeId, activeThreadRootId),
+        (old) =>
+          patchReactionOnThreadCache(old, messageId, emoji, op, actorUserId, user?.id ?? ''),
+      );
+    };
+
+    const onAdded = (payload: {
+      chatId: string;
+      messageId: string;
+      emoji: string;
+      userId: string;
+    }) => {
+      if (payload.chatId !== activeId) return;
+      patchThreadReactions(payload.messageId, payload.emoji, 'add', payload.userId);
+    };
+
+    const onRemoved = (payload: {
+      chatId: string;
+      messageId: string;
+      emoji: string;
+      userId: string;
+    }) => {
+      if (payload.chatId !== activeId) return;
+      patchThreadReactions(payload.messageId, payload.emoji, 'remove', payload.userId);
+    };
+
+    socket.on('reaction:added', onAdded);
+    socket.on('reaction:removed', onRemoved);
+    return () => {
+      socket.off('reaction:added', onAdded);
+      socket.off('reaction:removed', onRemoved);
+    };
+  }, [activeId, activeThreadRootId, queryClient, socket, user?.id]);
+
+  const handleViewInChat = useCallback(() => {
+    if (!activeThreadRootId) return;
+    requestScrollToMessage(activeThreadRootId);
+  }, [activeThreadRootId, requestScrollToMessage]);
+
+  const handleMenuAction = useCallback(
+    (msg: Message, action: MessageMenuAction) => {
+      if (!activeId) return;
+      switch (action) {
+        case 'edit':
+          setEditingMessage({
+            id: msg.id,
+            text: getMessageDisplayBody(msg, decryptedBodies, user?.id) || '',
+          });
+          break;
+        case 'delete':
+          setDeleteTarget(msg);
+          break;
+        case 'copy':
+          break;
+        default:
+          break;
+      }
+    },
+    [activeId, decryptedBodies, setEditingMessage, user?.id],
+  );
+
+  const handleReactionPick = useCallback(
+    (messageId: string, emoji: string) => {
+      if (!activeId) return;
+      const msg = allMessages.find((m) => m.id === messageId);
+      const alreadyMine = msg?.reactionsSummary?.some((r) => r.emoji === emoji && r.byMe);
+      if (alreadyMine) {
+        removeReaction({ chatId: activeId, messageId, emoji });
+      } else {
+        addReaction({ chatId: activeId, messageId, emoji });
+      }
+    },
+    [activeId, addReaction, allMessages, removeReaction],
+  );
+
+  const root = data?.root;
 
   if (!activeId || !activeThreadRootId) return null;
 
   return (
     <aside className={styles.panel} aria-label="Thread">
       <div className={styles.header}>
-        <span className={styles.title}>Thread</span>
-        <button type="button" className={styles.closeBtn} onClick={closeThread} aria-label="Close thread">
-          <X size={18} />
-        </button>
+        <div className={styles.headerMain}>
+          <MessageSquare size={18} className={styles.headerIcon} aria-hidden />
+          <div>
+            <h3 className={styles.title}>Thread</h3>
+            {replyCount > 0 && (
+              <span className={styles.subtitle}>
+                {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.viewInChatBtn}
+            onClick={handleViewInChat}
+            title="View parent in main chat"
+          >
+            <ExternalLink size={14} />
+            <span>View in chat</span>
+          </button>
+          <button type="button" className={styles.closeBtn} onClick={closeThread} aria-label="Close thread">
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       <div className={styles.scrollArea} ref={scrollRef}>
-        <div className={styles.scrollInner}>
-          {isLoading && (
-            <div className={styles.loading}>
-              <Loader2 className={streamStyles.spinner} size={20} />
-            </div>
-          )}
-          {isError && (
-            <p className={styles.loading}>Could not load thread replies.</p>
-          )}
-          {data?.root && (
-            <div className={styles.rootBlock}>
-              <ThreadMessageBubble
-                msg={data.root}
-                isMe={data.root.senderId === user?.id}
-                bodies={decryptedBodies}
-                viewerId={user?.id}
-              />
-            </div>
-          )}
-          {(data?.replies?.length ?? 0) > 0 && (
-            <>
-              <p className={styles.replyCount}>
-                {data!.replies.length} {data!.replies.length === 1 ? 'reply' : 'replies'}
-              </p>
-              <div className={styles.repliesBlock}>
-                {data!.replies.map((msg) => (
-                  <ThreadMessageBubble
-                    key={msg.id}
-                    msg={msg}
-                    isMe={msg.senderId === user?.id}
-                    bodies={decryptedBodies}
-                    viewerId={user?.id}
+        {showLoadingOverlay && (
+          <div className={styles.loading}>
+            <Loader2 className={streamStyles.spinner} size={20} />
+          </div>
+        )}
+        {isError && !root && (
+          <p className={styles.errorText}>Could not load thread. Try closing and reopening.</p>
+        )}
+
+        {root && (
+          <div className={styles.scrollInner}>
+            <section className={styles.parentSection} aria-label="Thread parent message">
+              <p className={styles.parentLabel}>Thread started by</p>
+              <div className={styles.parentCard}>
+                <div className={styles.parentHeader}>
+                  <UserAvatar
+                    userId={root.senderId}
+                    avatarUrl={root.sender?.avatarUrl}
+                    displayName={root.sender?.displayName}
+                    email={root.sender?.email}
+                    className={styles.parentAvatar}
+                    fallbackFontSize="0.8rem"
                   />
-                ))}
+                  <div className={styles.parentMeta}>
+                    <LiveUserName
+                      userId={root.senderId}
+                      displayName={root.sender?.displayName}
+                      email={root.sender?.email}
+                      className={styles.parentName}
+                    />
+                    <time className={styles.parentTime} dateTime={root.createdAt}>
+                      {formatChatTimestamp(root.createdAt)}
+                    </time>
+                  </div>
+                </div>
+                <p className={styles.parentPreview}>
+                  {(() => {
+                    const rootBody = getMessageDisplayBody(root, decryptedBodies, user?.id)?.trim();
+                    if (rootBody) return rootBody;
+                    const rootDisplay = messageWithDecryptedMeta(root, decryptedBodies);
+                    return getAttachmentPreviewLabel(rootDisplay);
+                  })()}
+                </p>
               </div>
-            </>
-          )}
-        </div>
+            </section>
+
+            <div className={styles.divider} role="separator">
+              <span>{replyCount > 0 ? 'Replies' : 'No replies yet'}</span>
+            </div>
+
+            {isFetching && !showLoadingOverlay && (
+              <div className={styles.refreshHint} aria-live="polite">
+                <Loader2 className={streamStyles.spinner} size={14} />
+              </div>
+            )}
+
+            <div className={styles.repliesBlock}>
+              {(data?.replies ?? []).map((msg) => (
+                <ThreadMessageRow
+                  key={msg.id}
+                  msg={msg}
+                  isMe={msg.senderId === user?.id}
+                  isDirectChat={Boolean(isDirectChat)}
+                  viewerId={user?.id}
+                  bodies={decryptedBodies}
+                  isPinned={pinnedIds.has(msg.id)}
+                  onReply={() => setThreadReplyingTo(msg.id)}
+                  onMenuAction={(action) => handleMenuAction(msg, action)}
+                  onReactionPick={(emoji) => handleReactionPick(msg.id, emoji)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={styles.footer}>
         <MessageComposer variant="thread" threadRootId={activeThreadRootId} />
       </div>
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="Delete message?"
+        description="This message will be removed for everyone in the chat."
+        confirmLabel="Delete"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={() => {
+          if (!activeId || !deleteTarget) return;
+          deleteMessage(
+            { chatId: activeId, messageId: deleteTarget.id },
+            { onSuccess: () => setDeleteTarget(null) },
+          );
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </aside>
   );
 };
-
-function ThreadMessageBubble({
-  msg,
-  isMe,
-  bodies,
-  viewerId,
-}: {
-  msg: Message;
-  isMe: boolean;
-  bodies: ReturnType<typeof useMessageBodies>;
-  viewerId?: string;
-}) {
-  const text = getMessagePreviewText(msg, bodies, viewerId);
-  return (
-    <div className={`${styles.messageRow} ${isMe ? styles.messageRowMe : ''}`}>
-      {!isMe && (
-        <UserAvatar
-          userId={msg.senderId}
-          displayName={msg.sender?.displayName}
-          email={msg.sender?.email}
-          className={streamStyles.avatar}
-        />
-      )}
-      <div className={`${styles.bubble} ${isMe ? styles.bubbleMe : ''}`}>{text || '…'}</div>
-    </div>
-  );
-}
 
 export default ThreadPanel;

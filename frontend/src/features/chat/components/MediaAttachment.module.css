@@ -237,3 +237,54 @@
 .fileActionBtn:hover {
   color: var(--primary);
 }
+
+.imageContainerLoading {
+  min-height: 120px;
+  min-width: 160px;
+}
+
+.mediaShimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0.75rem;
+  background: linear-gradient(
+    110deg,
+    var(--muted) 8%,
+    color-mix(in srgb, var(--muted) 70%, var(--background)) 18%,
+    var(--muted) 33%
+  );
+  background-size: 200% 100%;
+  animation: mediaShimmer 1.4s ease-in-out infinite;
+}
+
+.mediaShimmerLabel {
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  opacity: 0.85;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes mediaShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.imageHidden {
+  opacity: 0;
+}
+
+.imageVisible {
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
+}

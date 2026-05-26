@@ -89,6 +89,21 @@ type MarkMessagesReadResponse = {
   unread: ChatUnreadBoundary;
 };
 
+/** Mark all unread thread-only replies when the user opens a thread panel. */
+export async function markThreadAsRead(
+  chatId: string,
+  rootMessageId: string,
+): Promise<ChatUnreadBoundary | null> {
+  try {
+    const response = await api.post<MarkMessagesReadResponse>(
+      `/chats/${chatId}/threads/${rootMessageId}/read`,
+    );
+    return response.data.unread ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Mark specific messages as read (incremental scroll-to-read). */
 export async function markMessagesAsRead(
   chatId: string,

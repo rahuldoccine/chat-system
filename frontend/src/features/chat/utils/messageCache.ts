@@ -1,7 +1,7 @@
 import type { Message } from '../types';
 import type { DecryptedBody } from '../../e2ee/useMessageBodies';
 import { getMessageDisplayBody } from '../../e2ee/useMessageBodies';
-import { getMessageFiles, isVoiceMessage } from './fileMeta';
+import { isVoiceMessage } from './fileMeta';
 import { getMessagePreviewText } from './messagePreview';
 
 type MessagesCache = { pages: Array<{ data: Message[] }> };
@@ -61,18 +61,19 @@ export function canCopyMessage(
   return text !== '…' && Boolean(text.trim());
 }
 
-/** Messages with file/image attachments (caption-only edits). */
-export function hasEditableMedia(msg: Message): boolean {
-  const files = getMessageFiles(msg);
-  if (files && files.length > 0) return true;
-  return (
-    (msg.kind === 'FILE' || msg.kind === 'IMAGE') &&
-    Boolean(msg.contentMeta?.filename || msg.contentMeta?.url)
-  );
-}
-
-export function canEditMessage(msg: Message, userId?: string): boolean {
+/** Edit is text-only: plain messages or captions on media — not file/voice-only uploads. */
+export function canEditMessage(
+  msg: Message,
+  userId?: string,
+  bodies?: Record<string, DecryptedBody>,
+): boolean {
   if (!userId || msg.senderId !== userId || msg.deletedAt) return false;
-  if (msg.kind === 'TEXT') return Boolean(msg.ciphertext?.trim());
-  return hasEditableMedia(msg);
+  if (msg.kind === 'POLL' || isVoiceMessage(msg)) return false;
+
+  const text =
+    bodies && userId
+      ? getMessageDisplayBody(msg, bodies, userId)
+      : (msg.ciphertext?.trim() ?? '');
+
+  return text !== '…' && Boolean(text.trim());
 }

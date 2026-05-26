@@ -184,6 +184,10 @@ class SocketService {
     this.socket.on('call:signal', (data) => {
       this.trigger('call:signal', data);
     });
+
+    this.socket.on('call:transcript', (data) => {
+      this.trigger('call:transcript', data);
+    });
   }
 
   connect(token: string) {

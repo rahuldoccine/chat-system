@@ -301,6 +301,31 @@
   }
 }
 
+.searchMark {
+  background: #fef08a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.searchMarkActive {
+  background: #facc15;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45);
+  animation: searchMarkPulse 1.4s ease-out;
+}
+
+@keyframes searchMarkPulse {
+  0% {
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.65);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2);
+  }
+}
+
 /* Scroll-to / pin jump highlight - only around the message bubble */
 .messageHighlight {
   position: relative;
@@ -398,8 +423,14 @@
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--muted-foreground);
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.5rem;
   width: 100%;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 3px solid var(--primary);
+  box-sizing: border-box;
+  line-height: 1.35;
 }
 
 .threadBroadcastLink {
@@ -420,6 +451,23 @@
 
 .threadBroadcastLink:hover {
   text-decoration: underline;
+}
+
+/* Sent (purple) bubbles: thread header must stay readable */
+.isMe .threadBroadcastHeader {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.14);
+  border-left-color: rgba(255, 255, 255, 0.75);
+}
+
+.isMe .threadBroadcastLink {
+  color: #ffffff;
+}
+
+.isMe .threadBroadcastLink:hover {
+  color: #ffffff;
+  text-decoration: underline;
+  opacity: 0.95;
 }
 
 .bubble {

@@ -82,6 +82,7 @@ export async function patchCallTranscript(
   userId: string,
   callId: string,
   transcript: Array<{ t: number; speaker: string; text: string }>,
+  opts?: { postToChat?: boolean },
 ) {
   const prisma = getPrisma();
   const row = await getCallLogById(callId);
@@ -90,12 +91,25 @@ export async function patchCallTranscript(
     throw new AppError(403, "FORBIDDEN", "Not in call");
   }
   const prevMeta = (row.metadata ?? {}) as unknown as Record<string, unknown>;
-  return prisma.callLog.update({
+  const updated = await prisma.callLog.update({
     where: { id: callId },
     data: {
       metadata: { ...prevMeta, transcript } as unknown as Prisma.InputJsonValue,
     },
   });
+
+  if (opts?.postToChat && row.chatId && transcript.length > 0) {
+    const { createCallTranscriptMessage } = await import("./call-system-message.js");
+    const message = await createCallTranscriptMessage({
+      chatId: row.chatId,
+      callId,
+      userId,
+      lines: transcript,
+    });
+    return { row: updated, message };
+  }
+
+  return { row: updated, message: null };
 }
 
 export type EnrichedCallRow = {

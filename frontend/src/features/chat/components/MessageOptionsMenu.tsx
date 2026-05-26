@@ -52,7 +52,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   const showCopy =
     canCopyMessage(message, decryptedBodies, userId) &&
     (copyTextProp ?? getMessageCopyText(message, decryptedBodies, userId)).length > 0;
-  const showEdit = canEditMessage(message, userId);
+  const showEdit = canEditMessage(message, userId, decryptedBodies);
   const showDelete = isMe;
 
   const run = (action: MessageMenuAction) => {

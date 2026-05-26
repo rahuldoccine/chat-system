@@ -22,7 +22,8 @@ const CallMessageBubble: React.FC<CallMessageBubbleProps> = ({
   const missed = call.status === 'missed';
   const isVideo = call.kind === 'VIDEO';
   const Icon = missed ? PhoneMissed : isVideo ? Video : outgoing ? Phone : PhoneIncoming;
-  const canRedial = call.status === 'completed' || call.status === 'cancelled';
+  const canRedial =
+    call.status === 'completed' || call.status === 'cancelled' || call.status === 'missed';
 
   return (
     <div className={styles.wrap}>

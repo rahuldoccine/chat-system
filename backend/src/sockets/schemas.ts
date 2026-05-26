@@ -85,6 +85,13 @@ export const callSignalSchema = z.object({
   signal: z.enum(["mute", "unmute", "camera_on", "camera_off"]),
 });
 
+/** Live caption line relayed to the other call participant. */
+export const callTranscriptLineSchema = z.object({
+  callId: z.string().uuid(),
+  text: z.string().min(1).max(2000),
+  t: z.number(),
+});
+
 export const callHistoryQuerySchema = z.object({
   chatId: z.string().uuid().optional(),
   filter: z.enum(["all", "missed", "dialed", "received"]).optional(),
@@ -100,4 +107,5 @@ export const callTranscriptSchema = z.object({
       text: z.string().min(1).max(2000),
     }),
   ),
+  postToChat: z.boolean().optional(),
 });

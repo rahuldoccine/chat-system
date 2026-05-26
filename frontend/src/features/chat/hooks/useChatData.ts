@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import api from '../../../api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import type { Chat, Message, PollDetail } from '../types';
@@ -9,6 +15,8 @@ import {
   flattenMessagePages,
   mergeMessageIntoInfiniteCache,
   mergeMessageIntoThreadCache,
+  patchMessageInThreadCache,
+  removeMessageFromThreadCache,
   threadMessagesQueryKey,
   type MessagePage,
   type ThreadMessagesCache,
@@ -122,6 +130,7 @@ export const useThreadMessages = (chatId: string | null, rootMessageId: string |
     },
     enabled: Boolean(chatId && rootMessageId),
     staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -445,6 +454,17 @@ export const useEditMessage = () => {
           contentMeta: updated.contentMeta,
         }),
       );
+      if (updated.threadRootId) {
+        queryClient.setQueryData<ThreadMessagesCache>(
+          threadMessagesQueryKey(chatId, updated.threadRootId),
+          (old) =>
+            patchMessageInThreadCache(old, messageId, {
+              ciphertext: updated.ciphertext ?? '',
+              editedAt,
+              contentMeta: updated.contentMeta,
+            }),
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
@@ -460,6 +480,10 @@ export const useDeleteMessage = () => {
     onSuccess: (_data, { chatId, messageId }) => {
       queryClient.setQueryData(['messages', chatId], (old: unknown) =>
         removeMessageFromCache(old as Parameters<typeof removeMessageFromCache>[0], messageId),
+      );
+      queryClient.setQueriesData<ThreadMessagesCache>(
+        { queryKey: ['threadMessages', chatId] },
+        (old) => removeMessageFromThreadCache(old, messageId),
       );
       queryClient.invalidateQueries({ queryKey: ['pins', chatId] });
     },

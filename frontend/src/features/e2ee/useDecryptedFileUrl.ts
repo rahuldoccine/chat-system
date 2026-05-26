@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { buildFileUrl } from '../chat/utils/fileUrl';
 import type { FileAttachmentMeta } from '../chat/utils/fileMeta';
 import type { Message } from '../chat/types';
 import {
   e2eeMessageDepKey,
-  fileAttachmentDepKey,
-  transportMetaDepKey,
+  fileAttachmentIdentityKey,
+  fileHasDecryptKeys,
 } from './attachmentDeps';
 import { isE2eeMessage } from './directChat';
 import { decryptMessageFile } from './attachmentCrypto';
@@ -16,13 +16,8 @@ type E2eeMessageRef = Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'sende
 const blobUrlCache = new Map<string, string>();
 const inflightDecrypt = new Map<string, Promise<Blob | null>>();
 
-function cacheKey(
-  messageKey: string,
-  fileKey: string,
-  transportKey: string,
-  userId: string,
-): string {
-  return `${userId}|${messageKey}|${fileKey}|${transportKey}`;
+function stableBlobCacheKey(userId: string, messageKey: string, fileIdentity: string): string {
+  return `${userId}|${messageKey}|${fileIdentity}`;
 }
 
 export function useDecryptedFileUrl(
@@ -32,10 +27,12 @@ export function useDecryptedFileUrl(
 ): string {
   const { user, token } = useAuth();
   const [url, setUrl] = useState('');
+  const transportMetaRef = useRef(transportMeta);
+  transportMetaRef.current = transportMeta;
 
   const messageKey = e2eeMessageDepKey(e2eeMessage);
-  const fileKey = fileAttachmentDepKey(file);
-  const transportKey = transportMetaDepKey(transportMeta);
+  const fileIdentity = fileAttachmentIdentityKey(file);
+  const hasKeys = fileHasDecryptKeys(file);
 
   useEffect(() => {
     if (!file) {
@@ -48,7 +45,11 @@ export function useDecryptedFileUrl(
       return;
     }
 
-    const key = cacheKey(messageKey, fileKey, transportKey, user.id);
+    if (!hasKeys) {
+      return;
+    }
+
+    const key = stableBlobCacheKey(user.id, messageKey, fileIdentity);
     const cached = blobUrlCache.get(key);
     if (cached) {
       setUrl(cached);
@@ -64,7 +65,7 @@ export function useDecryptedFileUrl(
         file,
         user.id,
         token,
-        transportMeta,
+        transportMetaRef.current,
       );
       inflightDecrypt.set(key, run);
       void run.finally(() => {
@@ -78,15 +79,13 @@ export function useDecryptedFileUrl(
         const objectUrl = URL.createObjectURL(blob);
         blobUrlCache.set(key, objectUrl);
         setUrl(objectUrl);
-      } else {
-        setUrl('');
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [messageKey, fileKey, transportKey, user?.id, token]);
+  }, [messageKey, fileIdentity, hasKeys, user?.id, token, file, e2eeMessage]);
 
   return url;
 }

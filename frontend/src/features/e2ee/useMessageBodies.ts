@@ -2,21 +2,32 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Message, LinkPreviewMeta } from '../chat/types';
 import { useAuth } from '../../context/AuthContext';
 import { decryptDirectMessage, isE2eeMessage } from './directChat';
-import { decodeEnvelope, decodePayload, type DmV1Payload } from './protocol';
-import { getSignedPreKeyPrivate } from './keyStore';
 import { getLocalKeyMaterial } from './keyAccess';
 import { rememberPeerDevice } from './peerDevice';
-import { aesGcmDecrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
-import * as e2eeApi from './e2eeApi';
-import { getSentPlaintext, getSentPayloadMeta } from './sentPlaintextCache';
+import {
+  ensureSentPlaintextHydrated,
+  getSentPlaintext,
+  getSentPlaintextAsync,
+  getSentPayloadMeta,
+} from './sentPlaintextCache';
+import {
+  ciphertextFingerprint,
+  ensureDecryptedPayloadHydrated,
+  getPayloadCached,
+  getPayloadFromMemory,
+  rememberPayload,
+} from './decryptedPayloadCache';
+import { decryptMessagePayload } from './decryptMessagePayload';
+import { mergeContentMetaWithStubs } from './transportFileStubs';
 import { parseE2eePollMeta, type E2eePollPayload } from './pollMeta';
 
 export type DecryptedBody = {
   text: string;
   preview?: LinkPreviewMeta;
-  /** Inner payload meta (files, voiceNote, attachment keys) from E2EE decrypt or send cache. */
   meta?: Record<string, unknown>;
 };
+
+const DECRYPT_CHUNK = 12;
 
 function metaHasMediaAttachments(meta: Record<string, unknown> | undefined): boolean {
   if (!meta) return false;
@@ -27,10 +38,7 @@ function metaHasMediaAttachments(meta: Record<string, unknown> | undefined): boo
   return false;
 }
 
-function messageHasMediaAttachments(
-  msg: Message,
-  meta?: Record<string, unknown>,
-): boolean {
+function messageHasMediaAttachments(msg: Message, meta?: Record<string, unknown>): boolean {
   if (msg.kind === 'IMAGE' || msg.kind === 'FILE') return true;
   if (metaHasMediaAttachments(meta)) return true;
   const transport = msg.contentMeta as Record<string, unknown> | undefined;
@@ -39,7 +47,6 @@ function messageHasMediaAttachments(
   return Array.isArray(refs?.files) && refs.files.length > 0;
 }
 
-/** Sender-side caption: empty for media-only (same as decrypted receiver payload). */
 function senderE2eeDisplayText(
   msg: Message,
   sent: string | undefined,
@@ -50,47 +57,9 @@ function senderE2eeDisplayText(
   return '';
 }
 
-async function decryptPayloadFull(
-  userId: string,
-  msg: Message,
-): Promise<DmV1Payload | null> {
-  const envelope = decodeEnvelope(msg.ciphertext ?? '');
-  if (!envelope) return null;
-
-  const material = await getLocalKeyMaterial(userId);
-  if (!material) return null;
-
-  const meta = msg.contentMeta as Record<string, unknown> | undefined;
-  let fingerprint =
-    typeof meta?.senderFingerprint === 'string' ? meta.senderFingerprint : null;
-  if (!fingerprint) {
-    try {
-      const row = await e2eeApi.getIdentityKey(msg.senderId);
-      fingerprint = row.fingerprint;
-    } catch {
-      return null;
-    }
-  }
-
-  const spkIdsToTry = [
-    envelope.spkId,
-    ...material.signedPreKeys.map((k) => k.keyId).filter((id) => id !== envelope.spkId),
-  ];
-
-  for (const spkId of spkIdsToTry) {
-    const spkPrivate = await getSignedPreKeyPrivate(material, spkId);
-    if (!spkPrivate) continue;
-    try {
-      const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
-      const aesKey = await deriveAesGcmKey(shared, `${fingerprint}:${envelope.spkId}`);
-      const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
-      const payload = decodePayload(plainBuf);
-      if (payload) return payload;
-    } catch {
-      /* try next local signed pre-key */
-    }
-  }
-  return null;
+function bodyFromPayload(payload: { text: string; meta?: Record<string, unknown> }): DecryptedBody {
+  const preview = payload.meta?.preview as LinkPreviewMeta | undefined;
+  return { text: payload.text, preview, meta: payload.meta };
 }
 
 export function useMessageBodies(
@@ -114,53 +83,97 @@ export function useMessageBodies(
     let cancelled = false;
 
     const run = async () => {
-      const next: Record<string, DecryptedBody> = {};
+      await Promise.all([
+        ensureSentPlaintextHydrated(user.id),
+        ensureDecryptedPayloadHydrated(user.id),
+      ]);
+
+      const initial: Record<string, DecryptedBody> = {};
+      const toDecrypt: Message[] = [];
+
       for (const msg of messages) {
         if (!isE2eeMessage(msg)) {
-          if (msg.ciphertext != null) {
-            next[msg.id] = { text: msg.ciphertext };
-          }
+          if (msg.ciphertext != null) initial[msg.id] = { text: msg.ciphertext };
           continue;
         }
-        const sentMeta = getSentPayloadMeta(user.id, msg);
-        const sent = getSentPlaintext(user.id, msg);
+
+        const fp = ciphertextFingerprint(msg.ciphertext);
 
         if (msg.senderId === user.id) {
+          const sent =
+            getSentPlaintext(user.id, msg) ?? (await getSentPlaintextAsync(user.id, msg));
+          const sentMeta = getSentPayloadMeta(user.id, msg);
           const preview = sentMeta?.preview as LinkPreviewMeta | undefined;
           if (sent !== undefined || sentMeta) {
-            next[msg.id] = {
+            initial[msg.id] = {
               text: senderE2eeDisplayText(msg, sent, sentMeta),
               preview,
               meta: sentMeta,
             };
             continue;
           }
-          next[msg.id] = { text: '' };
+          initial[msg.id] = { text: '[Sent message unavailable on this device]' };
           continue;
         }
 
-        const payload = await decryptPayloadFull(user.id, msg);
-        if (payload) {
-          const preview = payload.meta?.preview as LinkPreviewMeta | undefined;
-          next[msg.id] = { text: payload.text, preview, meta: payload.meta };
-          const senderDeviceId = (msg.contentMeta as Record<string, unknown> | undefined)
-            ?.senderDeviceId;
-          if (typeof senderDeviceId === 'string') {
-            rememberPeerDevice(msg.senderId, senderDeviceId);
-          }
-          continue;
+        const cached =
+          getPayloadFromMemory(user.id, msg.id, fp) ??
+          (await getPayloadCached(user.id, msg.id, fp));
+        if (cached) {
+          initial[msg.id] = cached;
+        } else {
+          toDecrypt.push(msg);
         }
-        const plain = await decryptDirectMessage(user.id, msg, user.id);
-        if (plain && plain !== '[Unable to decrypt]') {
-          const senderDeviceId = (msg.contentMeta as Record<string, unknown> | undefined)
-            ?.senderDeviceId;
-          if (typeof senderDeviceId === 'string') {
-            rememberPeerDevice(msg.senderId, senderDeviceId);
-          }
-        }
-        next[msg.id] = { text: plain ?? '[Unable to decrypt]' };
       }
-      if (!cancelled) setBodies((prev) => ({ ...prev, ...next }));
+
+      if (!cancelled && Object.keys(initial).length) {
+        setBodies((prev) => ({ ...prev, ...initial }));
+      }
+
+      if (!toDecrypt.length || cancelled) return;
+
+      const material = await getLocalKeyMaterial(user.id);
+      if (!material || cancelled) return;
+
+      const fingerprintCache = new Map<string, string>();
+
+      for (let i = 0; i < toDecrypt.length; i += DECRYPT_CHUNK) {
+        if (cancelled) return;
+
+        const chunk = toDecrypt.slice(i, i + DECRYPT_CHUNK);
+        await Promise.all(
+          chunk.map(async (msg) => {
+            const fp = ciphertextFingerprint(msg.ciphertext);
+            const payload = await decryptMessagePayload(
+              user.id,
+              msg,
+              material,
+              fingerprintCache,
+            );
+
+            let body: DecryptedBody;
+            if (payload) {
+              body = bodyFromPayload(payload);
+              const senderDeviceId = (msg.contentMeta as Record<string, unknown> | undefined)
+                ?.senderDeviceId;
+              if (typeof senderDeviceId === 'string') {
+                rememberPeerDevice(msg.senderId, senderDeviceId);
+              }
+              void rememberPayload(user.id, msg.id, fp, body);
+            } else {
+              const plain = await decryptDirectMessage(user.id, msg, user.id);
+              body = { text: plain ?? '[Unable to decrypt]' };
+            }
+
+            if (cancelled) return;
+            setBodies((prev) => ({ ...prev, [msg.id]: body }));
+          }),
+        );
+
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 0);
+        });
+      }
     };
 
     void run();
@@ -193,7 +206,6 @@ export function getMessageLinkPreview(
   return msg.contentMeta?.preview;
 }
 
-/** Merges E2EE inner payload meta (e.g. files[]) onto transport contentMeta for UI. */
 export function getDecryptedTransportMeta(
   msg: Message,
   bodies: Record<string, DecryptedBody>,
@@ -202,7 +214,6 @@ export function getDecryptedTransportMeta(
   return bodies[msg.id]?.meta;
 }
 
-/** Decrypted poll copy from E2EE message payload or sender cache. */
 export function getDecryptedPollMeta(
   msg: Message,
   bodies: Record<string, DecryptedBody>,
@@ -220,21 +231,7 @@ export function messageWithDecryptedMeta(
   bodies: Record<string, DecryptedBody>,
 ): Message {
   const meta = getDecryptedTransportMeta(msg, bodies);
-  const cachedFiles = msg.contentMeta?.files;
-  const decryptedFiles = meta?.files;
-  const hasCachedFiles = Array.isArray(cachedFiles) && cachedFiles.length > 0;
-  const hasDecryptedFiles = Array.isArray(decryptedFiles) && decryptedFiles.length > 0;
-
-  if (!meta || !Object.keys(meta).length) {
-    return msg;
-  }
-
-  return {
-    ...msg,
-    contentMeta: {
-      ...(msg.contentMeta ?? {}),
-      ...meta,
-      ...(hasCachedFiles && !hasDecryptedFiles ? { files: cachedFiles } : {}),
-    },
-  };
+  const mergedMeta = mergeContentMetaWithStubs(msg.contentMeta, meta);
+  if (!mergedMeta) return msg;
+  return { ...msg, contentMeta: mergedMeta };
 }

@@ -54,8 +54,33 @@
   margin: 0.15rem 0;
 }
 
-.ctrlBtnOn {
-  background: #4f46e5;
+.captionLine {
+  font-size: 0.9rem;
+}
+
+.captionSpeaker {
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.captionInterim {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.captionHint {
+  margin-top: 0.35rem !important;
+  font-size: 0.72rem !important;
+  opacity: 0.65;
+  font-style: normal;
+}
+
+.captionsPlaceholder {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .stage {
@@ -104,9 +129,10 @@
 
 .controls {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem;
+  gap: 0;
   padding: 1.25rem 1rem 2rem;
   background: rgba(15, 23, 42, 0.9);
 }
@@ -134,10 +160,196 @@
   color: #dc2626;
 }
 
+/* Must come after .ctrlBtn — otherwise default grey wins over active state */
+.ctrlBtn.ctrlBtnCaptionsOn {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.9),
+    0 0 0 4px rgba(37, 99, 235, 0.55);
+}
+
+.ctrlBtn.ctrlBtnCaptionsOn:hover {
+  background: #1d4ed8;
+}
+
 .endBtn {
   background: #dc2626;
 }
 
 .endBtn:hover {
   background: #b91c1c;
+}
+
+.reconnectBanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 0.5rem 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #f59e0b;
+  color: #1e293b;
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.headerTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.remoteMutedBadge {
+  display: inline-flex;
+  align-items: center;
+  color: #fca5a5;
+}
+
+.connBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.35rem;
+  font-size: 0.72rem;
+}
+
+.connGood {
+  color: #86efac;
+}
+
+.connWarn {
+  color: #fcd34d;
+}
+
+.avatarWrap {
+  position: relative;
+}
+
+.avatarSpeaking {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.55);
+}
+
+.speakingRing {
+  position: absolute;
+  inset: -6px;
+  border-radius: 16px;
+  border: 2px solid rgba(37, 99, 235, 0.45);
+  animation: speakPulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes speakPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.35;
+  }
+}
+
+.localSpeakingBadge {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.85);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.waveBar {
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: #fff;
+  animation: waveBar 0.8s ease-in-out infinite;
+}
+
+.waveBar:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.waveBar:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes waveBar {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.controlRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.ctrlBtnActive {
+  background: #2563eb;
+}
+
+.ctrlBtnActive:hover {
+  background: #1d4ed8;
+}
+
+.captionMeta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+  font-size: 0.75rem;
+}
+
+.captionOn {
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.captionOff {
+  color: #94a3b8;
+}
+
+.langSelect select {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.72rem;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

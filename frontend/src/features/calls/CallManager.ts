@@ -2,6 +2,8 @@ import { buildIceServers } from './iceConfig';
 import { acquireUserMedia } from './mediaErrors';
 import type { CallIcePayload, CallMeta, CallPhase } from './types';
 
+export type CallConnectionUiState = 'connecting' | 'good' | 'poor' | 'reconnecting';
+
 export type IceEmitPayload = {
   callId: string;
   candidate: string;
@@ -24,6 +26,9 @@ class CallManager {
   private endReason: string | null = null;
   /** Set when a video call runs without a camera (audio-only fallback). */
   private videoFallback = false;
+  private connectionUi: CallConnectionUiState = 'connecting';
+  private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private onPeerFailed: (() => void) | null = null;
 
   getPhase(): CallPhase {
     return this.phase;
@@ -47,6 +52,14 @@ class CallManager {
 
   hadVideoFallback(): boolean {
     return this.videoFallback;
+  }
+
+  getConnectionUi(): CallConnectionUiState {
+    return this.connectionUi;
+  }
+
+  setPeerFailedHandler(handler: (() => void) | null): void {
+    this.onPeerFailed = handler;
   }
 
   subscribe(listener: StateListener): () => void {
@@ -193,10 +206,12 @@ class CallManager {
   }
 
   cleanup(): void {
+    this.clearDisconnectTimer();
     if (this.pc) {
       this.pc.onicecandidate = null;
       this.pc.ontrack = null;
       this.pc.onconnectionstatechange = null;
+      this.pc.oniceconnectionstatechange = null;
       this.pc.close();
       this.pc = null;
     }
@@ -210,6 +225,7 @@ class CallManager {
     this.phase = 'idle';
     this.endReason = null;
     this.videoFallback = false;
+    this.connectionUi = 'connecting';
     this.notify();
   }
 
@@ -268,15 +284,67 @@ class CallManager {
       this.iceEmit(payload);
     };
 
+    pc.oniceconnectionstatechange = () => {
+      this.applyIceConnectionState(pc.iceConnectionState);
+    };
+
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
+        this.clearDisconnectTimer();
+        this.setConnectionUi('good');
         this.setPhase('connected');
-      } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-        this.endLocally(pc.connectionState);
+      } else if (pc.connectionState === 'connecting') {
+        this.setConnectionUi('connecting');
+      } else if (pc.connectionState === 'disconnected') {
+        this.setConnectionUi('reconnecting');
+        this.scheduleDisconnectEnd();
+      } else if (pc.connectionState === 'failed') {
+        this.onPeerFailed?.();
+        this.endLocally('failed');
       }
     };
 
     this.pc = pc;
+  }
+
+  private setConnectionUi(state: CallConnectionUiState): void {
+    if (this.connectionUi === state) return;
+    this.connectionUi = state;
+    this.notify();
+  }
+
+  private clearDisconnectTimer(): void {
+    if (this.disconnectTimer) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = null;
+    }
+  }
+
+  private scheduleDisconnectEnd(): void {
+    if (this.disconnectTimer) return;
+    this.disconnectTimer = setTimeout(() => {
+      this.disconnectTimer = null;
+      if (this.pc?.connectionState === 'disconnected' || this.pc?.iceConnectionState === 'disconnected') {
+        this.onPeerFailed?.();
+        this.endLocally('disconnected');
+      }
+    }, 12_000);
+  }
+
+  private applyIceConnectionState(ice: RTCIceConnectionState): void {
+    if (ice === 'connected' || ice === 'completed') {
+      this.clearDisconnectTimer();
+      this.setConnectionUi('good');
+      if (this.phase === 'connecting') this.setPhase('connected');
+    } else if (ice === 'checking' || ice === 'new') {
+      this.setConnectionUi('connecting');
+    } else if (ice === 'disconnected') {
+      this.setConnectionUi('reconnecting');
+      this.scheduleDisconnectEnd();
+    } else if (ice === 'failed') {
+      this.onPeerFailed?.();
+      this.endLocally('failed');
+    }
   }
 
   private async flushPendingIce(): Promise<void> {

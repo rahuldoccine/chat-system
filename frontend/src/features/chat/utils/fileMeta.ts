@@ -104,6 +104,11 @@ export function getMessageFiles(message: Pick<Message, 'kind' | 'contentMeta'>):
     return bundled;
   }
 
+  const refs = (meta as Record<string, unknown>).attachmentRefs as { files?: unknown } | undefined;
+  if (Array.isArray(refs?.files) && refs.files.length > 0) {
+    return refs.files as FileAttachmentMeta[];
+  }
+
   if (message.kind && message.kind !== 'TEXT' && (meta.filename || meta.url)) {
     return [meta as FileAttachmentMeta];
   }

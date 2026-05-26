@@ -24,6 +24,7 @@ import { useChat } from '../../../context/ChatContext';
 import {
   useSendMessage,
   useMessages,
+  useThreadMessages,
   useEditMessage,
   useCreatePoll,
   useConversations,
@@ -113,6 +114,8 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
     setThreadDraft,
     alsoSendToMain,
     setAlsoSendToMain,
+    threadReplyingTo,
+    setThreadReplyingTo,
   } = useChat();
   const threadDraftKey =
     isThread && activeId && threadRootId ? `${activeId}:${threadRootId}` : null;
@@ -181,12 +184,27 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
     [activeId, isE2eeDm, uploadFile, user?.id],
   );
   const { data: messages } = useMessages(activeId);
+  const { data: threadData } = useThreadMessages(
+    isThread ? activeId : null,
+    isThread ? threadRootId ?? null : null,
+  );
   const decryptedBodies = useMessageBodies(messages);
+  const threadAllMessages = useMemo(() => {
+    if (!threadData?.root) return [];
+    return [threadData.root, ...(threadData.replies ?? [])];
+  }, [threadData]);
+  const threadDecryptedBodies = useMessageBodies(isThread ? threadAllMessages : undefined);
 
   const queryClient = useQueryClient();
   const replyTarget = messages?.find(m => m.id === replyingTo);
+  const threadReplyTarget = isThread
+    ? threadAllMessages.find((m) => m.id === threadReplyingTo)
+    : undefined;
   const replyPreviewText = replyTarget
     ? getMessagePreviewText(replyTarget, decryptedBodies, user?.id)
+    : '';
+  const threadReplyPreviewText = threadReplyTarget
+    ? getMessagePreviewText(threadReplyTarget, threadDecryptedBodies, user?.id)
     : '';
   const urlInText = useMemo(() => extractFirstHttpUrl(text), [text]);
   const linkPreviewEnabled =
@@ -394,9 +412,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
       }
     } finally {
       setUploadProgress(null);
-      if (opts?.viaEnter) {
-        requestAnimationFrame(() => inputRef.current?.focus());
-      }
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
 
     setText('');
@@ -406,7 +422,11 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
     } else if (activeId) {
       setDraft(activeId, '');
     }
-    if (!isThread) setReplyingTo(null);
+    if (isThread) {
+      setThreadReplyingTo(null);
+    } else {
+      setReplyingTo(null);
+    }
     setPreviewDismissed(false);
     setLinkDisplayAs('inline');
     resetUpload();
@@ -801,6 +821,31 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
           </button>
         </div>
       )}
+      {threadReplyTarget && !editingMessage && isThread && (
+        <div className={styles.replyBar}>
+          <div className={styles.replyInfo}>
+            <Reply size={14} className={styles.replyIcon} />
+            <div className={styles.replyContent}>
+              <span className={styles.replyLabel}>
+                Replying to{' '}
+                <LiveUserName
+                  userId={threadReplyTarget.senderId}
+                  displayName={threadReplyTarget.sender?.displayName}
+                  email={threadReplyTarget.sender?.email}
+                />
+              </span>
+              <p className={styles.replyText}>{threadReplyPreviewText}</p>
+            </div>
+          </div>
+          <button
+            className={styles.closeReply}
+            onClick={() => setThreadReplyingTo(null)}
+            type="button"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {voice.isRecording && (
         <div className={styles.recordingBar} role="status" aria-live="polite">
@@ -892,6 +937,17 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
             </p>
           )}
         </div>
+      )}
+
+      {isThread && (
+        <label className={styles.alsoSendRow}>
+          <input
+            type="checkbox"
+            checked={alsoSendToMain}
+            onChange={(e) => setAlsoSendToMain(e.target.checked)}
+          />
+          <span>Also send to direct message</span>
+        </label>
       )}
 
       <div className={styles.wrapper}>
@@ -1043,16 +1099,6 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
         </button>
       </div>
 
-      {isThread && (
-        <label className={styles.alsoSendRow}>
-          <input
-            type="checkbox"
-            checked={alsoSendToMain}
-            onChange={(e) => setAlsoSendToMain(e.target.checked)}
-          />
-          <span>Also send to direct message</span>
-        </label>
-      )}
     </div>
   );
 };

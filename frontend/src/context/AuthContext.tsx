@@ -9,6 +9,11 @@ import {
 import { unregisterWebPush } from '../services/push';
 import { ensureE2eeReady, E2eeKeysLockedError } from '../features/e2ee/bootstrap';
 import { clearSessionUnlock } from '../features/e2ee/accountSync';
+import {
+  ensureDecryptedPayloadHydrated,
+  clearDecryptedPayloadForUser,
+} from '../features/e2ee/decryptedPayloadCache';
+import { ensureSentPlaintextHydrated, clearSentPlaintextForUser } from '../features/e2ee/sentPlaintextCache';
 
 interface User {
   id: string;
@@ -105,6 +110,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             await ensureE2eeReady(loadedUser.id);
             setE2eeKeysLocked(false);
+            void Promise.all([
+              ensureSentPlaintextHydrated(loadedUser.id),
+              ensureDecryptedPayloadHydrated(loadedUser.id),
+            ]);
           } catch (err) {
             if (err instanceof E2eeKeysLockedError) {
               setE2eeKeysLocked(true);
@@ -131,7 +140,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [clearAuth]);
 
-  const markE2eeUnlocked = useCallback(() => setE2eeKeysLocked(false), []);
+  const markE2eeUnlocked = useCallback(() => {
+    setE2eeKeysLocked(false);
+    if (user?.id) {
+      void Promise.all([
+        ensureSentPlaintextHydrated(user.id),
+        ensureDecryptedPayloadHydrated(user.id),
+      ]);
+    }
+  }, [user?.id]);
 
   const login = useCallback(async (userData: unknown, newToken: string, password?: string) => {
     setAccessToken(newToken);
@@ -143,6 +160,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await ensureE2eeReady(mapped.id, { password });
         setE2eeKeysLocked(false);
+        void Promise.all([
+          ensureSentPlaintextHydrated(mapped.id),
+          ensureDecryptedPayloadHydrated(mapped.id),
+        ]);
       } catch (err) {
         if (err instanceof E2eeKeysLockedError) {
           setE2eeKeysLocked(true);
@@ -199,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [clearAuth]);
 
   const logoutAll = useCallback(async () => {
+    const uid = user?.id;
     try {
       await unregisterWebPush();
     } catch {
@@ -209,8 +231,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Still clear local state.
     }
+    if (uid) {
+      await Promise.all([
+        clearSentPlaintextForUser(uid),
+        clearDecryptedPayloadForUser(uid),
+      ]);
+    }
     clearAuth();
-  }, [clearAuth]);
+  }, [clearAuth, user?.id]);
 
   return (
     <AuthContext.Provider

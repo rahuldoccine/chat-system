@@ -46,8 +46,12 @@ import ForwardMessageModal from './ForwardMessageModal';
 import ConfirmModal from './ConfirmModal';
 import PollMessage from './PollMessage';
 import CallMessageBubble, { getCallFromMessageMeta } from '../../calls/components/CallMessageBubble';
+import CallTranscriptBubble, {
+  getCallTranscriptFromMeta,
+} from '../../calls/components/CallTranscriptBubble';
 import LinkPreviewBlock from './LinkPreviewBlock';
 import { useUpdateLinkDisplay } from '../hooks/useUpdateLinkDisplay';
+import { useAppSettings } from '../../settings/hooks/useUserSettings';
 import { linkDisplayMode, messageTextWithoutLink } from '../utils/linkPreviewUtils';
 import { useCall } from '../../calls/CallProvider';
 import { retryOutboxMessage } from '../../sync/sendMessage';
@@ -65,6 +69,7 @@ import {
 } from '../../e2ee/useMessageBodies';
 import TypingIndicator from './TypingIndicator';
 import { useChatTyping } from '../hooks/useChatTyping';
+import { HighlightedMessageText } from '../utils/searchHighlight';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -98,6 +103,10 @@ const MessageStream: React.FC = () => {
     clearPendingScrollToMessage,
     requestScrollToMessage,
     openThread,
+    inChatSearchOpen,
+    inChatSearchQuery,
+    inChatSearchMatchIds,
+    inChatSearchActiveIndex,
   } = useChat();
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
@@ -160,6 +169,12 @@ const MessageStream: React.FC = () => {
     [decryptedBodies, user?.id],
   );
 
+  const searchQuery = inChatSearchOpen ? inChatSearchQuery.trim() : '';
+  const activeSearchMessageId = useMemo(() => {
+    if (!searchQuery || !inChatSearchMatchIds.length) return null;
+    return inChatSearchMatchIds[inChatSearchActiveIndex] ?? null;
+  }, [searchQuery, inChatSearchMatchIds, inChatSearchActiveIndex]);
+
   const isDirectChat = activeChat?.type === 'DIRECT';
   const { startCall, phase: callPhase } = useCall();
   const { isPeerTyping, peerTypingCount } = useChatTyping(activeId, user?.id);
@@ -183,6 +198,9 @@ const MessageStream: React.FC = () => {
 
   const chatInitial = getChatName().charAt(0).toUpperCase();
   const isEmpty = !isLoading && !error && (messages?.length ?? 0) === 0;
+
+  const { data: appSettings } = useAppSettings();
+  const showReadReceipts = appSettings?.showReadReceipts !== false;
 
   const { mutate: addReaction } = useAddReaction();
   const { mutate: removeReaction } = useRemoveReaction();
@@ -654,7 +672,7 @@ const MessageStream: React.FC = () => {
     queryClient,
   ]);
 
-  // Keep paginating until every unread message id is present in the loaded list
+  // Keep paginating until every main-feed unread id is loaded (thread-only ids never appear here)
   useEffect(() => {
     if (!activeId || isLoading || isFetchingNextPage) return;
     const pending = [...unreadMessageIdsRef.current];
@@ -675,6 +693,20 @@ const MessageStream: React.FC = () => {
     fetchOlderMessages,
     unreadDivider?.count,
   ]);
+
+  // Thread-only unreads are not in the main timeline; clear them so divider/count stay accurate
+  useEffect(() => {
+    if (!activeId || isLoading || hasNextPage) return;
+    const loadedIds = new Set((messages ?? []).map((m) => m.id));
+    const orphans = [...unreadMessageIdsRef.current].filter((id) => !loadedIds.has(id));
+    if (orphans.length === 0) return;
+
+    for (const id of orphans) {
+      unreadMessageIdsRef.current.delete(id);
+    }
+    applyLocalUnreadState(activeId, [...unreadMessageIdsRef.current]);
+    void markMessagesAsRead(activeId, orphans);
+  }, [activeId, messages, hasNextPage, isLoading, applyLocalUnreadState]);
 
   // Preserve scroll position when older messages are prepended
   useLayoutEffect(() => {
@@ -1536,16 +1568,27 @@ const MessageStream: React.FC = () => {
               const isVoiceNote = isVoiceMessage(displayMsg);
                           const isPoll = msg.kind === 'POLL' && Boolean(msg.contentMeta?.pollId);
               const callMeta = getCallFromMessageMeta(msg.contentMeta);
+              const transcriptMeta = getCallTranscriptFromMeta(msg.contentMeta);
               const isCallSystem = msg.kind === 'SYSTEM' && Boolean(callMeta);
+              const isCallTranscript = msg.kind === 'SYSTEM' && Boolean(transcriptMeta);
               const showMediaTimestamp = hasMedia && !hasCaption;
               const mediaOnly = showMediaTimestamp && !usesGroupedFiles;
               const hasReactions = Boolean(msg.reactionsSummary && msg.reactionsSummary.length > 0);
               const isOptionsOpen = optionsFor === msg.id;
               const isReactionPickerOpen = reactionPickerFor === msg.id;
               const isPinned = pinnedIds.has(msg.id);
-              const isHighlighted = highlightMessageId === msg.id;
+              const isHighlighted =
+                highlightMessageId === msg.id || msg.id === activeSearchMessageId;
               const linkPreview =
                 !msg.deletedAt ? getMessageLinkPreview(msg, decryptedBodies) ?? null : null;
+
+              if (isCallTranscript && transcriptMeta) {
+                return (
+                  <div key={msg.id} id={`msg-${msg.id}`}>
+                    <CallTranscriptBubble transcript={transcriptMeta} preview={msg.ciphertext} />
+                  </div>
+                );
+              }
 
               if (isCallSystem && callMeta && user) {
                 const peer = activeChat?.dmPeer;
@@ -1655,7 +1698,7 @@ const MessageStream: React.FC = () => {
                         >
                         {msg.threadRootId && msg.broadcastToChannel && isDirectChat && (
                           <div className={styles.threadBroadcastHeader}>
-                            <span>replied to a thread: </span>
+                            <span>Replied to a thread: </span>
                             <button
                               type="button"
                               className={styles.threadBroadcastLink}
@@ -1732,7 +1775,9 @@ const MessageStream: React.FC = () => {
                                       editedAt: msg.editedAt,
                                       isMe,
                                       receiptStatus:
-                                        isMe && isDirectChat ? msg.receiptStatus ?? 'sent' : undefined,
+                                        isMe && isDirectChat && showReadReceipts
+                                          ? msg.receiptStatus ?? 'sent'
+                                          : undefined,
                                     }
                                   : undefined
                               }
@@ -1761,7 +1806,21 @@ const MessageStream: React.FC = () => {
                             const bodyText = linkPreview
                               ? messageTextWithoutLink(displayBody, linkPreview.url)
                               : displayBody;
-                            return bodyText?.trim() ? <p>{bodyText}</p> : null;
+                            return bodyText?.trim() ? (
+                              <p>
+                                {searchQuery ? (
+                                  <HighlightedMessageText
+                                    text={bodyText}
+                                    query={searchQuery}
+                                    isActiveMessage={msg.id === activeSearchMessageId}
+                                    markClassName={styles.searchMark}
+                                    markActiveClassName={styles.searchMarkActive}
+                                  />
+                                ) : (
+                                  bodyText
+                                )}
+                              </p>
+                            ) : null;
                           })()}
                           {linkPreview && !groupedWithCaption ? (
                             <LinkPreviewBlock
@@ -1787,7 +1846,7 @@ const MessageStream: React.FC = () => {
                               isMe={isMe}
                               sendStatus={isMe ? msg.status : undefined}
                               receiptStatus={
-                                isMe && isDirectChat && !msg.status
+                                isMe && isDirectChat && showReadReceipts && !msg.status
                                   ? msg.receiptStatus ?? 'sent'
                                   : undefined
                               }

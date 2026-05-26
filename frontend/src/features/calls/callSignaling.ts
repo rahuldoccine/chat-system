@@ -105,3 +105,11 @@ export function emitCallIce(payload: CallIcePayload): void {
 export function emitCallSignal(callId: string, signal: 'mute' | 'unmute' | 'camera_on' | 'camera_off'): void {
   socketService.emit('call:signal', { callId, signal });
 }
+
+export function emitCallTranscriptLine(payload: {
+  callId: string;
+  text: string;
+  t: number;
+}): void {
+  socketService.emit('call:transcript', payload);
+}

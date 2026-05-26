@@ -37,17 +37,22 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function useChatMessageSearch(chatId: string | null, query: string, enabled: boolean) {
+export function useChatMessageSearch(
+  chatId: string | null,
+  query: string,
+  enabled: boolean,
+  limit = 20,
+) {
   const trimmed = query.trim();
   const debouncedQ = useDebouncedValue(trimmed, 300);
   const canSearch = enabled && Boolean(chatId) && debouncedQ.length >= 1;
 
   return useQuery<SearchMessagesResponse>({
-    queryKey: ['chat-search', chatId, debouncedQ],
+    queryKey: ['chat-search', chatId, debouncedQ, limit],
     queryFn: async () => {
       const response = await api.get<SearchMessagesResponse>(
         `/chats/${chatId}/messages/search`,
-        { params: { q: debouncedQ, limit: 20 } },
+        { params: { q: debouncedQ, limit } },
       );
       return response.data;
     },
@@ -57,7 +62,12 @@ export function useChatMessageSearch(chatId: string | null, query: string, enabl
 }
 
 /** Client-side search for E2EE chats (decrypt + match loaded history). */
-export function useE2eeChatMessageSearch(chatId: string | null, query: string, enabled: boolean) {
+export function useE2eeChatMessageSearch(
+  chatId: string | null,
+  query: string,
+  enabled: boolean,
+  limit = 20,
+) {
   const { user } = useAuth();
   const trimmed = query.trim();
   const debouncedQ = useDebouncedValue(trimmed, 300);
@@ -86,7 +96,7 @@ export function useE2eeChatMessageSearch(chatId: string | null, query: string, e
       return { data: [], nextCursor: null };
     }
     return {
-      data: searchMessagesLocally(messages, bodies, debouncedQ, user.id),
+      data: searchMessagesLocally(messages, bodies, debouncedQ, user.id, limit),
       nextCursor: null,
     };
   }, [active, messages, bodies, debouncedQ, user?.id]);

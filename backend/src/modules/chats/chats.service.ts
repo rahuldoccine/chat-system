@@ -43,6 +43,11 @@ const senderSelect = {
   avatarUrl: true,
 } as const;
 
+/** Matches main chat timeline (excludes thread-only replies). */
+const MAIN_FEED_MESSAGE_WHERE = {
+  OR: [{ threadRootId: null }, { broadcastToChannel: true }],
+} satisfies Prisma.MessageWhereInput;
+
 const messageWithSenderInclude = {
   sender: { select: senderSelect },
   replyTo: {
@@ -393,7 +398,11 @@ export async function listChats(
   const unreadByChat = new Map<string, number>();
   for (const chatId of chatIds) {
     const n = await prisma.receipt.count({
-      where: { userId, readAt: null, message: { chatId, deletedAt: null } },
+      where: {
+        userId,
+        readAt: null,
+        message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
+      },
     });
     unreadByChat.set(chatId, n);
   }
@@ -1671,7 +1680,7 @@ export async function getChatUnreadBoundary(userId: string, chatId: string) {
     where: {
       userId,
       readAt: null,
-      message: { chatId, deletedAt: null },
+      message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
     },
     orderBy: { message: { createdAt: "asc" } },
     select: { messageId: true },
@@ -1686,6 +1695,39 @@ export async function getChatUnreadBoundary(userId: string, chatId: string) {
   }
   const messageIds = rows.map((r) => r.messageId);
   return { count: messageIds.length, firstMessageId: messageIds[0] ?? null, messageIds };
+}
+
+/** Mark unread thread-only replies for a thread (opening thread panel). */
+export async function markThreadAsRead(userId: string, chatId: string, threadRootId: string) {
+  await requireActiveMember(userId, chatId);
+  const prisma = getPrisma();
+  const rows = await prisma.receipt.findMany({
+    where: {
+      userId,
+      readAt: null,
+      message: {
+        chatId,
+        deletedAt: null,
+        threadRootId,
+        NOT: { broadcastToChannel: true },
+      },
+    },
+    select: { messageId: true },
+  });
+  const messageIds = rows.map((r) => r.messageId);
+  if (messageIds.length === 0) {
+    const unread = await getChatUnreadBoundary(userId, chatId);
+    return {
+      chatId,
+      messageIds: [] as string[],
+      readAt: null as Date | null,
+      shareReadReceipts: await userSharesReadReceipts(prisma, userId),
+      unread,
+    };
+  }
+  const marked = await markMessagesRead(userId, chatId, messageIds);
+  const unread = await getChatUnreadBoundary(userId, chatId);
+  return { ...marked, unread };
 }
 
 /** Mark every unread receipt in a chat for this member (used when opening a conversation). */

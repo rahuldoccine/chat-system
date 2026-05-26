@@ -19,11 +19,45 @@
 /* Thread panel footer — no double border; room for checkbox + menus */
 .containerThread {
   border-top: none;
-  padding: 0.75rem 1rem 1rem;
-  gap: 0.6rem;
+  padding: 0.5rem 0.75rem 0.75rem;
+  gap: 0.45rem;
   background: #ffffff;
   overflow: visible;
   box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.containerThread .wrapper {
+  padding: 0.45rem 0.65rem;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.containerThread .input {
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.containerThread .actionBtn {
+  padding: 0.4rem;
+  flex-shrink: 0;
+}
+
+.containerThread .sendBtn {
+  flex-shrink: 0;
+}
+
+.containerThread .alsoSendRow {
+  padding: 0.25rem 0.15rem 0.35rem;
+  margin: 0;
+  width: 100%;
+  line-height: 1.35;
+}
+
+.containerThread .replyBar {
+  margin-bottom: 0.15rem;
 }
 
 .replyBar {

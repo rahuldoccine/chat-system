@@ -15,6 +15,7 @@ import {
   ackIncomingMessages,
   applyChatReadToCaches,
   applyUnreadStateToCaches,
+  markThreadAsRead,
 } from '../utils/messageReceipts';
 import { removeMessageIdsFromUnread } from '../utils/incrementalRead';
 import { syncOnReconnect } from '../../sync/syncOnReconnect';
@@ -27,7 +28,7 @@ import {
 const ConversationRealtimeSync: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { activeId } = useChat();
+  const { activeId, activeThreadRootId } = useChat();
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -39,6 +40,16 @@ const ConversationRealtimeSync: React.FC = () => {
         void queryClient.invalidateQueries({
           queryKey: threadMessagesQueryKey(data.chatId, data.message.threadRootId),
         });
+        const isThreadOnly = !data.message.broadcastToChannel;
+        const viewingThread =
+          data.chatId === activeId &&
+          activeThreadRootId === data.message.threadRootId &&
+          data.message.senderId !== user.id;
+        if (isThreadOnly && viewingThread) {
+          void markThreadAsRead(data.chatId, data.message.threadRootId).then((unread) => {
+            if (unread) applyUnreadStateToCaches(queryClient, data.chatId, unread);
+          });
+        }
       }
 
       let found = false;
@@ -134,7 +145,7 @@ const ConversationRealtimeSync: React.FC = () => {
       socket.off('receipt:read', handleReceiptRead);
       socket.off('poll:updated', handlePollUpdated);
     };
-  }, [socket, queryClient, user?.id, activeId]);
+  }, [socket, queryClient, user?.id, activeId, activeThreadRootId]);
 
   return null;
 };

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './MediaAttachment.module.css';
 import { Download, ImageIcon } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
@@ -103,6 +103,7 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
 
   const { user, token } = useAuth();
   const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const closeViewer = useCallback(() => setViewerOpen(false), []);
   const openViewer = useCallback((e: React.MouseEvent) => {
@@ -140,6 +141,11 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
   const decryptedUrl = useDecryptedFileUrl(e2eeMessage, fileRef, transportMeta);
   const fullUrl =
     e2eeMessage && isE2eeMessage(e2eeMessage) ? decryptedUrl : buildFileUrl(fileRef, token);
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [fullUrl]);
   const mediaWidth = meta.width ?? primaryFile?.width;
   const mediaHeight = meta.height ?? primaryFile?.height;
   const isGif =
@@ -175,7 +181,10 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
     [displayName, e2eeMessage, fileRef, fullUrl, primaryFile, token, transportMeta, user?.id],
   );
 
-  if (!fullUrl) {
+  const showPlaceholder = !fullUrl || (fullUrl && !imgLoaded && !imgError);
+  const canOpenViewer = Boolean(fullUrl);
+
+  if (!fullUrl && !primaryFile && !meta.filename) {
     return <div className={styles.imageError}>Image unavailable</div>;
   }
 
@@ -184,39 +193,52 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
       <div
         className={`${styles.imageContainer} ${embedded ? styles.imageContainerEmbedded : ''} ${
           viewerOpen ? styles.imageContainerViewerOpen : ''
-        }`}
+        } ${showPlaceholder ? styles.imageContainerLoading : ''}`}
         style={!embedded && aspectRatio ? { aspectRatio } : undefined}
-        onClick={openViewer}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            e.stopPropagation();
-            setViewerOpen(true);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-label={`Open ${displayName}`}
+        onClick={canOpenViewer ? openViewer : undefined}
+        onKeyDown={
+          canOpenViewer
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setViewerOpen(true);
+                }
+              }
+            : undefined
+        }
+        role={canOpenViewer ? 'button' : undefined}
+        tabIndex={canOpenViewer ? 0 : undefined}
+        aria-label={canOpenViewer ? `Open ${displayName}` : `Loading ${displayName}`}
+        aria-busy={showPlaceholder && !fullUrl}
       >
-        {!imgError ? (
+        {showPlaceholder && (
+          <div className={styles.mediaShimmer} aria-hidden>
+            <span className={styles.mediaShimmerLabel}>{displayName}</span>
+          </div>
+        )}
+        {fullUrl && !imgError ? (
           <img
             src={fullUrl}
             alt={displayName}
             className={`${styles.image} ${embedded ? styles.imageEmbedded : ''} ${
               isGif ? styles.imageGif : ''
-            }`}
+            } ${imgLoaded ? styles.imageVisible : styles.imageHidden}`}
             crossOrigin="anonymous"
-            onLoad={onMediaLoad}
+            onLoad={() => {
+              setImgLoaded(true);
+              onMediaLoad?.();
+            }}
             onError={() => setImgError(true)}
             draggable={false}
           />
-        ) : (
+        ) : fullUrl && imgError ? (
           <button type="button" className={styles.imageError} onClick={openViewer}>
             <ImageIcon size={20} />
             <span>View image</span>
           </button>
-        )}
-        {!imgError && (
+        ) : null}
+        {imgLoaded && !imgError && (
           <div className={styles.imageOverlay}>
             <span className={styles.imageName}>{displayName}</span>
             <button
@@ -241,7 +263,9 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
           </div>
         )}
       </div>
-      <ImageViewerModal open={viewerOpen} src={fullUrl} alt={displayName} onClose={closeViewer} />
+      {fullUrl ? (
+        <ImageViewerModal open={viewerOpen} src={fullUrl} alt={displayName} onClose={closeViewer} />
+      ) : null}
     </>
   );
 };

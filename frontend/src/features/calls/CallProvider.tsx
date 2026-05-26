@@ -53,6 +53,8 @@ type CallContextValue = {
   switchCamera: () => Promise<boolean>;
   remotePeerMuted: boolean;
   connectedAt: number | null;
+  peerRinging: boolean;
+  connectionUi: import('./CallManager').CallConnectionUiState;
   clearError: () => void;
 };
 
@@ -90,6 +92,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remotePeerMuted, setRemotePeerMuted] = useState(false);
+  const [peerRinging, setPeerRinging] = useState(false);
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const remoteSdpRef = useRef<string | null>(null);
   const startingRef = useRef(false);
@@ -102,7 +105,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     callManager.setIceEmitter((payload) => emitCallIce(payload));
-    return () => callManager.setIceEmitter(null);
+    callManager.setPeerFailedHandler(() => {
+      const meta = callManager.getMeta();
+      if (meta?.callId) void emitCallEnd(meta.callId, 'network_lost');
+    });
+    return () => {
+      callManager.setIceEmitter(null);
+      callManager.setPeerFailedHandler(null);
+    };
   }, []);
 
   const handleEnded = useCallback((reason?: string) => {
@@ -114,6 +124,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsStarting(false);
     setConnectedAt(null);
     setRemotePeerMuted(false);
+    setPeerRinging(false);
     void queryClient.invalidateQueries({ queryKey: ['calls'] });
     void queryClient.invalidateQueries({ queryKey: ['messages'] });
     refresh();
@@ -151,9 +162,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (payload.signal === 'unmute') setRemotePeerMuted(false);
     };
 
+    const onRinging = (payload: { callId: string }) => {
+      const meta = callManager.getMeta();
+      if (!meta || meta.callId !== payload.callId) return;
+      setPeerRinging(true);
+    };
+
     const onAnswered = async (payload: { callId: string; sdp: string }) => {
       const meta = callManager.getMeta();
       if (!meta || meta.callId !== payload.callId) return;
+      setPeerRinging(false);
       try {
         await callManager.applyAnswer(payload.sdp);
         const ts = Date.now();
@@ -190,6 +208,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     socketService.on('call:incoming', onIncoming);
+    socketService.on('call:ringing', onRinging);
     socketService.on('call:answered', onAnswered);
     socketService.on('call:ice', onIce);
     socketService.on('call:rejected', onRejected);
@@ -209,6 +228,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       socketService.off('call:incoming', onIncoming);
+      socketService.off('call:ringing', onRinging);
       socketService.off('call:answered', onAnswered);
       socketService.off('call:ice', onIce);
       socketService.off('call:rejected', onRejected);
@@ -379,6 +399,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       switchCamera: () => callManager.switchCamera(),
       remotePeerMuted,
       connectedAt,
+      peerRinging,
+      connectionUi: callManager.getConnectionUi(),
       clearError: () => setError(null),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tick drives manager-derived fields
@@ -390,6 +412,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       error,
       remotePeerMuted,
       connectedAt,
+      peerRinging,
       startCall,
       acceptIncoming,
       rejectIncoming,

@@ -2,6 +2,7 @@ import React from 'react';
 import { useCall } from '../CallProvider';
 import type { CallMeta, OutgoingPreview } from '../types';
 import IncomingCallModal from './IncomingCallModal';
+import OutgoingCallModal from './OutgoingCallModal';
 import CallOverlay from './CallOverlay';
 import CallErrorBanner from './CallErrorBanner';
 
@@ -21,12 +22,15 @@ const CallShell: React.FC = () => {
     phase,
     meta,
     outgoingPreview,
+    isStarting,
     pendingIncoming,
     localStream,
     remoteStream,
     error,
     connectedAt,
     remotePeerMuted,
+    connectionUi,
+    peerRinging,
     acceptIncoming,
     rejectIncoming,
     hangUp,
@@ -52,44 +56,67 @@ const CallShell: React.FC = () => {
     );
   }
 
-  const showOverlay =
-    phase === 'ringing_out' ||
-    phase === 'connecting' ||
-    phase === 'connected';
-
   const overlayMeta: CallMeta | null =
-    meta ?? (outgoingPreview && showOverlay ? overlayMetaFromPreview(outgoingPreview) : null);
+    meta ??
+    (outgoingPreview && (isStarting || phase === 'ringing_out' || phase === 'connecting')
+      ? overlayMetaFromPreview(outgoingPreview)
+      : null);
 
-  if (!showOverlay || !overlayMeta) {
+  const showOutgoingCard =
+    Boolean(overlayMeta) &&
+    (isStarting || phase === 'ringing_out' || phase === 'connecting');
+
+  const showActiveOverlay = phase === 'connected' && Boolean(meta ?? overlayMeta);
+
+  if (!showOutgoingCard && !showActiveOverlay) {
     return error ? <CallErrorBanner message={error} onDismiss={clearError} /> : null;
   }
 
   const statusLabel =
-    phase === 'ringing_out'
+    isStarting
       ? 'Calling…'
-      : phase === 'connecting'
-        ? 'Connecting…'
-        : 'Ongoing';
+      : phase === 'ringing_out'
+        ? peerRinging
+          ? 'Ringing…'
+          : 'Calling…'
+        : phase === 'connecting'
+          ? 'Connecting…'
+          : 'Ongoing';
+
+  const activeMeta = meta ?? overlayMeta!;
 
   return (
     <>
       {error && <CallErrorBanner message={error} onDismiss={clearError} />}
-      <CallOverlay
-        peerUserId={overlayMeta.peerUserId}
-        peerName={overlayMeta.peerDisplayName}
-        peerAvatarUrl={overlayMeta.peerAvatarUrl}
-        statusLabel={statusLabel}
-        isVideo={overlayMeta.isVideo}
-        callId={meta?.callId ?? null}
-        connectedAt={connectedAt ?? meta?.connectedAt ?? null}
-        remotePeerMuted={remotePeerMuted}
-        localStream={localStream}
-        remoteStream={remoteStream}
-        onHangUp={() => void hangUp()}
-        onToggleMute={toggleMute}
-        onToggleCamera={toggleCamera}
-        onSwitchCamera={switchCamera}
-      />
+      {showOutgoingCard && overlayMeta && (
+        <OutgoingCallModal
+          peerName={overlayMeta.peerDisplayName}
+          peerUserId={overlayMeta.peerUserId}
+          peerAvatarUrl={overlayMeta.peerAvatarUrl}
+          statusLabel={statusLabel}
+          onCancel={() => void hangUp()}
+        />
+      )}
+      {showActiveOverlay && (
+        <CallOverlay
+          peerUserId={activeMeta.peerUserId}
+          peerName={activeMeta.peerDisplayName}
+          peerAvatarUrl={activeMeta.peerAvatarUrl}
+          statusLabel="Ongoing"
+          phase={phase}
+          isVideo={activeMeta.isVideo}
+          callId={meta?.callId ?? null}
+          connectedAt={connectedAt ?? meta?.connectedAt ?? null}
+          connectionUi={connectionUi}
+          remotePeerMuted={remotePeerMuted}
+          localStream={localStream}
+          remoteStream={remoteStream}
+          onHangUp={() => void hangUp()}
+          onToggleMute={toggleMute}
+          onToggleCamera={toggleCamera}
+          onSwitchCamera={switchCamera}
+        />
+      )}
     </>
   );
 };
