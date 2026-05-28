@@ -12,6 +12,15 @@ describe("messagePreviewBody", () => {
     ).toBe("hi there");
   });
 
+  it("strips @mention tokens from non-E2EE text preview", () => {
+    expect(
+      messagePreviewBody(
+        { kind: "TEXT", ciphertext: "@all hi @demotwo please check", contentMeta: null },
+        false,
+      ),
+    ).toBe("hi please check");
+  });
+
   it("returns voice label for voice notes", () => {
     expect(
       messagePreviewBody(
@@ -32,6 +41,19 @@ describe("messagePreviewBody", () => {
         true,
       ),
     ).toBe("hello there");
+  });
+
+  it("strips @mention tokens from E2EE pushPreview", () => {
+    expect(
+      messagePreviewBody(
+        {
+          kind: "TEXT",
+          ciphertext: "encrypted-blob",
+          contentMeta: { e2eeVersion: 1, pushPreview: "@demoone hello @all" },
+        },
+        true,
+      ),
+    ).toBe("hello");
   });
 
   it("returns media label from pushPreview for E2EE", () => {

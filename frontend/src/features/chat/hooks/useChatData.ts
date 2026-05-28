@@ -25,7 +25,7 @@ import { flushOutbox, sendMessageUnified } from '../../sync/sendMessage';
 import { canAttemptDelivery as canAttemptDeliveryAsync } from '../../sync/connectivity';
 import { buildOptimisticMessage } from '../../sync/optimisticMessage';
 import { linkSentMessageId, rememberSentPlaintext, rememberSentPayloadMeta } from '../../e2ee/sentPlaintextCache';
-import { isDmE2eeChat } from '../../e2ee/chatE2ee';
+import { isDmE2eeChat, isE2eeChat } from '../../e2ee/chatE2ee';
 import { prepareOutboundMessage, prepareOutboundPoll } from '../../e2ee/prepareOutbound';
 import { latestPeerSenderDeviceId } from '../../e2ee/peerDevice';
 
@@ -151,6 +151,7 @@ export const useSendMessage = () => {
       contentMeta,
       chat,
       peerUserId,
+      groupMemberIds,
       preEncrypted,
     }: {
       chatId: string;
@@ -162,6 +163,7 @@ export const useSendMessage = () => {
       contentMeta?: unknown;
       chat?: Chat | null;
       peerUserId?: string;
+      groupMemberIds?: string[];
       preEncrypted?: { ciphertext: string; contentMeta: unknown };
     }) => {
       const clientMessageId = crypto.randomUUID();
@@ -173,6 +175,17 @@ export const useSendMessage = () => {
           flattenMessagePages(cached?.pages),
           peerUserId,
         );
+      }
+
+      if (user?.id && chat && isE2eeChat(chat)) {
+        const plainMeta =
+          contentMeta && typeof contentMeta === 'object'
+            ? (contentMeta as Record<string, unknown>)
+            : undefined;
+        rememberSentPlaintext(user.id, clientMessageId, text ?? '');
+        if (plainMeta && Object.keys(plainMeta).length > 0) {
+          rememberSentPayloadMeta(user.id, clientMessageId, plainMeta);
+        }
       }
 
       if (user) {
@@ -224,12 +237,23 @@ export const useSendMessage = () => {
         userId: user?.id,
         chat: chat ?? undefined,
         peerUserId,
+        groupMemberIds,
         preferPeerDeviceId,
         preEncrypted,
       });
 
       if (user?.id && !result.queued) {
         linkSentMessageId(user.id, clientMessageId, result.message.id);
+        if (chat && isE2eeChat(chat)) {
+          rememberSentPlaintext(user.id, clientMessageId, text ?? '', result.message.id);
+          const plainMeta =
+            contentMeta && typeof contentMeta === 'object'
+              ? (contentMeta as Record<string, unknown>)
+              : undefined;
+          if (plainMeta && Object.keys(plainMeta).length > 0) {
+            rememberSentPayloadMeta(user.id, clientMessageId, plainMeta, result.message.id);
+          }
+        }
       }
 
       return { ...result, chatId, clientMessageId };
@@ -434,7 +458,7 @@ export const useEditMessage = () => {
             : new Date(updated.editedAt as string | number | Date).toISOString()
           : new Date().toISOString();
 
-      if (user?.id && isDmE2eeChat(chat ?? null)) {
+      if (user?.id && isE2eeChat(chat ?? null)) {
         const cacheKey = updated.clientMessageId ?? messageId;
         rememberSentPlaintext(user.id, cacheKey, text, updated.id);
         if (updated.contentMeta && typeof updated.contentMeta === 'object') {

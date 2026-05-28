@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 
 export function useChatTyping(activeId: string | null, currentUserId?: string) {
@@ -27,9 +27,19 @@ export function useChatTyping(activeId: string | null, currentUserId?: string) {
     [typingUsers, currentUserId],
   );
 
+  const clearTyping = useCallback((userId: string) => {
+    setTypingUsers((prev) => {
+      if (!prev[userId]) return prev;
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+  }, []);
+
   return {
     peerTypingIds,
     peerTypingCount: peerTypingIds.length,
     isPeerTyping: peerTypingIds.length > 0,
+    clearTyping,
   };
 }

@@ -16,6 +16,23 @@ import { getPrisma } from "./prisma.js";
 
 export type { NewMessageNotificationPayload };
 
+type MentionsMeta = { userIds?: string[]; all?: boolean };
+
+function readMentionsMeta(contentMeta: unknown): MentionsMeta {
+  if (!contentMeta || typeof contentMeta !== "object" || Array.isArray(contentMeta)) {
+    return {};
+  }
+  const raw = (contentMeta as { mentions?: unknown }).mentions;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+  const m = raw as MentionsMeta;
+  return {
+    userIds: Array.isArray(m.userIds) ? m.userIds.filter((id): id is string => typeof id === "string") : [],
+    all: m.all === true,
+  };
+}
+
 async function isRecipientActivelyViewingChat(userId: string, chatId: string): Promise<boolean> {
   const config = loadConfig();
   const fromRedis = await isActivelyViewingChatRedis(userId, chatId, config);
@@ -47,21 +64,32 @@ export async function notifyNewMessage(payload: {
     chatId: payload.chatId,
     message: payload.message,
   });
+  const mentions = readMentionsMeta(payload.message.contentMeta);
+  const hasDirectMentions = Boolean(mentions.all || (mentions.userIds?.length ?? 0) > 0);
+  const mentionedSet = new Set(mentions.userIds ?? []);
 
   for (const m of members) {
+    const isMentionRecipient = mentions.all === true || mentionedSet.has(m.userId);
+    const shouldTargetRecipient = hasDirectMentions ? isMentionRecipient : true;
+    if (!shouldTargetRecipient) continue;
+
     const settings = m.user.userSettings ?? (await getOrCreateSettings(m.userId));
     const viewing = await isRecipientActivelyViewingChat(m.userId, payload.chatId);
-    const send = shouldSendPush({
+    const baseSend = shouldSendPush({
       notifyPush: settings.notifyPush,
       mutedUntil: m.mutedUntil,
       isActivelyViewingChat: viewing,
     });
+    const muted = Boolean(m.mutedUntil && m.mutedUntil > new Date());
+    // Mentions bypass only "actively viewing this chat" suppression.
+    // They still respect notifyPush + mute settings.
+    const send = baseSend || (isMentionRecipient && settings.notifyPush && !muted);
     if (send) {
       enqueuePushNotification({
         userId: m.userId,
         chatId: payload.chatId,
         messageId: payload.message.id,
-        title: pushCopy.title,
+        title: isMentionRecipient ? `${pushCopy.title}` : pushCopy.title,
         body: pushCopy.body,
       });
     }

@@ -1,6 +1,8 @@
 import type { Chat } from '../chat/types';
 import { buildPushPreview } from '../chat/utils/pushPreview';
-import { isDmE2eeChat } from './chatE2ee';
+import { isDmE2eeChat, isGroupE2eeChat } from './chatE2ee';
+import { encryptGroupMessage } from './groupChat';
+import { GROUP_E2EE_VERSION } from './protocol';
 import { ensureE2eeReady, E2eeKeysLockedError } from './bootstrap';
 import { encryptDirectMessage, E2eePeerNotReadyError } from './directChat';
 import { getRememberedPeerDevice } from './peerDevice';
@@ -13,6 +15,7 @@ export type OutboundPlainMessage = {
   clientMessageId?: string;
   chat?: Pick<Chat, 'type' | 'e2eeMode' | 'dmPeer'> | null;
   peerUserId?: string;
+  groupMemberIds?: string[];
   /** Peer device from their latest message in this chat. */
   preferPeerDeviceId?: string | null;
 };
@@ -56,6 +59,24 @@ function buildAttachmentRefs(
   return files.length ? { files } : undefined;
 }
 
+function plainMetaFromInput(meta: unknown): Record<string, unknown> | undefined {
+  return meta && typeof meta === 'object' ? (meta as Record<string, unknown>) : undefined;
+}
+
+function mentionsMetaFromInput(
+  meta: Record<string, unknown> | undefined,
+): { userIds: string[]; all?: true } | undefined {
+  const raw = meta?.mentions;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const m = raw as { userIds?: unknown; all?: unknown };
+  const userIds = Array.isArray(m.userIds)
+    ? [...new Set(m.userIds.filter((id): id is string => typeof id === 'string'))]
+    : [];
+  const all = m.all === true;
+  if (!all && userIds.length === 0) return undefined;
+  return { userIds, ...(all ? { all: true as const } : {}) };
+}
+
 export async function prepareOutboundMessage(
   userId: string,
   input: OutboundPlainMessage,
@@ -64,6 +85,34 @@ export async function prepareOutboundMessage(
   const chat = input.chat;
   const peerUserId =
     input.peerUserId ?? (chat?.type === 'DIRECT' ? chat.dmPeer?.id : undefined);
+
+  if (isGroupE2eeChat(chat ?? null) && input.chatId) {
+    await ensureE2eeReady(userId, { offline: offlineMode });
+    const memberIds = input.groupMemberIds ?? [];
+    const plainMeta = plainMetaFromInput(input.contentMeta);
+    const encrypted = await encryptGroupMessage(
+      userId,
+      input.chatId,
+      memberIds,
+      input.text ?? '',
+      plainMeta,
+    );
+    const pushPreview = buildPushPreview({
+      text: input.text,
+      kind: input.kind,
+      contentMeta: plainMeta,
+    });
+    const mentions = mentionsMetaFromInput(plainMeta);
+    return {
+      ciphertext: encrypted.ciphertext,
+      contentMeta: {
+        ...encrypted.contentMeta,
+        e2eeVersion: GROUP_E2EE_VERSION,
+        pushPreview,
+        ...(mentions ? { mentions } : {}),
+      },
+    };
+  }
 
   if (!isDmE2eeChat(chat ?? null) || !peerUserId) {
     return {

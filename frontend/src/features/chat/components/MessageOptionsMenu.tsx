@@ -11,7 +11,9 @@ type MessageOptionsMenuProps = {
   message: Message;
   isMe: boolean;
   isPinned: boolean;
+  canPin?: boolean;
   userId?: string;
+  canModerateDelete?: boolean;
   decryptedBodies?: Record<string, DecryptedBody>;
   /** Decrypted/plain preview for copy (E2EE-safe). */
   copyText?: string;
@@ -23,7 +25,9 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   message,
   isMe,
   isPinned,
+  canPin = true,
   userId,
+  canModerateDelete = false,
   decryptedBodies,
   copyText: copyTextProp,
   onAction,
@@ -53,7 +57,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
     canCopyMessage(message, decryptedBodies, userId) &&
     (copyTextProp ?? getMessageCopyText(message, decryptedBodies, userId)).length > 0;
   const showEdit = canEditMessage(message, userId, decryptedBodies);
-  const showDelete = isMe;
+  const showDelete = isMe || canModerateDelete;
 
   const run = (action: MessageMenuAction) => {
     onAction(action);
@@ -80,17 +84,18 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
           <span>Delete</span>
         </button>
       )}
-      {isPinned ? (
-        <button type="button" className={styles.item} role="menuitem" onClick={() => run('unpin')}>
-          <PinOff size={16} />
-          <span>Unpin</span>
-        </button>
-      ) : (
-        <button type="button" className={styles.item} role="menuitem" onClick={() => run('pin')}>
-          <Pin size={16} />
-          <span>Pin</span>
-        </button>
-      )}
+      {canPin &&
+        (isPinned ? (
+          <button type="button" className={styles.item} role="menuitem" onClick={() => run('unpin')}>
+            <PinOff size={16} />
+            <span>Unpin</span>
+          </button>
+        ) : (
+          <button type="button" className={styles.item} role="menuitem" onClick={() => run('pin')}>
+            <Pin size={16} />
+            <span>Pin</span>
+          </button>
+        ))}
       <button type="button" className={styles.item} role="menuitem" onClick={() => run('forward')}>
         <Forward size={16} />
         <span>Forward</span>

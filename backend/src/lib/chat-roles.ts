@@ -19,6 +19,11 @@ export function canManageGroupMeta(role: ChatMemberRole): boolean {
   return roleAtLeast(role, "ADMIN");
 }
 
+/** Invite or add members (private groups: owner, admin, moderator). */
+export function canInviteGroupMembers(role: ChatMemberRole): boolean {
+  return roleAtLeast(role, "MOD");
+}
+
 export function roleRank(role: ChatMemberRole): number {
   return rank[role];
 }

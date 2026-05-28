@@ -8,7 +8,7 @@ import { AppError } from "../../errors/index.js";
 import { getPrisma } from "../../lib/prisma.js";
 import { shouldForceAttachmentDisposition } from "../../lib/upload-allowlist.js";
 import { userCanAccessUploadedFile } from "../../lib/upload-access.js";
-import { createRequireAuth } from "../../middleware/auth.js";
+import { isSafeStorageKey, resolveStorageAbsolutePath } from "../../lib/upload-storage.js";
 import { asyncHandler } from "../../middleware/async-handler.js";
 
 import { verifyAccessTokenActive } from "../../lib/validate-access-token.js";
@@ -42,11 +42,14 @@ export function createFilesRouter(config: AppConfig): Router {
   };
 
   router.get(
-    "/:key",
+    "/*",
     requireAuthOrQueryToken,
     asyncHandler(async (req, res) => {
-      const key = req.params.key as string;
-      if (!key || key !== path.basename(key) || key.includes("..")) {
+      // Router is mounted at `/files`, so `req.path` is everything after `/files`
+      // e.g. `/groupchats/<uuid>.jpg` (supports nested keys).
+      const rawKey = (req.path ?? "").replace(/^\/+/, "");
+      const key = decodeURIComponent(rawKey);
+      if (!key || !isSafeStorageKey(key)) {
         throw new AppError(400, "INVALID_KEY", "Invalid file key");
       }
 
@@ -60,20 +63,19 @@ export function createFilesRouter(config: AppConfig): Router {
         throw new AppError(404, "NOT_FOUND", "File not found");
       }
 
-      const root = path.resolve(config.uploadDir);
-      const abs = path.resolve(root, key);
-      if (abs !== root && !abs.startsWith(root + path.sep)) {
-        throw new AppError(400, "INVALID_KEY", "Invalid file key");
-      }
-      if (!fs.existsSync(abs)) {
+      const abs = resolveStorageAbsolutePath(config.uploadDir, key);
+      if (!abs || !fs.existsSync(abs)) {
         throw new AppError(404, "NOT_FOUND", "File missing on disk");
       }
 
       res.setHeader("Content-Type", file.mimeType);
-      // Allow <img> / media from the Vite dev server (different port than API)
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       if (shouldForceAttachmentDisposition(file.mimeType)) {
-        res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(key)}"`);
+        const downloadName = path.basename(key);
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${encodeURIComponent(downloadName)}"`,
+        );
       }
       fs.createReadStream(abs).pipe(res);
     }),

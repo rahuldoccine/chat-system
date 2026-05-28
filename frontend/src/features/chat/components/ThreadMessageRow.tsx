@@ -25,6 +25,7 @@ export type ThreadMessageRowProps = {
   msg: Message;
   isMe: boolean;
   isDirectChat: boolean;
+  canPin?: boolean;
   viewerId?: string;
   bodies: Record<string, DecryptedBody>;
   isPinned?: boolean;
@@ -37,6 +38,7 @@ const ThreadMessageRow: React.FC<ThreadMessageRowProps> = ({
   msg,
   isMe,
   isDirectChat,
+  canPin = true,
   viewerId,
   bodies,
   isPinned = false,
@@ -219,6 +221,7 @@ const ThreadMessageRow: React.FC<ThreadMessageRowProps> = ({
               message={msg}
               isMe={isMe}
               isPinned={isPinned}
+              canPin={canPin}
               userId={viewerId}
               decryptedBodies={bodies}
               copyText={getMessageCopyText(msg, bodies, viewerId)}

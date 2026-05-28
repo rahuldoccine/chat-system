@@ -6,14 +6,21 @@ import { isChatMuted, muteUntilIndefinite } from '../utils/mute';
 import { useMuteChat, getApiErrorMessage } from '../../settings/hooks/useUserSettings';
 import UserAvatar from './UserAvatar';
 import styles from './ChatDetailsPanel.module.css';
+import GroupInfoPanel from './GroupInfoPanel';
 
 type ChatDetailsPanelProps = {
   chat: Chat;
   chatName: string;
   isPeerOnline: boolean;
+  onGroupLeave?: () => void;
 };
 
-const ChatDetailsPanel: React.FC<ChatDetailsPanelProps> = ({ chat, chatName, isPeerOnline }) => {
+const ChatDetailsPanel: React.FC<ChatDetailsPanelProps> = ({
+  chat,
+  chatName,
+  isPeerOnline,
+  onGroupLeave,
+}) => {
   const [muted, setMuted] = useState(() => isChatMuted(chat.mutedUntil));
   const { mutateAsync: muteChat, isPending: muting } = useMuteChat();
 
@@ -32,6 +39,10 @@ const ChatDetailsPanel: React.FC<ChatDetailsPanelProps> = ({ chat, chatName, isP
 
   const statusClass =
     chat.type === 'DIRECT' && isPeerOnline ? styles.status : `${styles.status} ${styles.statusMuted}`;
+
+  if (chat.type === 'GROUP') {
+    return <GroupInfoPanel chat={chat} chatName={chatName} onLeave={onGroupLeave} />;
+  }
 
   const handleMuteToggle = async () => {
     const nextMuted = !muted;

@@ -232,13 +232,13 @@ export function getSentPlaintext(
 
   if (msg.clientMessageId) {
     const hit = byClientId.get(msg.clientMessageId);
-    if (hit) return hit;
+    if (hit !== undefined) return hit;
     const persisted = data[storageKey(userId, 'c', msg.clientMessageId)];
-    if (persisted) return persisted;
+    if (persisted !== undefined) return persisted;
   }
 
   const mem = byMessageId.get(msg.id);
-  if (mem) return mem;
+  if (mem !== undefined) return mem;
   return data[storageKey(userId, 'm', msg.id)];
 }
 
@@ -294,7 +294,7 @@ export function linkSentMessageId(
 ): void {
   const text =
     byClientId.get(clientMessageId) ?? loadPersisted()[storageKey(userId, 'c', clientMessageId)];
-  if (text) {
+  if (text !== undefined) {
     byMessageId.set(messageId, text);
     persistEntry(userId, 'm', messageId, text);
     persistEntry(userId, 'c', clientMessageId, text);

@@ -2,7 +2,8 @@ import type { Message } from '../chat/types';
 import type { E2eeKeyMaterial } from './keyStore';
 import { getSignedPreKeyPrivate } from './keyStore';
 import { aesGcmDecrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
-import { decodeEnvelope, decodePayload, type DmV1Payload } from './protocol';
+import { decodeEnvelope, decodePayload, isGroupE2eeMessage, type DmV1Payload } from './protocol';
+import { decryptGroupMessage } from './groupChat';
 import * as e2eeApi from './e2eeApi';
 import { getPayloadFromMemory, setPayloadMemory, ciphertextFingerprint } from './decryptedPayloadCache';
 import type { DecryptedBody } from './useMessageBodies';
@@ -30,6 +31,12 @@ export async function decryptMessagePayload(
   material: E2eeKeyMaterial,
   fingerprintCache: Map<string, string>,
 ): Promise<DmV1Payload | null> {
+  if (isGroupE2eeMessage(msg)) {
+    const meta = msg.contentMeta as Record<string, unknown> | undefined;
+    const epoch = typeof meta?.epoch === 'number' ? meta.epoch : 0;
+    return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch);
+  }
+
   const envelope = decodeEnvelope(msg.ciphertext ?? '');
   if (!envelope) return null;
 

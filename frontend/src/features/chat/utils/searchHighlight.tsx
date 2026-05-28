@@ -33,6 +33,33 @@ type HighlightedMessageTextProps = {
   markActiveClassName: string;
 };
 
+import { splitMentionSegments } from './mentions';
+
+type MentionHighlightedTextProps = {
+  text: string;
+  mentionClassName: string;
+};
+
+export const MentionHighlightedText: React.FC<MentionHighlightedTextProps> = ({
+  text,
+  mentionClassName,
+}) => {
+  const parts = splitMentionSegments(text);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.type === 'mention' ? (
+          <mark key={i} className={mentionClassName}>
+            {part.value}
+          </mark>
+        ) : (
+          <React.Fragment key={i}>{part.value}</React.Fragment>
+        ),
+      )}
+    </>
+  );
+};
+
 export const HighlightedMessageText: React.FC<HighlightedMessageTextProps> = ({
   text,
   query,

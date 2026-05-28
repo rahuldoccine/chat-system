@@ -1,6 +1,8 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useAuth } from './AuthContext';
 
-export type ChatSection = 'messages' | 'files' | 'pins' | 'calls';
+export type ChatSection = 'messages' | 'files' | 'pins' | 'calls' | 'members' | 'settings';
+export type GroupDetailsTab = 'members' | 'settings';
 
 interface ChatContextType {
   activeId: string | null;
@@ -9,6 +11,8 @@ interface ChatContextType {
   chatFocusKey: number;
   activeSection: ChatSection;
   setActiveSection: (section: ChatSection) => void;
+  groupDetailsTab: GroupDetailsTab;
+  setGroupDetailsTab: (tab: GroupDetailsTab) => void;
   pendingScrollToMessageId: string | null;
   requestScrollToMessage: (messageId: string) => void;
   clearPendingScrollToMessage: () => void;
@@ -46,6 +50,7 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [chatFocusKey, setChatFocusKey] = useState(0);
   const [isDetailsOpen, setDetailsOpen] = useState(false);
@@ -59,6 +64,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     contentMeta?: unknown;
   } | null>(null);
   const [activeSection, setActiveSection] = useState<ChatSection>('messages');
+  const [groupDetailsTab, setGroupDetailsTab] = useState<GroupDetailsTab>('members');
   const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
   const [activeThreadRootId, setActiveThreadRootId] = useState<string | null>(null);
   const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
@@ -115,6 +121,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setDrafts(prev => ({ ...prev, [id]: text }));
   };
 
+  useEffect(() => {
+    if (isAuthenticated) return;
+    // Ensure a fresh default Home state after logout/login cycles.
+    setActiveIdState(null);
+    setReplyingTo(null);
+    setEditingMessage(null);
+    setForwardingMessage(null);
+    setActiveSection('messages');
+    setGroupDetailsTab('members');
+    setPendingScrollToMessageId(null);
+    setActiveThreadRootId(null);
+    setAlsoSendToMain(false);
+    setThreadReplyingTo(null);
+    clearInChatSearch();
+  }, [isAuthenticated, clearInChatSearch]);
+
   return (
     <ChatContext.Provider value={{ 
       activeId, 
@@ -125,6 +147,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setEditingMessage(null);
         setForwardingMessage(null);
         setActiveSection('messages');
+        setGroupDetailsTab('members');
         setPendingScrollToMessageId(null);
         setActiveThreadRootId(null);
         setAlsoSendToMain(false);
@@ -134,6 +157,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       activeSection,
       setActiveSection,
+      groupDetailsTab,
+      setGroupDetailsTab,
       pendingScrollToMessageId,
       requestScrollToMessage,
       clearPendingScrollToMessage,

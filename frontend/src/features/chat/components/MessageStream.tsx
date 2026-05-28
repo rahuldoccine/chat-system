@@ -17,7 +17,7 @@ import UserAvatar from './UserAvatar';
 import LiveUserName from './LiveUserName';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Reply, Smile, MoreHorizontal, MessageCircle, Sparkles, ChevronDown, Pin } from 'lucide-react';
 import MediaAttachment from './MediaAttachment';
 import MessageMeta from './MessageMeta';
@@ -49,6 +49,11 @@ import CallMessageBubble, { getCallFromMessageMeta } from '../../calls/component
 import CallTranscriptBubble, {
   getCallTranscriptFromMeta,
 } from '../../calls/components/CallTranscriptBubble';
+import GroupActivityBubble, {
+  getGroupActivityFromMeta,
+} from './GroupActivityBubble';
+import { fetchGroup, type GroupMember } from '../api/groupsApi';
+import { canModerateMessages, roleLabel } from '../utils/groupRoles';
 import LinkPreviewBlock from './LinkPreviewBlock';
 import { useUpdateLinkDisplay } from '../hooks/useUpdateLinkDisplay';
 import { useAppSettings } from '../../settings/hooks/useUserSettings';
@@ -69,7 +74,7 @@ import {
 } from '../../e2ee/useMessageBodies';
 import TypingIndicator from './TypingIndicator';
 import { useChatTyping } from '../hooks/useChatTyping';
-import { HighlightedMessageText } from '../utils/searchHighlight';
+import { HighlightedMessageText, MentionHighlightedText } from '../utils/searchHighlight';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -176,8 +181,27 @@ const MessageStream: React.FC = () => {
   }, [searchQuery, inChatSearchMatchIds, inChatSearchActiveIndex]);
 
   const isDirectChat = activeChat?.type === 'DIRECT';
+  const isGroupChat = activeChat?.type === 'GROUP';
+  const supportsThreads = isDirectChat || isGroupChat;
+  const { data: groupDetails } = useQuery({
+    queryKey: ['group', activeId],
+    queryFn: () => fetchGroup(activeId!),
+    enabled: Boolean(activeId && isGroupChat),
+  });
+  const canModerate = groupDetails ? canModerateMessages(groupDetails.myRole) : false;
+  const memberRoleByUserId = useMemo(() => {
+    const map = new Map<string, string>();
+    groupDetails?.members.forEach((m) => map.set(m.userId, roleLabel(m.role)));
+    return map;
+  }, [groupDetails?.members]);
+
+  const groupMemberById = useMemo(() => {
+    const map = new Map<string, GroupMember>();
+    groupDetails?.members.forEach((m) => map.set(m.userId, m));
+    return map;
+  }, [groupDetails?.members]);
   const { startCall, phase: callPhase } = useCall();
-  const { isPeerTyping, peerTypingCount } = useChatTyping(activeId, user?.id);
+  const { isPeerTyping, peerTypingCount, peerTypingIds } = useChatTyping(activeId, user?.id);
 
   const getChatName = () => {
     if (!activeChat) return 'this chat';
@@ -190,11 +214,40 @@ const MessageStream: React.FC = () => {
     if (activeChat?.type === 'DIRECT') {
       return `${getChatName()} is typing`;
     }
-    if (peerTypingCount === 1) return 'Someone is typing';
+    if (peerTypingCount === 1) {
+      const uid = peerTypingIds[0];
+      const member = uid ? groupMemberById.get(uid) : undefined;
+      const name =
+        member?.displayName || member?.username || member?.email || 'Someone';
+      return `${name} is typing`;
+    }
     return `${peerTypingCount} people are typing`;
-  }, [isPeerTyping, activeChat?.type, peerTypingCount, activeChat]);
+  }, [
+    isPeerTyping,
+    activeChat?.type,
+    activeChat,
+    peerTypingCount,
+    peerTypingIds,
+    groupMemberById,
+    getChatName,
+  ]);
 
-  const typingPeer = activeChat?.type === 'DIRECT' ? activeChat.dmPeer : undefined;
+  const typingPeer = useMemo(() => {
+    if (!isPeerTyping) return undefined;
+    if (activeChat?.type === 'DIRECT') return activeChat.dmPeer;
+    const uid = peerTypingIds[0];
+    if (!uid) return undefined;
+    const member = groupMemberById.get(uid);
+    if (member) {
+      return {
+        id: member.userId,
+        displayName: member.displayName,
+        email: member.email,
+        avatarUrl: member.avatarUrl,
+      };
+    }
+    return { id: uid };
+  }, [isPeerTyping, activeChat, peerTypingIds, groupMemberById]);
 
   const chatInitial = getChatName().charAt(0).toUpperCase();
   const isEmpty = !isLoading && !error && (messages?.length ?? 0) === 0;
@@ -1167,6 +1220,7 @@ const MessageStream: React.FC = () => {
     const handleClickOutside = (e: MouseEvent) => {
       if (reactionPickerRef.current && !reactionPickerRef.current.contains(e.target as Node)) {
         setReactionPickerFor(null);
+        setOptionsFor(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1569,6 +1623,9 @@ const MessageStream: React.FC = () => {
                           const isPoll = msg.kind === 'POLL' && Boolean(msg.contentMeta?.pollId);
               const callMeta = getCallFromMessageMeta(msg.contentMeta);
               const transcriptMeta = getCallTranscriptFromMeta(msg.contentMeta);
+              const groupActivityMeta = getGroupActivityFromMeta(msg.contentMeta);
+              const isGroupActivity =
+                msg.kind === 'SYSTEM' && Boolean(groupActivityMeta) && !callMeta;
               const isCallSystem = msg.kind === 'SYSTEM' && Boolean(callMeta);
               const isCallTranscript = msg.kind === 'SYSTEM' && Boolean(transcriptMeta);
               const showMediaTimestamp = hasMedia && !hasCaption;
@@ -1581,6 +1638,14 @@ const MessageStream: React.FC = () => {
                 highlightMessageId === msg.id || msg.id === activeSearchMessageId;
               const linkPreview =
                 !msg.deletedAt ? getMessageLinkPreview(msg, decryptedBodies) ?? null : null;
+
+              if (isGroupActivity) {
+                return (
+                  <div key={msg.id} id={`msg-${msg.id}`}>
+                    <GroupActivityBubble ciphertext={msg.ciphertext} meta={groupActivityMeta ?? undefined} />
+                  </div>
+                );
+              }
 
               if (isCallTranscript && transcriptMeta) {
                 return (
@@ -1627,10 +1692,6 @@ const MessageStream: React.FC = () => {
                   className={`${styles.messageWrapper} ${isMe ? styles.isMe : ''} ${
                     wideMediaLayout ? styles.messageWrapperWithMedia : ''
                   } ${compactMediaLayout ? styles.messageWrapperMediaCompact : ''}`}
-                  onMouseLeave={() => {
-                    if (isOptionsOpen) setOptionsFor(null);
-                    if (isReactionPickerOpen) setReactionPickerFor(null);
-                  }}
                 >
                   {!isMe && (
                     <UserAvatar
@@ -1651,12 +1712,19 @@ const MessageStream: React.FC = () => {
                       </span>
                     )}
                     {!isMe && (
-                      <LiveUserName
-                        userId={msg.senderId}
-                        displayName={msg.sender?.displayName}
-                        email={msg.sender?.email}
-                        className={styles.senderName}
-                      />
+                      <div className={styles.senderNameRow}>
+                        <LiveUserName
+                          userId={msg.senderId}
+                          displayName={msg.sender?.displayName}
+                          email={msg.sender?.email}
+                          className={styles.senderName}
+                        />
+                        {isGroupChat && memberRoleByUserId.get(msg.senderId) && (
+                          <span className={styles.roleBadge}>
+                            {memberRoleByUserId.get(msg.senderId)}
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     <div className={styles.bubbleContainer}>
@@ -1696,7 +1764,7 @@ const MessageStream: React.FC = () => {
                             isMe && msg.status === 'error' ? styles.bubbleFailed : ''
                           }`}
                         >
-                        {msg.threadRootId && msg.broadcastToChannel && isDirectChat && (
+                        {msg.threadRootId && msg.broadcastToChannel && supportsThreads && (
                           <div className={styles.threadBroadcastHeader}>
                             <span>Replied to a thread: </span>
                             <button
@@ -1817,7 +1885,10 @@ const MessageStream: React.FC = () => {
                                     markActiveClassName={styles.searchMarkActive}
                                   />
                                 ) : (
-                                  bodyText
+                                  <MentionHighlightedText
+                                    text={bodyText}
+                                    mentionClassName={styles.mentionMark}
+                                  />
                                 )}
                               </p>
                             ) : null;
@@ -1854,7 +1925,7 @@ const MessageStream: React.FC = () => {
                           )}
                         </div>
                         </div>
-                        {(msg.threadReplyCount ?? 0) > 0 && !msg.threadRootId && isDirectChat && (
+                        {(msg.threadReplyCount ?? 0) > 0 && !msg.threadRootId && supportsThreads && (
                           <button
                             type="button"
                             className={styles.threadSummary}
@@ -1883,14 +1954,17 @@ const MessageStream: React.FC = () => {
                             ))}
                           </div>
                         )}
-                      </div>
 
-                      <div
-                        className={`${styles.actions} ${isMe ? styles.actionsMe : ''} ${
-                          isOptionsOpen || isReactionPickerOpen ? styles.actionsPinned : ''
-                        }`}
-                        ref={reactionPickerFor === msg.id ? reactionPickerRef : undefined}
-                      >
+                        <div
+                          className={`${styles.actions} ${isMe ? styles.actionsMe : ''} ${
+                            isOptionsOpen || isReactionPickerOpen ? styles.actionsPinned : ''
+                          }`}
+                          ref={
+                            reactionPickerFor === msg.id || optionsFor === msg.id
+                              ? reactionPickerRef
+                              : undefined
+                          }
+                        >
                         <button
                           type="button"
                           className={styles.actionBtn}
@@ -1922,9 +1996,9 @@ const MessageStream: React.FC = () => {
                         <button
                           type="button"
                           className={styles.actionBtn}
-                          aria-label={isDirectChat ? 'Reply in thread' : 'Reply'}
+                          aria-label={supportsThreads ? 'Reply in thread' : 'Reply'}
                           onClick={() => {
-                            if (isDirectChat) {
+                            if (supportsThreads) {
                               const rootId =
                                 msg.threadRootId && msg.broadcastToChannel
                                   ? msg.threadRootId
@@ -1954,13 +2028,16 @@ const MessageStream: React.FC = () => {
                             message={msg}
                             isMe={isMe}
                             isPinned={pinnedIds.has(msg.id)}
+                            canPin={isDirectChat || canModerate}
                             userId={user?.id}
+                            canModerateDelete={canModerate && !isMe}
                             decryptedBodies={decryptedBodies}
                             copyText={getMessageCopyText(msg, decryptedBodies, user?.id)}
                             onAction={(action) => handleMenuAction(msg, action)}
                             onClose={() => setOptionsFor(null)}
                           />
                         )}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -47,6 +47,26 @@ export const notificationContextSchema = z.object({
 
 // --- Sprint 9: calling/signaling ---
 
+export const groupCallStartSchema = z.object({
+  chatId: z.string().uuid(),
+  kind: z.enum(["AUDIO", "VIDEO"]).default("AUDIO"),
+});
+
+export const groupCallJoinSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
+export const groupCallLeaveSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
+export const groupCallSignalSchema = z.object({
+  sessionId: z.string().uuid(),
+  targetUserId: z.string().uuid(),
+  type: z.enum(["offer", "answer", "ice"]),
+  payload: z.unknown(),
+});
+
 export const callOfferSchema = z.object({
   callId: z.string().uuid().optional(),
   chatId: z.string().uuid(),

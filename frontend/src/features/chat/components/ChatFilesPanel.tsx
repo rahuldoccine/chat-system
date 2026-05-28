@@ -290,8 +290,19 @@ const ChatFilesPanel: React.FC = () => {
   const closeDocViewer = useCallback(() => setDocViewer(null), []);
   const closeMediaViewer = useCallback(() => setMediaViewer(null), []);
 
-  const { data: messages, isLoading } = useMessages(activeId);
+  const {
+    data: messages,
+    isLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useMessages(activeId);
   const decryptedBodies = useMessageBodies(messages);
+
+  useEffect(() => {
+    if (!activeId || !hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [activeId, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const mediaItems = useMemo(() => {
     const list = expandMessagesToMediaItems((messages ?? []) as Message[], decryptedBodies);
@@ -401,6 +412,12 @@ const ChatFilesPanel: React.FC = () => {
                 </button>
               )}
             </section>
+          )}
+          {isFetchingNextPage && (
+            <div className={panelStyles.loading}>
+              <Loader2 size={16} className={panelStyles.spinner} />
+              Loading more…
+            </div>
           )}
         </>
       )}

@@ -9,6 +9,8 @@ export const createChatBodySchema = z.discriminatedUnion("type", [
     type: z.literal("GROUP"),
     title: z.string().min(1).max(120),
     memberIds: z.array(z.string().uuid()).max(200).optional(),
+    e2eeMode: z.enum(["NONE", "GROUP_V1"]).optional(),
+    groupVisibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
   }),
 ]);
 
@@ -95,7 +97,7 @@ export const patchChatMuteBodySchema = z.object({
 });
 
 export const patchChatE2eeBodySchema = z.object({
-  e2eeMode: z.enum(["NONE", "DM_V1"]),
+  e2eeMode: z.enum(["NONE", "DM_V1", "GROUP_V1"]),
 });
 
 export const markMessagesReadBodySchema = z.object({

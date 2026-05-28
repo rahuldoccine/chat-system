@@ -5,13 +5,25 @@ import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import { useConversations } from '../features/chat/hooks/useChatData';
 import { useSocket } from '../context/SocketContext';
-import { LogOut, Settings, Search, Bell, BellOff, Hash, LayoutGrid, Plus } from 'lucide-react';
+import {
+  LogOut,
+  Settings,
+  Search,
+  Bell,
+  BellOff,
+  LayoutGrid,
+  Plus,
+  Users,
+  Hash,
+} from 'lucide-react';
+import GroupChannelIcon from '../features/chat/components/GroupChannelIcon';
 import { isChatMuted } from '../features/chat/utils/mute';
 import UserAvatar from '../features/chat/components/UserAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConnectionStatus from '../features/chat/components/ConnectionStatus';
 import E2eeUnlockBanner from '../features/e2ee/E2eeUnlockBanner';
 import NewDmModal from '../features/chat/components/NewDmModal';
+import CreateGroupModal from '../features/chat/components/CreateGroupModal';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -26,6 +38,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNewDm, setShowNewDm] = useState(false);
+  const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showGroupActions, setShowGroupActions] = useState(false);
+  const [showPublicGroupsPicker, setShowPublicGroupsPicker] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,8 +55,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const conversations = (response as any)?.data || [];
   
-  const channels = conversations.filter((c: any) => c.type === 'GROUP');
+  const channels = conversations.filter(
+    (c: any) => c.type === 'GROUP' && c.isMember !== false,
+  );
   const dms = conversations.filter((c: any) => c.type === 'DIRECT');
+  const joinablePublicGroups = conversations.filter(
+    (chat: any) => chat.groupVisibility === 'PUBLIC' && chat.canJoin && chat.isMember === false,
+  );
 
   const getChatName = (chat: any) => {
     if (chat.type === 'GROUP') return chat.title || 'Untitled Group';
@@ -96,7 +116,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <div className={styles.navSection}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionLabel}>Channels</span>
-              <Plus size={14} className={styles.addIcon} />
+              <Plus
+                size={14}
+                className={styles.addIcon}
+                onClick={() => setShowGroupActions(true)}
+                role="button"
+                aria-label="Create group"
+              />
             </div>
             {channels.map((chat: any) => (
               <button 
@@ -104,7 +130,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 onClick={() => setActiveId(chat.id)}
                 className={`${styles.navItem} ${activeId === chat.id ? styles.active : ''}`}
               >
-                <Hash size={18} strokeWidth={2.5} />
+                <GroupChannelIcon
+                  visibility={chat.groupVisibility}
+                  size={18}
+                  strokeWidth={2.5}
+                  className={styles.channelAvatar}
+                />
                 <span className={styles.navLabel}>{getChatName(chat)}</span>
                 {chat.unreadCount > 0 && (
                   <span className={styles.unreadBadge}>{formatUnread(chat.unreadCount)}</span>
@@ -171,16 +202,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <div className={styles.menuHeader}>
                   <span className={styles.menuTitle}>Account Details</span>
                 </div>
-                <div
+                <button
+                  type="button"
                   className={styles.menuItem}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowUserMenu(false);
-                    navigate('/settings');
+                    // Clear chat focus before route switch to avoid stale chat view state.
+                    setActiveId(null);
+                    navigate('/settings', { replace: true });
                   }}
                 >
                   <Settings size={16} />
                   <span>My Settings</span>
-                </div>
+                </button>
                 <div className={styles.menuDivider}></div>
                 <button
                   type="button"
@@ -251,6 +286,104 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           onChatCreated={(chatId) => setActiveId(chatId)}
         />
       )}
+      <AnimatePresence>
+        {showGroupActions && (
+          <motion.div
+            className={styles.groupActionsOverlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowGroupActions(false)}
+          >
+            <motion.div
+              className={styles.groupActionsModal}
+              initial={{ opacity: 0, y: 14, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 14, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className={styles.groupActionsTitle}>Group actions</h3>
+              <p className={styles.groupActionsHint}>Choose what you want to do next.</p>
+
+              <button
+                type="button"
+                className={styles.groupActionBtn}
+                onClick={() => {
+                  setShowGroupActions(false);
+                  setShowNewGroup(true);
+                }}
+              >
+                <Users size={16} />
+                <span>Create Group</span>
+              </button>
+
+              <button
+                type="button"
+                className={styles.groupActionBtn}
+                onClick={() => {
+                  setShowGroupActions(false);
+                  setShowPublicGroupsPicker(true);
+                }}
+              >
+                <Hash size={16} />
+                <span>Join Public Channels/Groups</span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showPublicGroupsPicker && (
+          <motion.div
+            className={styles.groupActionsOverlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowPublicGroupsPicker(false)}
+          >
+            <motion.div
+              className={styles.groupActionsModal}
+              initial={{ opacity: 0, y: 14, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 14, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className={styles.groupActionsTitle}>Join Public Channels/Groups</h3>
+              <p className={styles.groupActionsHint}>Select a public channel to join.</p>
+              {joinablePublicGroups.length === 0 ? (
+                <div className={styles.emptyPublicGroups}>No public channels available right now.</div>
+              ) : (
+                <div className={styles.publicGroupsList}>
+                  {joinablePublicGroups.map((chat: any) => (
+                    <button
+                      key={chat.id}
+                      type="button"
+                      className={styles.publicGroupItem}
+                      onClick={() => {
+                        setShowPublicGroupsPicker(false);
+                        setActiveId(chat.id);
+                      }}
+                    >
+                      <GroupChannelIcon visibility={chat.groupVisibility} size={16} strokeWidth={2.4} />
+                      <span className={styles.publicGroupName}>{getChatName(chat)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showNewGroup && (
+          <CreateGroupModal
+            onClose={() => setShowNewGroup(false)}
+            onChatCreated={(chatId) => setActiveId(chatId)}
+          />
+        )}
+      </AnimatePresence>
     </div>
     </>
   );

@@ -1,8 +1,14 @@
+export type GroupVisibility = 'PRIVATE' | 'PUBLIC';
+
 export type Chat = {
   id: string;
   type: 'DIRECT' | 'GROUP';
-  e2eeMode?: 'NONE' | 'DM_V1';
+  e2eeMode?: 'NONE' | 'DM_V1' | 'GROUP_V1';
+  groupVisibility?: GroupVisibility;
+  isMember?: boolean;
+  canJoin?: boolean;
   title?: string;
+  avatarUrl?: string | null;
   dmPeer?: {
     id: string;
     email: string;
@@ -104,6 +110,8 @@ export type Message = {
     height?: number;
     preview?: LinkPreviewMeta;
     e2eeVersion?: string;
+    mentions?: { userIds?: string[]; all?: boolean };
+    groupActivity?: Record<string, unknown>;
     senderFingerprint?: string;
     peerDeviceId?: string;
     senderDeviceId?: string;

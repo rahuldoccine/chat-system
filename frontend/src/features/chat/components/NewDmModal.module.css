@@ -125,13 +125,8 @@
 .avatar {
   width: 36px;
   height: 36px;
+  min-width: 36px;
   border-radius: 50%;
-  background: var(--primary, #5865f2);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
   flex-shrink: 0;
 }
 

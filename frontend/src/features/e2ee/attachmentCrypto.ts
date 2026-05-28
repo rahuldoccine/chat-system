@@ -3,7 +3,7 @@ import { buildFileUrl } from '../chat/utils/fileUrl';
 import type { Message } from '../chat/types';
 import { aesGcmDecrypt, aesGcmDecryptBytes, aesGcmEncrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
 import { bufToB64, b64ToBuf } from './encoding';
-import { decodeEnvelope, decodePayload } from './protocol';
+import { decodeEnvelope, decodePayload, isGroupE2eeMessage } from './protocol';
 import { getSignedPreKeyPrivate, loadKeyMaterial } from './keyStore';
 import * as e2eeApi from './e2eeApi';
 import { isE2eeMessage } from './directChat';
@@ -186,7 +186,16 @@ export async function decryptMessageFile(
     const meta = await resolveTransportMeta(userId, msg, viewerId, transportMeta);
     keys = resolveFileAttachmentKeys(file, meta);
   }
-  if (!keys) return null;
+  if (!keys) {
+    // For GROUP E2EE messages, attachments may be uploaded without per-file encrypt/decrypt keys.
+    // In that case, fall back to returning the fetched bytes as a plain attachment.
+    if (isGroupE2eeMessage(msg)) {
+      const buf = await fetchEncryptedFileBytes(file, token);
+      if (!buf) return null;
+      return new Blob([buf], { type: file.mimetype || 'application/octet-stream' });
+    }
+    return null;
+  }
 
   const encrypted = await fetchEncryptedFileBytes(file, token);
   if (!encrypted) return null;

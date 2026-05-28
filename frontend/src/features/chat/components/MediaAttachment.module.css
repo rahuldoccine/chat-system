@@ -61,6 +61,10 @@
   transform: scale(1.02);
 }
 
+.imageContainerOverlayActive .image {
+  transform: scale(1.02);
+}
+
 .imageContainerViewerOpen,
 .imageContainerViewerOpen:hover .image {
   transform: none;
@@ -87,8 +91,11 @@
   pointer-events: none;
 }
 
-.imageContainer:hover .imageOverlay {
+.imageContainer:hover .imageOverlay,
+.imageContainerOverlayActive .imageOverlay,
+.imageOverlay:hover {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .imageName {

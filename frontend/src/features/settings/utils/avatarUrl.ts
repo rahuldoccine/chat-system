@@ -19,16 +19,57 @@ export function validateAvatarFile(file: File): string | null {
   return null;
 }
 
-/** Normalize stored avatar URL to an absolute API or external URL (no auth token). */
-export function toStoredAvatarUrl(url: string): string {
-  const trimmed = url.trim();
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
+/** Extract file name for DB from upload API response (prefers storage key basename). */
+export function avatarFileNameFromUpload(data: {
+  key?: string;
+  filename?: string;
+  url: string;
+}): string {
+  const key = data.key?.trim() || data.filename?.trim();
+  if (key) {
+    const normalized = key.replace(/\\/g, '/');
+    const base = normalized.split('/').pop();
+    if (base) return base;
   }
-  if (trimmed.startsWith('/')) {
-    return `${env.apiOrigin}${trimmed}`;
+  const match = data.url.match(/\/files\/([^?#]+)/);
+  if (match?.[1]) {
+    try {
+      const decoded = decodeURIComponent(match[1]);
+      const base = decoded.split('/').pop();
+      if (base) return base;
+    } catch {
+      const base = match[1].split('/').pop();
+      if (base) return base;
+    }
   }
-  return trimmed;
+  return '';
+}
+
+/**
+ * Resolve avatar value from API (path or legacy URL) to absolute URL for <img src>.
+ * API returns `/api/v1/files/logos/<fileName>`; DB stores only `<fileName>`.
+ */
+export function resolveAvatarAbsoluteUrl(
+  avatarUrl: string | null | undefined,
+): string | null {
+  if (!avatarUrl?.trim()) return null;
+  const v = avatarUrl.trim();
+
+  if (v.startsWith('http://') || v.startsWith('https://')) {
+    return v;
+  }
+
+  if (v.startsWith('/api/') || v.startsWith('/files/')) {
+    return `${env.apiOrigin}${v.startsWith('/') ? v : `/${v}`}`;
+  }
+
+  if (v.includes('/files/')) {
+    const pathPart = v.startsWith('/') ? v : `/${v}`;
+    return `${env.apiOrigin}${pathPart}`;
+  }
+
+  const fileName = v.replace(/\\/g, '/').split('/').pop() ?? v;
+  return `${env.apiOrigin}/api/v1/files/logos/${encodeURIComponent(fileName)}`;
 }
 
 /** Build a URL suitable for <img src> (adds access token for protected /files routes). */
@@ -36,12 +77,8 @@ export function getAvatarImageSrc(
   avatarUrl: string | null | undefined,
   accessToken: string | null,
 ): string | null {
-  if (!avatarUrl?.trim()) return null;
-
-  let absolute = avatarUrl.trim();
-  if (absolute.startsWith('/')) {
-    absolute = `${env.apiOrigin}${absolute}`;
-  }
+  const absolute = resolveAvatarAbsoluteUrl(avatarUrl);
+  if (!absolute) return null;
 
   if (!accessToken || !absolute.includes('/files/')) {
     return absolute;
@@ -54,4 +91,9 @@ export function getAvatarImageSrc(
   } catch {
     return absolute;
   }
+}
+
+/** @deprecated Use avatarFileNameFromUpload — kept for any remaining imports */
+export function toStoredAvatarUrl(url: string): string {
+  return avatarFileNameFromUpload({ url });
 }

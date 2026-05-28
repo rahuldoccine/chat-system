@@ -31,6 +31,9 @@ import {
 } from '../hooks/useChatData';
 import { useAuth } from '../../../context/AuthContext';
 import { isDmE2eeChat } from '../../e2ee/chatE2ee';
+import { useQuery } from '@tanstack/react-query';
+import { fetchGroup } from '../api/groupsApi';
+import { parseMentionsFromText } from '../utils/mentions';
 import { encryptFileBlob } from '../../e2ee/attachmentCrypto';
 import type { E2eeFileAttachmentKeys } from '../../e2ee/attachmentCrypto';
 import { E2eePeerNotReadyError } from '../../e2ee/directChat';
@@ -66,6 +69,7 @@ import {
   instantPreviewFromUrl,
   withLinkDisplay,
 } from '../utils/linkPreviewUtils';
+import { roleAtLeast } from '../utils/groupRoles';
 
 type ComposerAlert = {
   title: string;
@@ -132,6 +136,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [alert, setAlert] = useState<ComposerAlert | null>(null);
+  const [mentionOpen, setMentionOpen] = useState(false);
 
   const showAlert = useCallback((title: string, description: string) => {
     setAlert({ title, description });
@@ -141,6 +146,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const mentionMenuRef = useRef<HTMLDivElement>(null);
   const micBtnRef = useRef<HTMLButtonElement>(null);
   const micPointerActiveRef = useRef(false);
 
@@ -151,7 +157,16 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const activeChat = conversationsData?.data?.find((c) => c.id === activeId);
   const dmPeerId = activeChat?.type === 'DIRECT' ? activeChat.dmPeer?.id : undefined;
   const isE2eeDm = isDmE2eeChat(activeChat);
-  const sendCtx = { chat: activeChat ?? null, peerUserId: dmPeerId };
+  const { data: groupDetails } = useQuery({
+    queryKey: ['group', activeId],
+    queryFn: () => fetchGroup(activeId!),
+    enabled: Boolean(activeId && activeChat?.type === 'GROUP'),
+  });
+  const sendCtx = {
+    chat: activeChat ?? null,
+    peerUserId: dmPeerId,
+    groupMemberIds: groupDetails?.members.map((m) => m.userId),
+  };
 
   const { mutateAsync: sendMessageAsync, isPending: isSending } = useSendMessage();
   const { mutateAsync: createPollAsync, isPending: isCreatingPoll } = useCreatePoll();
@@ -196,6 +211,35 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const threadDecryptedBodies = useMessageBodies(isThread ? threadAllMessages : undefined);
 
   const queryClient = useQueryClient();
+  const mentionTokenMatch = useMemo(() => {
+    if (editingMessage || activeChat?.type !== 'GROUP' || !groupDetails) return null;
+    return text.match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+  }, [text, editingMessage, activeChat?.type, groupDetails]);
+  const mentionQuery = mentionTokenMatch?.[1]?.toLowerCase() ?? '';
+  const canUseAllMention = roleAtLeast(groupDetails?.myRole ?? 'MEMBER', 'ADMIN');
+  const mentionCandidates = useMemo(() => {
+    if (activeChat?.type !== 'GROUP' || !groupDetails || !mentionTokenMatch) return [];
+    const candidates: Array<{ key: string; handle: string; label: string; userId?: string }> = [];
+    if (canUseAllMention && 'all'.includes(mentionQuery)) {
+      candidates.push({ key: 'all', handle: 'all', label: 'Notify everyone in this group' });
+    }
+    for (const m of groupDetails.members) {
+      if (m.userId === user?.id) continue;
+      const baseHandle =
+        m.username?.trim() ||
+        m.displayName?.toLowerCase().replace(/\s+/g, '') ||
+        m.email.split('@')[0] ||
+        'user';
+      const handle = baseHandle.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
+      const label = m.displayName || m.username || m.email;
+      const hay = `${handle} ${label.toLowerCase()} ${m.email.toLowerCase()}`;
+      if (!mentionQuery || hay.includes(mentionQuery)) {
+        candidates.push({ key: m.userId, handle, label, userId: m.userId });
+      }
+      if (candidates.length >= 8) break;
+    }
+    return candidates;
+  }, [activeChat?.type, groupDetails, mentionTokenMatch, canUseAllMention, mentionQuery, user?.id]);
   const replyTarget = messages?.find(m => m.id === replyingTo);
   const threadReplyTarget = isThread
     ? threadAllMessages.find((m) => m.id === threadReplyingTo)
@@ -269,10 +313,17 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
         setShowPlusMenu(false);
         setShowGifPicker(false);
       }
+      if (mentionMenuRef.current && !mentionMenuRef.current.contains(target)) {
+        setMentionOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setMentionOpen(mentionCandidates.length > 0);
+  }, [mentionCandidates.length]);
 
   const debouncedStopTyping = useCallback(
     debounce((chatId: string) => {
@@ -391,12 +442,33 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
           }
         }
 
+        let textMeta = contentMeta;
+        if (activeChat?.type === 'GROUP' && groupDetails) {
+          const parsed = parseMentionsFromText(trimmedText, groupDetails.members);
+          if (parsed.all && !canUseAllMention) {
+            showAlert(
+              '@all is restricted',
+              'Only Owner/Admin can use @all in this group.',
+            );
+            return;
+          }
+          if (parsed.all || parsed.userIds.length > 0) {
+            textMeta = {
+              ...(textMeta ?? {}),
+              mentions: {
+                userIds: parsed.userIds,
+                ...(parsed.all ? { all: true } : {}),
+              },
+            };
+          }
+        }
+
         await sendMessageAsync({
           chatId: activeId,
           text: trimmedText,
           replyToId: isThread ? undefined : replyingTo || undefined,
           kind: 'TEXT',
-          contentMeta,
+          contentMeta: textMeta,
           ...sendCtx,
           ...threadSendMeta,
         });
@@ -446,6 +518,19 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
       socket.sendTyping(activeId, true);
       debouncedStopTyping(activeId);
     }
+  };
+
+  const applyMention = (handle: string) => {
+    const next = text.replace(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/, (m) =>
+      m.replace(/@([a-zA-Z0-9_.-]*)$/, `@${handle} `),
+    );
+    setText(next);
+    if (activeId && !editingMessage) {
+      if (isThread && threadDraftKey) setThreadDraft(threadDraftKey, next);
+      else setDraft(activeId, next);
+    }
+    setMentionOpen(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -1036,6 +1121,24 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
           className={styles.input}
           disabled={voiceBusy}
         />
+        {mentionOpen && mentionCandidates.length > 0 && (
+          <div className={styles.mentionMenu} ref={mentionMenuRef}>
+            {mentionCandidates.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                className={styles.mentionItem}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applyMention(c.handle);
+                }}
+              >
+                <span className={styles.mentionHandle}>@{c.handle}</span>
+                <span className={styles.mentionLabel}>{c.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {!editingMessage && (
           <button

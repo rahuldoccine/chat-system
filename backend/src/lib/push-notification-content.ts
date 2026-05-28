@@ -27,6 +27,14 @@ function truncate(text: string, max: number): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
+function stripMentionTags(text: string): string {
+  // Remove tokens like @all and @username from push preview copy.
+  return text
+    .replace(/(^|\s)@[a-z0-9._-]+/gi, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function contentMetaRecord(meta: unknown): Record<string, unknown> | null {
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) return null;
   return meta as Record<string, unknown>;
@@ -35,7 +43,8 @@ function contentMetaRecord(meta: unknown): Record<string, unknown> | null {
 function e2eePushPreviewFromMeta(meta: Record<string, unknown> | null): string | null {
   const line = meta?.pushPreview;
   if (typeof line === "string" && line.trim()) {
-    return line.trim();
+    const cleaned = stripMentionTags(line.trim());
+    return cleaned || "New message";
   }
   return null;
 }
@@ -56,6 +65,33 @@ function e2eePushPreviewFromAttachmentRefs(meta: Record<string, unknown> | null)
   return `Sent ${files.length} files`;
 }
 
+function groupActivityPushPreview(meta: Record<string, unknown> | null): string | null {
+  const groupActivity = meta?.groupActivity;
+  if (!groupActivity || typeof groupActivity !== "object" || Array.isArray(groupActivity)) {
+    return null;
+  }
+  const activity = groupActivity as Record<string, unknown>;
+  const type = activity.type;
+  if (type !== "member_joined") {
+    return null;
+  }
+  const actorName =
+    typeof activity.actorName === "string" && activity.actorName.trim().length > 0
+      ? activity.actorName.trim()
+      : "Someone";
+  const targetName =
+    typeof activity.targetName === "string" && activity.targetName.trim().length > 0
+      ? activity.targetName.trim()
+      : "a member";
+  const actorId = typeof activity.actorId === "string" ? activity.actorId : "";
+  const targetUserId = typeof activity.targetUserId === "string" ? activity.targetUserId : "";
+
+  if (actorId && targetUserId && actorId === targetUserId) {
+    return `${actorName} joined the public group`;
+  }
+  return `${actorName} added ${targetName} to the group`;
+}
+
 /** Preview line shown in push notification body. */
 export function messagePreviewBody(
   message: Pick<NewMessageNotificationPayload, "kind" | "ciphertext" | "contentMeta">,
@@ -63,6 +99,10 @@ export function messagePreviewBody(
 ): string {
   const meta = contentMetaRecord(message.contentMeta);
   const kind = message.kind as MessageKind;
+  if (kind === "SYSTEM") {
+    const activityPreview = groupActivityPushPreview(meta);
+    if (activityPreview) return activityPreview;
+  }
 
   if (isE2eeDm) {
     const fromClient = e2eePushPreviewFromMeta(meta);
@@ -81,7 +121,8 @@ export function messagePreviewBody(
 
   const text = message.ciphertext?.trim();
   if (text) {
-    return text;
+    const cleaned = stripMentionTags(text);
+    if (cleaned) return cleaned;
   }
 
   if (kind === "IMAGE") return "Photo";
@@ -114,8 +155,10 @@ export async function resolvePushNotificationContent(params: {
   ]);
 
   const senderName = sender?.displayName?.trim() || sender?.email?.trim() || "Someone";
-  const isE2eeDm = chat?.type === "DIRECT" && chat.e2eeMode === "DM_V1";
-  const preview = messagePreviewBody(params.message, isE2eeDm);
+  const isE2ee =
+    (chat?.type === "DIRECT" && chat.e2eeMode === "DM_V1") ||
+    (chat?.type === "GROUP" && chat.e2eeMode === "GROUP_V1");
+  const preview = messagePreviewBody(params.message, isE2ee);
 
   if (chat?.type === "GROUP") {
     const groupTitle = chat.title?.trim() || "Group";

@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import { putDeviceKeySchema, putIdentityKeySchema, postPreKeysSchema } from "./e2ee.schemas.js";
 import * as e2eeService from "./e2ee.service.js";
+import * as groupKeysService from "./group-keys.service.js";
 
 export async function putIdentityKey(req: Request, res: Response) {
   const body = putIdentityKeySchema.parse(req.body);
@@ -45,3 +46,20 @@ export async function getPreKeyBundle(req: Request, res: Response) {
   res.status(200).json({ ok: true, data: out });
 }
 
+export async function postGroupSenderKey(req: Request, res: Response) {
+  const chatId = String(req.params.chatId ?? "");
+  const body = req.body as { epoch?: number; distribution?: string };
+  const epoch = typeof body.epoch === "number" ? body.epoch : 0;
+  const distribution = String(body.distribution ?? "");
+  const out = await groupKeysService.upsertGroupSenderKey(req.user!.sub, chatId, {
+    epoch,
+    distribution,
+  });
+  res.status(201).json({ ok: true, data: out });
+}
+
+export async function listGroupSenderKeys(req: Request, res: Response) {
+  const chatId = String(req.params.chatId ?? "");
+  const rows = await groupKeysService.listGroupSenderKeys(req.user!.sub, chatId);
+  res.status(200).json({ ok: true, data: rows });
+}

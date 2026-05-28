@@ -1,3 +1,4 @@
+import { expandAvatarUrl } from "../../lib/avatar-urls.js";
 import { AppError } from "../../errors/index.js";
 import { requireActiveMember } from "../../lib/chat-access.js";
 import { getPrisma } from "../../lib/prisma.js";
@@ -47,7 +48,7 @@ export async function getPollForUser(userId: string, pollId: string) {
       id: vote.user.id,
       displayName: vote.user.displayName,
       email: vote.user.email,
-      avatarUrl: vote.user.avatarUrl,
+      avatarUrl: expandAvatarUrl(vote.user.avatarUrl),
     });
     votersByOption.set(vote.pollOptionId, list);
   }

@@ -1,6 +1,6 @@
-## E2EE boundary (DIRECT chats only)
+## E2EE boundary (DIRECT and GROUP chats)
 
-This backend supports **ciphertext-only** storage and transport for **private (DIRECT) chats** when `Chat.e2eeMode = DM_V1`.
+This backend supports **ciphertext-only** storage and transport for **private (DIRECT) chats** when `Chat.e2eeMode = DM_V1`, and for **groups** when `Chat.e2eeMode = GROUP_V1` (sender-key envelopes; opaque key distribution in `GroupSenderKey`).
 
 ### Backend is allowed to know
 - **Participants and membership**: `chatId`, `senderId`, recipients (via `ChatMember`)

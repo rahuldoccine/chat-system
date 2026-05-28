@@ -146,48 +146,8 @@
   box-shadow: 0 1px 3px rgba(99, 102, 241, 0.08);
 }
 
-.parentHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.5rem;
-}
-
-.parentAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-
-.parentMeta {
-  min-width: 0;
-}
-
-.parentName {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--foreground);
-}
-
-.parentTime {
-  font-size: 0.72rem;
-  color: var(--muted-foreground);
-  font-weight: 500;
-}
-
-.parentPreview {
+.parentRootRow {
   margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: var(--foreground);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .divider {

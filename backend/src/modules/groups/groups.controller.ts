@@ -4,11 +4,17 @@ import { ValidationError } from "../../errors/index.js";
 import { parseBody } from "../../validation/validate.js";
 import { createChatBodySchema } from "../chats/chats.schemas.js";
 import * as chatsService from "../chats/chats.service.js";
+import { getGroupChatDetails } from "../../lib/groups/group-chat.js";
 import {
   addGroupMemberBodySchema,
   patchGroupBodySchema,
   patchGroupMemberRoleBodySchema,
 } from "./groups.schemas.js";
+
+export async function getGroup(req: Request, res: Response): Promise<void> {
+  const group = await getGroupChatDetails(req.user!.sub, req.params.groupId as string);
+  res.json({ group });
+}
 
 export async function createGroup(req: Request, res: Response): Promise<void> {
   const body = parseBody(createChatBodySchema, req.body);
@@ -49,4 +55,9 @@ export async function patchMemberRole(req: Request, res: Response): Promise<void
     body.role,
   );
   res.status(204).end();
+}
+
+export async function joinGroup(req: Request, res: Response): Promise<void> {
+  const chat = await chatsService.joinPublicGroup(req.user!.sub, req.params.groupId as string);
+  res.status(200).json({ chat });
 }

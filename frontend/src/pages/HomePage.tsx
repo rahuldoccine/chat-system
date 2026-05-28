@@ -22,8 +22,14 @@ import DmHeaderMenu from '../features/chat/components/DmHeaderMenu';
 import MessagingRestrictedNotice from '../features/chat/components/MessagingRestrictedNotice';
 import { useBlockStatus } from '../features/chat/hooks/useBlockStatus';
 import { useCall } from '../features/calls/CallProvider';
+import { useGroupCall } from '../features/calls/GroupCallProvider';
+import { useQuery } from '@tanstack/react-query';
+import { fetchGroup, joinPublicGroup } from '../features/chat/api/groupsApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Chat } from '../features/chat/types';
 import UserAvatar from '../features/chat/components/UserAvatar';
+import ChatAvatar from '../features/chat/components/ChatAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const HomePage: React.FC = () => {
@@ -32,18 +38,30 @@ const HomePage: React.FC = () => {
   const {
     activeId,
     setActiveId,
+    setActiveSection,
     isDetailsOpen,
     setDetailsOpen,
     activeSection,
+    setGroupDetailsTab,
     activeThreadRootId,
     setInChatSearchOpen,
   } = useChat();
+  const queryClient = useQueryClient();
   const { data: conversations } = useConversations();
+  const activeChat = (conversations as { data?: Chat[] })?.data?.find((c) => c.id === activeId);
+  const [joiningGroup, setJoiningGroup] = React.useState(false);
+  const canJoinPublicGroup = Boolean(
+    activeChat?.type === 'GROUP' && activeChat.canJoin && activeChat.isMember === false,
+  );
   const { onlineUsers, isConnected } = useSocket();
   const { phase, startCall, isStarting } = useCall();
+  const { startGroupCall, joinGroupCall, state: groupCallState } = useGroupCall();
+  const { data: groupDetails } = useQuery({
+    queryKey: ['group', activeId],
+    queryFn: () => fetchGroup(activeId!),
+    enabled: Boolean(activeId && activeChat?.type === 'GROUP'),
+  });
   const { peerTypingCount: typingCount } = useChatTyping(activeId, user?.id);
-
-  const activeChat = (conversations as { data?: Chat[] })?.data?.find((c) => c.id === activeId);
 
   React.useEffect(() => {
     void refreshProfile();
@@ -71,7 +89,7 @@ const HomePage: React.FC = () => {
     blockStatus && (blockStatus.blockedByMe || blockStatus.blockedByPeer),
   );
 
-  const canCall =
+  const canDmCall =
     Boolean(activeId && dmPeerId) &&
     activeChat?.type === 'DIRECT' &&
     !isMessagingRestricted &&
@@ -79,21 +97,57 @@ const HomePage: React.FC = () => {
     !isStarting &&
     isConnected;
 
+  const activeGroupSessionInThisChat =
+    Boolean(
+      activeId &&
+        activeChat?.type === 'GROUP' &&
+        groupCallState.sessionId &&
+        groupCallState.chatId === activeId,
+    );
+  const alreadyJoinedGroupSession = activeGroupSessionInThisChat && Boolean(groupCallState.localStream);
+  const canJoinExistingGroupCall =
+    activeGroupSessionInThisChat && !alreadyJoinedGroupSession && phase === 'idle' && !isStarting && isConnected;
+  const ongoingGroupCallParticipantCount = Math.max(groupCallState.participants.length, 1);
+
+  const canGroupCall =
+    Boolean(activeId) &&
+    activeChat?.type === 'GROUP' &&
+    phase === 'idle' &&
+    !isStarting &&
+    isConnected &&
+    (!groupCallState.sessionId || canJoinExistingGroupCall);
+
+  const canCall = canDmCall || canGroupCall;
+
   const callDisabledReason = !activeId
     ? undefined
     : !isConnected
       ? 'Connecting…'
-      : activeChat?.type !== 'DIRECT'
-        ? 'Calls work only in one-to-one chats'
-        : isMessagingRestricted
-          ? "You can't call while someone is blocked"
-          : isStarting
-            ? 'Starting call…'
-            : phase !== 'idle'
-              ? 'Finish your current call first'
+      : isMessagingRestricted
+        ? "You can't call while someone is blocked"
+        : isStarting
+          ? 'Starting call…'
+          : phase !== 'idle'
+            ? 'Finish your current call first'
+            : groupCallState.sessionId && !canJoinExistingGroupCall
+              ? 'Already in a group call'
               : undefined;
 
   const isPeerOnline = activeChat?.type === 'DIRECT' && activeChat.dmPeer && (activeChat.dmPeer.isOnline || onlineUsers.has(activeChat.dmPeer.id));
+
+  const handleJoinPublicGroup = async () => {
+    if (!activeId || joiningGroup) return;
+    setJoiningGroup(true);
+    try {
+      await joinPublicGroup(activeId);
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success('You joined the group');
+    } catch {
+      toast.error('Could not join this group');
+    } finally {
+      setJoiningGroup(false);
+    }
+  };
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -105,6 +159,26 @@ const HomePage: React.FC = () => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [activeId, setInChatSearchOpen]);
+
+  React.useEffect(() => {
+    if (activeSection === 'members') setGroupDetailsTab('members');
+    else if (activeSection === 'settings') setGroupDetailsTab('settings');
+  }, [activeSection, setGroupDetailsTab]);
+
+  React.useEffect(() => {
+    if (canJoinPublicGroup && activeSection !== 'messages') {
+      setActiveSection('messages');
+    }
+  }, [canJoinPublicGroup, activeSection, setActiveSection]);
+
+  React.useEffect(() => {
+    if (
+      (activeSection === 'members' || activeSection === 'settings') &&
+      activeChat?.type !== 'GROUP'
+    ) {
+      setActiveSection('messages');
+    }
+  }, [activeSection, activeChat?.type, setActiveSection]);
 
   return (
     <MainLayout>
@@ -195,26 +269,18 @@ const HomePage: React.FC = () => {
                         }}
                         fallbackFontSize="1rem"
                       />
-                    ) : (
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 12,
-                          background: 'var(--primary)',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {chatName?.charAt(0)?.toUpperCase()}
-                      </div>
-                    )}
+                    ) : activeChat?.type === 'GROUP' ? (
+                      <ChatAvatar
+                        chat={activeChat}
+                        chatName={chatName}
+                        size={40}
+                        borderRadius={12}
+                      />
+                    ) : null}
                     <div>
                       <h4 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--foreground)' }}>{chatName}</h4>
-                      {activeChat?.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1' ? (
+                      {(activeChat?.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1') ||
+                      (activeChat?.type === 'GROUP' && activeChat.e2eeMode === 'GROUP_V1') ? (
                         <span
                           style={{
                             display: 'block',
@@ -244,12 +310,16 @@ const HomePage: React.FC = () => {
                           : blockStatus?.blockedByMe
                             ? 'You blocked this user'
                             : typingCount > 0
-                              ? 'Typing...'
-                              : isPeerOnline
-                                ? 'Online'
-                                : activeChat?.dmPeer?.lastSeenAt
-                                  ? `Last seen ${formatLastSeen(activeChat.dmPeer.lastSeenAt)}`
-                                  : 'Offline'}
+                              ? activeChat?.type === 'GROUP'
+                                ? `${typingCount} typing...`
+                                : 'Typing...'
+                              : activeChat?.type === 'GROUP'
+                                ? `${groupDetails?.memberCount ?? '…'} members`
+                                : isPeerOnline
+                                  ? 'Online'
+                                  : activeChat?.dmPeer?.lastSeenAt
+                                    ? `Last seen ${formatLastSeen(activeChat.dmPeer.lastSeenAt)}`
+                                    : 'Offline'}
                       </span>
                     </div>
                   </div>
@@ -277,7 +347,16 @@ const HomePage: React.FC = () => {
                       aria-label="Voice call"
                       disabled={!canCall}
                       onClick={() => {
-                        if (!canCall || !activeId || !dmPeerId) return;
+                        if (!canCall || !activeId) return;
+                        if (activeChat?.type === 'GROUP') {
+                          if (canJoinExistingGroupCall && groupCallState.sessionId) {
+                            void joinGroupCall(groupCallState.sessionId, activeId, false);
+                            return;
+                          }
+                          void startGroupCall(activeId, false);
+                          return;
+                        }
+                        if (!dmPeerId) return;
                         void startCall({
                           chatId: activeId,
                           peerUserId: dmPeerId,
@@ -303,7 +382,16 @@ const HomePage: React.FC = () => {
                       aria-label="Video call"
                       disabled={!canCall}
                       onClick={() => {
-                        if (!canCall || !activeId || !dmPeerId) return;
+                        if (!canCall || !activeId) return;
+                        if (activeChat?.type === 'GROUP') {
+                          if (canJoinExistingGroupCall && groupCallState.sessionId) {
+                            void joinGroupCall(groupCallState.sessionId, activeId, true);
+                            return;
+                          }
+                          void startGroupCall(activeId, true);
+                          return;
+                        }
+                        if (!dmPeerId) return;
                         void startCall({
                           chatId: activeId,
                           peerUserId: dmPeerId,
@@ -342,7 +430,117 @@ const HomePage: React.FC = () => {
 
                 <ConnectionStatusBanner />
 
-                <ChatSubNav />
+                {canJoinPublicGroup && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
+                      padding: '0.65rem 1rem',
+                      borderBottom: '1px solid var(--border)',
+                      background: 'rgba(88, 101, 242, 0.12)',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.85rem' }}>
+                      This is a public group. Join to read and send messages.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={joiningGroup}
+                      onClick={() => void handleJoinPublicGroup()}
+                      style={{
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: 'var(--primary, #5865f2)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        cursor: joiningGroup ? 'wait' : 'pointer',
+                      }}
+                    >
+                      {joiningGroup ? 'Joining…' : 'Join group'}
+                    </button>
+                  </div>
+                )}
+
+                {activeChat?.type === 'GROUP' && activeGroupSessionInThisChat && !alreadyJoinedGroupSession && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
+                      padding: '0.72rem 1rem',
+                      borderBottom: '1px solid #dbe4ff',
+                      background: '#f3f6ff',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e3a8a' }}>
+                        Ongoing group call
+                      </span>
+                      <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                        {ongoingGroupCallParticipantCount} participant
+                        {ongoingGroupCallParticipantCount > 1 ? 's' : ''} in this call
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      {groupCallState.kind === 'VIDEO' ? (
+                        <button
+                          type="button"
+                          disabled={!canJoinExistingGroupCall}
+                          onClick={() => {
+                            if (!groupCallState.sessionId || !activeId || !canJoinExistingGroupCall) return;
+                            void joinGroupCall(groupCallState.sessionId, activeId, true);
+                          }}
+                          style={{
+                            minHeight: '32px',
+                            padding: '0.35rem 0.7rem',
+                            borderRadius: 999,
+                            border: 'none',
+                            background: '#2563eb',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            cursor: canJoinExistingGroupCall ? 'pointer' : 'not-allowed',
+                            opacity: canJoinExistingGroupCall ? 1 : 0.55,
+                          }}
+                        >
+                          Join video
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!canJoinExistingGroupCall}
+                          onClick={() => {
+                            if (!groupCallState.sessionId || !activeId || !canJoinExistingGroupCall) return;
+                            void joinGroupCall(groupCallState.sessionId, activeId, false);
+                          }}
+                          style={{
+                            minHeight: '32px',
+                            padding: '0.35rem 0.7rem',
+                            borderRadius: 999,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            cursor: canJoinExistingGroupCall ? 'pointer' : 'not-allowed',
+                            opacity: canJoinExistingGroupCall ? 1 : 0.55,
+                          }}
+                        >
+                          Join audio
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <ChatSubNav
+                  showGroupDetailsTabs={activeChat?.type === 'GROUP'}
+                  restrictToMessages={canJoinPublicGroup}
+                />
 
                 {activeId && (
                   <ChatInMessageSearch
@@ -363,26 +561,56 @@ const HomePage: React.FC = () => {
                       overflow: 'hidden',
                     }}
                   >
-                    <MessageStream />
+                    {canJoinPublicGroup ? (
+                      <div
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'column',
+                          gap: '0.45rem',
+                          color: 'var(--muted-foreground)',
+                          background: '#f8fafc',
+                          padding: '1.5rem',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <MessageSquare size={26} />
+                        <p style={{ margin: 0, fontWeight: 600 }}>Join this public group to view messages.</p>
+                      </div>
+                    ) : (
+                      <MessageStream />
+                    )}
                     {isMessagingRestricted && blockStatus ? (
                       <MessagingRestrictedNotice
                         peerName={chatName}
                         blockStatus={blockStatus}
                       />
-                    ) : (
+                    ) : canJoinPublicGroup ? null : (
                       <MessageComposer />
                     )}
                   </div>
                   {activeSection === 'files' && <ChatFilesPanel />}
                   {activeSection === 'pins' && <ChatPinsPanel />}
                   {activeSection === 'calls' && <ChatCallHistoryPanel />}
+                  {(activeSection === 'members' || activeSection === 'settings') && activeChat && (
+                    <ChatDetailsPanel
+                      chat={activeChat}
+                      chatName={chatName}
+                      isPeerOnline={Boolean(isPeerOnline)}
+                      onGroupLeave={() => setActiveId(null)}
+                    />
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {activeId && activeThreadRootId && activeChat?.type === 'DIRECT' && <ThreadPanel />}
+        {activeId && activeThreadRootId && (activeChat?.type === 'DIRECT' || activeChat?.type === 'GROUP') && (
+          <ThreadPanel />
+        )}
 
         <AnimatePresence>
           {activeId && isDetailsOpen && !activeThreadRootId && (
@@ -406,6 +634,7 @@ const HomePage: React.FC = () => {
                   chat={activeChat}
                   chatName={chatName}
                   isPeerOnline={Boolean(isPeerOnline)}
+                  onGroupLeave={() => setActiveId(null)}
                 />
               )}
             </motion.div>

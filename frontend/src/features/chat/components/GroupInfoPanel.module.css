@@ -1,0 +1,381 @@
+.panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem 1.5rem;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.header {
+  max-width: 900px;
+  margin: 0 auto 0.9rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 0.7rem;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.83rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.section {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem 1.15rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.memberList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.memberRow:last-child {
+  border-bottom: none;
+}
+
+.memberAvatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.memberMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.memberName {
+  display: block;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: #0f172a;
+}
+
+.roleBadge {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.memberActions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.memberActions select {
+  min-height: 28px;
+  padding: 0.2rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.75rem;
+}
+
+.memberActions button {
+  min-height: 28px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.removeBtn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: #fecaca !important;
+  background: #fff5f5 !important;
+  color: #dc2626 !important;
+}
+
+.removeBtn:hover {
+  background: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #b91c1c !important;
+}
+
+.removeBtn:active {
+  transform: translateY(0.5px);
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 40px;
+  padding: 0 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.addRow input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.candidateItem {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 42px;
+  padding: 0.45rem 0.55rem;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.candidateItem:hover {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.candidateAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.candidateMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.candidateName {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.candidateEmail {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field label {
+  display: block;
+  font-size: 0.76rem;
+  margin-bottom: 0.35rem;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.field input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.settingsBlock {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: #ffffff;
+}
+
+.blockTitle {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #334155;
+  text-transform: uppercase;
+}
+
+.blockTitleDanger {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #b91c1c;
+  text-transform: uppercase;
+}
+
+.muteRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.muteLabel {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.muteHint {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: absolute;
+  inset: 0;
+  background: #cbd5e1;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.toggleSlider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.toggle input:checked + .toggleSlider {
+  background: #6366f1;
+}
+
+.toggle input:checked + .toggleSlider::after {
+  transform: translateX(20px);
+}
+
+.leaveBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  min-height: 38px;
+  width: 100%;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  background: #fef2f2;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.dangerHint {
+  font-size: 0.75rem;
+  color: #7f1d1d;
+  margin-bottom: 0.55rem;
+}
+
+.readOnlyHint {
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  margin: 1.2rem auto;
+  display: block;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

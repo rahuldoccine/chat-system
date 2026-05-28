@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import { useCreateDirectChat, useSearchUsers, type DiscoverableUser } from '../hooks/useChatData';
+import UserAvatar from './UserAvatar';
 import styles from './NewDmModal.module.css';
 
 interface NewDmModalProps {
@@ -69,9 +70,14 @@ const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
                 disabled={createChat.isPending}
                 onClick={() => handleSelect(user)}
               >
-                <div className={styles.avatar}>
-                  {getUserLabel(user).charAt(0).toUpperCase()}
-                </div>
+                <UserAvatar
+                  userId={user.id}
+                  avatarUrl={user.avatarUrl}
+                  displayName={user.displayName}
+                  email={user.email}
+                  className={styles.avatar}
+                  fallbackFontSize="0.95rem"
+                />
                 <div className={styles.userMeta}>
                   <span className={styles.name}>{getUserLabel(user)}</span>
                   <span className={styles.email}>{user.email}</span>

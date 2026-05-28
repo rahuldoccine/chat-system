@@ -22,6 +22,9 @@ export function createE2eeRouter(config: AppConfig, logger: Logger): Router {
   router.post("/prekeys/:deviceId", requireAuth, asyncHandler(e2eeController.postPreKeys));
   router.get("/prekeys/:userId/:deviceId", requireAuth, asyncHandler(e2eeController.getPreKeyBundle));
 
+  router.post("/group-keys/:chatId", requireAuth, asyncHandler(e2eeController.postGroupSenderKey));
+  router.get("/group-keys/:chatId", requireAuth, asyncHandler(e2eeController.listGroupSenderKeys));
+
   router.put("/backup", requireAuth, asyncHandler(recovery.putBackup));
   router.get("/backup/status", requireAuth, asyncHandler(recovery.getBackupStatus));
   router.get("/backup/account", requireAuth, asyncHandler(recovery.getBackupAccount));

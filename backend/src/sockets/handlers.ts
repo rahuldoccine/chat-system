@@ -4,7 +4,7 @@ import { ZodError } from "zod";
 
 import type { AppConfig } from "../config/index.js";
 import { AppError } from "../errors/index.js";
-import { requireActiveMember } from "../lib/chat-access.js";
+import { requireActiveMember, requireActiveMemberMinRole } from "../lib/chat-access.js";
 import { assertNotBlockedPair } from "../lib/moderation-guard.js";
 import type { Logger } from "../lib/logger.js";
 import { createCallLog, setCallStatus } from "../lib/calls/call-service.js";
@@ -33,6 +33,10 @@ import {
   callOfferSchema,
   callSignalSchema,
   callTranscriptLineSchema,
+  groupCallStartSchema,
+  groupCallJoinSchema,
+  groupCallLeaveSchema,
+  groupCallSignalSchema,
   chatSubscribeSchema,
   messageSendSocketSchema,
   notificationContextSchema,
@@ -54,6 +58,14 @@ import {
   markCallConnected,
   putActiveCall,
 } from "./calls-state.js";
+import {
+  endGroupCall,
+  getActiveGroupCallForChat,
+  getGroupCall,
+  putGroupCall,
+  type ActiveGroupCall,
+} from "./group-call-state.js";
+import { publishGroupActivityMessage } from "../lib/groups/group-system-message.js";
 import { v4 as uuidv4 } from "uuid";
 import { redactLogPayload } from "../lib/log-redaction.js";
 
@@ -559,13 +571,12 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
         }
         socket.data.typingChatId = p.chatId;
 
-        if (shouldEmitTypingUpdate(p.chatId, userId)) {
-          socket.to(roomChat(p.chatId)).volatile.emit("typing:update", {
-            chatId: p.chatId,
-            userId,
-            isTyping: true,
-          });
-        }
+        socket.to(roomChat(p.chatId)).volatile.emit("typing:update", {
+          chatId: p.chatId,
+          userId,
+          isTyping: true,
+        });
+        shouldEmitTypingUpdate(p.chatId, userId);
 
         clearTypingTimer();
         const t = setTimeout(() => {
@@ -639,6 +650,116 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
         const p = syncHelloSchema.parse(payload);
         const hints = await chatsService.syncHelloForChats(userId, p.chats);
         ack?.({ ok: true, data: { chats: hints } });
+      } catch (err) {
+        ack?.(ackError(err));
+      }
+    });
+
+    socket.on("groupCall:start", async (payload: unknown, cb?: unknown) => {
+      const ack = ackFn(cb);
+      try {
+        const p = groupCallStartSchema.parse(payload);
+        await requireActiveMemberMinRole(userId, p.chatId, "MEMBER");
+        const existing = getActiveGroupCallForChat(p.chatId);
+        if (existing) {
+          ack?.({
+            ok: true,
+            data: { sessionId: existing.sessionId, existing: true, startedAt: existing.createdAt },
+          });
+          return;
+        }
+        const sessionId = uuidv4();
+        const call: ActiveGroupCall = {
+          sessionId,
+          chatId: p.chatId,
+          initiatorId: userId,
+          kind: p.kind,
+          createdAt: Date.now(),
+          participants: new Map([[userId, { userId, joinedAt: Date.now() }]]),
+        };
+        putGroupCall(call);
+        emitToChatMembers(io, p.chatId, "groupCall:started", {
+          sessionId,
+          chatId: p.chatId,
+          initiatorId: userId,
+          kind: p.kind,
+          startedAt: call.createdAt,
+        });
+        void publishGroupActivityMessage({
+          chatId: p.chatId,
+          senderId: userId,
+          meta: { type: "group_call_started", actorId: userId, kind: p.kind },
+        }).catch(() => {});
+        ack?.({ ok: true, data: { sessionId, startedAt: call.createdAt } });
+      } catch (err) {
+        ack?.(ackError(err));
+      }
+    });
+
+    socket.on("groupCall:join", async (payload: unknown, cb?: unknown) => {
+      const ack = ackFn(cb);
+      try {
+        const p = groupCallJoinSchema.parse(payload);
+        const call = getGroupCall(p.sessionId);
+        if (!call) throw new AppError(404, "NOT_FOUND", "Group call not found");
+        await requireActiveMember(userId, call.chatId);
+        call.participants.set(userId, { userId, joinedAt: Date.now() });
+        emitToChatMembers(io, call.chatId, "groupCall:participantUpdate", {
+          sessionId: p.sessionId,
+          participants: [...call.participants.keys()],
+        });
+        ack?.({ ok: true, data: { sessionId: p.sessionId, participants: [...call.participants.keys()] } });
+      } catch (err) {
+        ack?.(ackError(err));
+      }
+    });
+
+    socket.on("groupCall:leave", async (payload: unknown, cb?: unknown) => {
+      const ack = ackFn(cb);
+      try {
+        const p = groupCallLeaveSchema.parse(payload);
+        const call = getGroupCall(p.sessionId);
+        if (!call) {
+          ack?.({ ok: true });
+          return;
+        }
+        call.participants.delete(userId);
+        if (call.participants.size === 0 || call.initiatorId === userId) {
+          endGroupCall(p.sessionId);
+          emitToChatMembers(io, call.chatId, "groupCall:ended", { sessionId: p.sessionId });
+          void publishGroupActivityMessage({
+            chatId: call.chatId,
+            senderId: userId,
+            meta: { type: "group_call_ended", actorId: userId, kind: call.kind },
+          }).catch(() => {});
+        } else {
+          emitToChatMembers(io, call.chatId, "groupCall:participantUpdate", {
+            sessionId: p.sessionId,
+            participants: [...call.participants.keys()],
+          });
+        }
+        ack?.({ ok: true });
+      } catch (err) {
+        ack?.(ackError(err));
+      }
+    });
+
+    socket.on("groupCall:signal", async (payload: unknown, cb?: unknown) => {
+      const ack = ackFn(cb);
+      try {
+        const p = groupCallSignalSchema.parse(payload);
+        const call = getGroupCall(p.sessionId);
+        if (!call) throw new AppError(404, "NOT_FOUND", "Group call not found");
+        if (!call.participants.has(userId)) {
+          throw new AppError(403, "FORBIDDEN", "Not in call");
+        }
+        io.to(roomUser(p.targetUserId)).emit("groupCall:signal", {
+          sessionId: p.sessionId,
+          fromUserId: userId,
+          type: p.type,
+          payload: p.payload,
+        });
+        ack?.({ ok: true });
       } catch (err) {
         ack?.(ackError(err));
       }

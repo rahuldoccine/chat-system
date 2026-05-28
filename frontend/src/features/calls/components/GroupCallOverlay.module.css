@@ -1,0 +1,113 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.88);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 1rem;
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(2, 6, 23, 0.42);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.dot {
+  color: #94a3b8;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.audioState {
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.audioState p {
+  margin: 0.6rem 0 0;
+  font-weight: 700;
+}
+
+.localVideo {
+  width: min(880px, calc(100vw - 2rem));
+  height: min(560px, calc(100vh - 180px));
+  border-radius: 14px;
+  object-fit: cover;
+  background: #020617;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.captions {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100vw - 2rem));
+  border-radius: 12px;
+  padding: 0.55rem 0.75rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 0.8rem;
+}
+
+.captions p {
+  margin: 0.2rem 0;
+}
+
+.captionInterim {
+  color: #cbd5e1;
+}
+
+.controls {
+  height: 72px;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(2, 6, 23, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.ctrlBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctrlBtnOff {
+  background: rgba(127, 29, 29, 0.9);
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.ctrlBtnActive {
+  background: rgba(30, 64, 175, 0.9);
+  border-color: rgba(96, 165, 250, 0.65);
+}
+
+.endBtn {
+  background: #dc2626;
+  border-color: #ef4444;
+  color: #fff;
+}

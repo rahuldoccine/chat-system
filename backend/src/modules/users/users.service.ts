@@ -2,6 +2,7 @@ import type { User } from "@prisma/client";
 
 import { loadConfig } from "../../config/index.js";
 import { AppError } from "../../errors/index.js";
+import { expandAvatarUrl, normalizeAvatarDbValue } from "../../lib/avatar-urls.js";
 import { deleteReplacedAvatarUpload } from "../../lib/upload-cleanup.js";
 import { getPrisma } from "../../lib/prisma.js";
 
@@ -23,7 +24,7 @@ export function toPublicUser(user: User): PublicUser {
     email: user.email,
     displayName: user.displayName,
     username: user.username,
-    avatarUrl: user.avatarUrl,
+    avatarUrl: expandAvatarUrl(user.avatarUrl),
     publicKey: user.publicKey,
     keyVersion: user.keyVersion,
     isAdmin: user.isAdmin,
@@ -64,7 +65,9 @@ export async function patchMe(userId: string, data: {
       data: {
         ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
         ...(data.username !== undefined ? { username: data.username } : {}),
-        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+        ...(data.avatarUrl !== undefined
+          ? { avatarUrl: normalizeAvatarDbValue(data.avatarUrl) }
+          : {}),
         ...(data.publicKey !== undefined ? { publicKey: data.publicKey } : {}),
         ...(data.keyVersion !== undefined ? { keyVersion: data.keyVersion } : {}),
       },

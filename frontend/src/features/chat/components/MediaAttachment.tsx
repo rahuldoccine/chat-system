@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './MediaAttachment.module.css';
 import { Download, ImageIcon } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
@@ -105,6 +105,8 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [overlayActive, setOverlayActive] = useState(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const closeViewer = useCallback(() => setViewerOpen(false), []);
   const openViewer = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -146,6 +148,15 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
     setImgLoaded(false);
     setImgError(false);
   }, [fullUrl]);
+
+  useEffect(() => {
+    if (!fullUrl || imgError) return;
+    // Cached images may already be complete before onLoad fires on some rerenders.
+    if (imgRef.current?.complete) {
+      setImgLoaded(true);
+      onMediaLoad?.();
+    }
+  }, [fullUrl, imgError, onMediaLoad]);
   const mediaWidth = meta.width ?? primaryFile?.width;
   const mediaHeight = meta.height ?? primaryFile?.height;
   const isGif =
@@ -193,8 +204,18 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
       <div
         className={`${styles.imageContainer} ${embedded ? styles.imageContainerEmbedded : ''} ${
           viewerOpen ? styles.imageContainerViewerOpen : ''
-        } ${showPlaceholder ? styles.imageContainerLoading : ''}`}
+        } ${showPlaceholder ? styles.imageContainerLoading : ''} ${
+          overlayActive ? styles.imageContainerOverlayActive : ''
+        }`}
         style={!embedded && aspectRatio ? { aspectRatio } : undefined}
+        onMouseEnter={() => setOverlayActive(true)}
+        onMouseLeave={() => setOverlayActive(false)}
+        onFocusCapture={() => setOverlayActive(true)}
+        onBlurCapture={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setOverlayActive(false);
+          }
+        }}
         onClick={canOpenViewer ? openViewer : undefined}
         onKeyDown={
           canOpenViewer
@@ -219,6 +240,7 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
         )}
         {fullUrl && !imgError ? (
           <img
+            ref={imgRef}
             src={fullUrl}
             alt={displayName}
             className={`${styles.image} ${embedded ? styles.imageEmbedded : ''} ${

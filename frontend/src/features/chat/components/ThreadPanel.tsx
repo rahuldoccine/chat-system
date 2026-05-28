@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Loader2, MessageSquare, ExternalLink } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
@@ -12,16 +12,13 @@ import {
   usePinnedMessages,
   useConversations,
 } from '../hooks/useChatData';
+import { fetchGroup } from '../api/groupsApi';
+import { canModerateMessages } from '../utils/groupRoles';
 import {
   useMessageBodies,
   getMessageDisplayBody,
-  messageWithDecryptedMeta,
 } from '../../e2ee/useMessageBodies';
-import { getAttachmentPreviewLabel } from '../utils/fileMeta';
-import { formatChatTimestamp } from '../../../utils/timeFormat';
 import type { Message } from '../types';
-import UserAvatar from './UserAvatar';
-import LiveUserName from './LiveUserName';
 import MessageComposer from './MessageComposer';
 import ThreadMessageRow from './ThreadMessageRow';
 import type { MessageMenuAction } from './MessageOptionsMenu';
@@ -59,6 +56,12 @@ const ThreadPanel: React.FC = () => {
   const { data: conversationsData } = useConversations();
   const activeChat = conversationsData?.data?.find((c) => c.id === activeId);
   const isDirectChat = activeChat?.type === 'DIRECT';
+  const { data: groupDetails } = useQuery({
+    queryKey: ['group', activeId],
+    queryFn: () => fetchGroup(activeId!),
+    enabled: Boolean(activeId && activeChat?.type === 'GROUP'),
+  });
+  const canPinInThread = isDirectChat || Boolean(groupDetails && canModerateMessages(groupDetails.myRole));
 
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
   const { mutate: addReaction } = useAddReaction();
@@ -243,35 +246,20 @@ const ThreadPanel: React.FC = () => {
             <section className={styles.parentSection} aria-label="Thread parent message">
               <p className={styles.parentLabel}>Thread started by</p>
               <div className={styles.parentCard}>
-                <div className={styles.parentHeader}>
-                  <UserAvatar
-                    userId={root.senderId}
-                    avatarUrl={root.sender?.avatarUrl}
-                    displayName={root.sender?.displayName}
-                    email={root.sender?.email}
-                    className={styles.parentAvatar}
-                    fallbackFontSize="0.8rem"
+                <div className={styles.parentRootRow}>
+                  <ThreadMessageRow
+                    msg={root}
+                    isMe={root.senderId === user?.id}
+                    isDirectChat={Boolean(isDirectChat)}
+                    canPin={canPinInThread}
+                    viewerId={user?.id}
+                    bodies={decryptedBodies}
+                    isPinned={pinnedIds.has(root.id)}
+                    onReply={() => setThreadReplyingTo(root.id)}
+                    onMenuAction={(action) => handleMenuAction(root, action)}
+                    onReactionPick={(emoji) => handleReactionPick(root.id, emoji)}
                   />
-                  <div className={styles.parentMeta}>
-                    <LiveUserName
-                      userId={root.senderId}
-                      displayName={root.sender?.displayName}
-                      email={root.sender?.email}
-                      className={styles.parentName}
-                    />
-                    <time className={styles.parentTime} dateTime={root.createdAt}>
-                      {formatChatTimestamp(root.createdAt)}
-                    </time>
-                  </div>
                 </div>
-                <p className={styles.parentPreview}>
-                  {(() => {
-                    const rootBody = getMessageDisplayBody(root, decryptedBodies, user?.id)?.trim();
-                    if (rootBody) return rootBody;
-                    const rootDisplay = messageWithDecryptedMeta(root, decryptedBodies);
-                    return getAttachmentPreviewLabel(rootDisplay);
-                  })()}
-                </p>
               </div>
             </section>
 
@@ -292,6 +280,7 @@ const ThreadPanel: React.FC = () => {
                   msg={msg}
                   isMe={msg.senderId === user?.id}
                   isDirectChat={Boolean(isDirectChat)}
+                  canPin={canPinInThread}
                   viewerId={user?.id}
                   bodies={decryptedBodies}
                   isPinned={pinnedIds.has(msg.id)}

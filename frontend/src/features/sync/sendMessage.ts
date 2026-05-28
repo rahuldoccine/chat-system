@@ -37,6 +37,7 @@ export type SendMessageInput = {
   userId?: string;
   chat?: Pick<Chat, 'type' | 'e2eeMode' | 'dmPeer'> | null;
   peerUserId?: string;
+  groupMemberIds?: string[];
   preferPeerDeviceId?: string | null;
   /** Skip encryption when ciphertext was prepared externally (e.g. encrypted attachments). */
   preEncrypted?: { ciphertext: string; contentMeta: unknown };
@@ -243,6 +244,7 @@ async function buildSendBody(
         clientMessageId,
         chat: input.chat,
         peerUserId: input.peerUserId,
+        groupMemberIds: input.groupMemberIds,
         preferPeerDeviceId: input.preferPeerDeviceId,
       },
       offlineMode,

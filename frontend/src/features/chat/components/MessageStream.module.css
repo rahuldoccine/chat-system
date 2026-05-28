@@ -394,11 +394,35 @@
   }
 }
 
+.senderNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 0.25rem;
+  margin-bottom: 2px;
+}
+
 .senderName {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--muted-foreground);
-  margin-left: 0.25rem;
+}
+
+.roleBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--muted, #f1f5f9);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.mentionMark {
+  background: rgba(37, 99, 235, 0.16);
+  color: #1e3a8a;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-weight: 600;
 }
 
 .threadSummary {
@@ -635,16 +659,6 @@
   vertical-align: top;
 }
 
-/* Hover actions beside the bubble, not inside layout width */
-.messageWrapperMediaCompact:not(.isMe) .bubbleContainer > .actions {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-left: 0.35rem;
-  white-space: nowrap;
-}
-
 .bubbleFilesOnly .bubbleBody {
   display: none;
 }
@@ -760,6 +774,13 @@
   display: inline-block;
   max-width: 100%;
   vertical-align: top;
+  /* Invisible hover bridge so cursor can reach action buttons without flicker */
+  padding-right: 2.5rem;
+}
+
+.isMe .bubbleWrap {
+  padding-right: 0;
+  padding-left: 2.5rem;
 }
 
 .bubbleWrapWithReactions {
@@ -771,15 +792,19 @@
   bottom: -0.85rem;
   left: 0.35rem;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  /* Size reactions by visible bubble area, not hover bridge padding. */
+  width: max-content;
+  max-width: none;
   gap: 0.28rem;
   z-index: 3;
   pointer-events: auto;
 }
 
 .isMe .reactionsOnBubble {
-  left: 0.35rem;
-  right: auto;
+  left: auto;
+  right: 0.35rem;
+  justify-content: flex-end;
 }
 
 .bubbleContainer {
@@ -793,17 +818,33 @@
   flex-direction: row-reverse;
 }
 
+.bubbleWrap > .actions {
+  position: absolute;
+  top: 50%;
+  right: -3.5rem;
+  left: auto;
+  transform: translateY(-50%);
+  margin: 0;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.isMe .bubbleWrap > .actions {
+  right: auto;
+  left: -3.5rem;
+}
+
 .actions {
   display: flex;
   gap: 0.25rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
-  position: relative;
 }
 
 .actionsPinned,
-.messageWrapper:hover .actions {
+.bubbleContent:hover .actions,
+.bubbleWrap:hover > .actions {
   opacity: 1;
   pointer-events: auto;
 }

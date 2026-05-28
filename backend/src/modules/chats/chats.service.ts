@@ -2,7 +2,14 @@ import { Prisma, type ChatE2eeMode, type ChatType, type MessageKind } from "@pri
 
 import { AppError } from "../../errors/index.js";
 import { requireActiveMember, requireActiveMemberMinRole } from "../../lib/chat-access.js";
-import { canModerateMessages, canManageGroupMeta, roleAtLeast, roleRank } from "../../lib/chat-roles.js";
+import { expandAvatarUrl, normalizeAvatarDbValue } from "../../lib/avatar-urls.js";
+import {
+  canInviteGroupMembers,
+  canModerateMessages,
+  canManageGroupMeta,
+  roleAtLeast,
+  roleRank,
+} from "../../lib/chat-roles.js";
 import { decodeMessageCursor, encodeMessageCursor } from "../../lib/cursor-pagination.js";
 import { assertNotBlockedPair } from "../../lib/moderation-guard.js";
 import { notifyNewMessage } from "../../lib/notification-router.js";
@@ -10,7 +17,11 @@ import { getPollForUser } from "../polls/polls.service.js";
 import { loadConfig } from "../../config/index.js";
 import { getPrisma } from "../../lib/prisma.js";
 import { pairKeyForUserIds } from "../../lib/pair-key.js";
-import { bindUploadsToMessage, purgeUploadsForMessage } from "../../lib/upload-cleanup.js";
+import {
+  bindUploadsToMessage,
+  deleteReplacedAvatarUpload,
+  purgeUploadsForMessage,
+} from "../../lib/upload-cleanup.js";
 import {
   extractFirstHttpUrl,
   fetchLinkPreviewForText,
@@ -20,6 +31,11 @@ import {
 import { SOCKET_PROTOCOL_VERSION } from "../../sockets/constants.js";
 import { emitToChatMembers } from "../../sockets/chat-broadcast.js";
 import { getSocketIo } from "../../sockets/socket-holder.js";
+import {
+  publishGroupActivityMessage,
+  resolveDisplayName,
+} from "../../lib/groups/group-system-message.js";
+import { validateAndMergeMentions } from "../../lib/groups/mentions.js";
 
 async function isBlockedPair(a: string, b: string): Promise<boolean> {
   try {
@@ -97,7 +113,7 @@ export function publicReplyPreview(m: {
           id: m.sender.id,
           email: m.sender.email,
           displayName: m.sender.displayName,
-          avatarUrl: m.sender.avatarUrl,
+          avatarUrl: expandAvatarUrl(m.sender.avatarUrl),
           username: m.sender.username,
         }
       : undefined,
@@ -156,24 +172,10 @@ export function publicMessage(
       id: m.sender.id,
       email: m.sender.email,
       displayName: m.sender.displayName,
-      avatarUrl: m.sender.avatarUrl,
+      avatarUrl: expandAvatarUrl(m.sender.avatarUrl),
       username: m.sender.username,
     } : undefined,
   };
-}
-
-async function requireDmChatForThreads(chatId: string): Promise<void> {
-  const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    select: { type: true },
-  });
-  if (!chat) {
-    throw new AppError(404, "NOT_FOUND", "Chat not found");
-  }
-  if (chat.type !== "DIRECT") {
-    throw new AppError(400, "THREADS_DM_ONLY", "Threads are only supported in direct messages for now");
-  }
 }
 
 async function resolveCanonicalThreadRoot(
@@ -416,14 +418,19 @@ export async function listChats(
     let dmPeer: unknown = undefined;
     if (chat.type === "DIRECT") {
       const other = chat.members.find((x) => x.userId !== userId)?.user;
-      dmPeer = other ?? null;
+      dmPeer = other
+        ? { ...other, avatarUrl: expandAvatarUrl(other.avatarUrl) }
+        : null;
     }
     return {
       id: chat.id,
       type: chat.type,
       title: chat.title,
-      avatarUrl: chat.avatarUrl,
+      avatarUrl: expandAvatarUrl(chat.avatarUrl),
       e2eeMode: chat.e2eeMode,
+      groupVisibility: chat.type === "GROUP" ? chat.groupVisibility : undefined,
+      isMember: true,
+      canJoin: false,
       dmPeer,
       lastMessage: last ? publicMessage(last, lastSummaries.get(last.id) ?? []) : null,
       unreadCount: unreadByChat.get(chat.id) ?? 0,
@@ -432,6 +439,57 @@ export async function listChats(
       mutedUntil: m.mutedUntil ? m.mutedUntil.toISOString() : null,
     };
   });
+
+  const memberChatIds = new Set(page.map((r) => r.chatId));
+  if ((!opts.type || opts.type === "GROUP") && (!opts.cursor || opts.cursor.length === 0)) {
+    const discoverable = await prisma.chat.findMany({
+      where: {
+        type: "GROUP",
+        groupVisibility: "PUBLIC",
+        ...(memberChatIds.size > 0 ? { id: { notIn: [...memberChatIds] } } : {}),
+      },
+      take: 30,
+      orderBy: { updatedAt: "desc" },
+      include: {
+        members: {
+          where: { leftAt: null },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                displayName: true,
+                username: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    for (const chat of discoverable) {
+      const last = await prisma.message.findFirst({
+        where: { chatId: chat.id, deletedAt: null },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      });
+      data.push({
+        id: chat.id,
+        type: chat.type,
+        title: chat.title,
+        avatarUrl: expandAvatarUrl(chat.avatarUrl),
+        e2eeMode: chat.e2eeMode,
+        groupVisibility: chat.groupVisibility,
+        isMember: false,
+        canJoin: true,
+        dmPeer: undefined,
+        lastMessage: last ? publicMessage(last, []) : null,
+        unreadCount: 0,
+        updatedAt: chat.updatedAt,
+        lastMessageAt: chat.lastMessageAt,
+        mutedUntil: null,
+      });
+    }
+  }
 
   const lastRow = page[page.length - 1];
   const nextCursor =
@@ -452,17 +510,23 @@ export async function patchChatMute(userId: string, chatId: string, mutedUntil: 
 }
 
 export async function patchChatE2eeMode(userId: string, chatId: string, e2eeMode: ChatE2eeMode): Promise<void> {
-  await requireActiveMember(userId, chatId);
+  await requireActiveMemberMinRole(userId, chatId, "ADMIN");
   const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, e2eeMode: true } });
   if (!chat) {
     throw new AppError(404, "NOT_FOUND", "Chat not found");
   }
-  if (chat.type !== "DIRECT") {
-    throw new AppError(400, "INVALID_CHAT", "E2EE mode can only be changed for direct chats");
-  }
-  if (e2eeMode === "NONE") {
-    throw new AppError(403, "E2EE_MANDATORY", "Direct chats always use mandatory E2EE");
+  if (chat.type === "DIRECT") {
+    if (e2eeMode === "NONE") {
+      throw new AppError(403, "E2EE_MANDATORY", "Direct chats always use mandatory E2EE");
+    }
+    if (e2eeMode !== "DM_V1") {
+      throw new AppError(400, "INVALID_CHAT", "Direct chats only support DM_V1");
+    }
+  } else if (chat.type === "GROUP") {
+    if (e2eeMode !== "NONE" && e2eeMode !== "GROUP_V1") {
+      throw new AppError(400, "INVALID_CHAT", "Groups support NONE or GROUP_V1");
+    }
   }
   await prisma.chat.update({
     where: { id: chatId },
@@ -504,7 +568,15 @@ export async function getChat(userId: string, chatId: string) {
 
 export async function createChat(
   userId: string,
-  body: { type: "DIRECT"; otherUserId: string } | { type: "GROUP"; title: string; memberIds?: string[] },
+  body:
+    | { type: "DIRECT"; otherUserId: string }
+    | {
+        type: "GROUP";
+        title: string;
+        memberIds?: string[];
+        e2eeMode?: "NONE" | "GROUP_V1";
+        groupVisibility?: "PRIVATE" | "PUBLIC";
+      },
 ) {
   const prisma = getPrisma();
   if (body.type === "DIRECT") {
@@ -569,12 +641,17 @@ export async function createChat(
     }
   }
 
+  const groupE2ee = body.e2eeMode === "GROUP_V1" ? "GROUP_V1" : "NONE";
+  const groupVisibility = body.groupVisibility ?? "PRIVATE";
+
   const chat = await prisma.$transaction(async (tx) => {
     const c = await tx.chat.create({
       data: {
         type: "GROUP",
         title: body.title,
         createdById: userId,
+        e2eeMode: groupE2ee,
+        groupVisibility,
       },
     });
     await tx.chatMember.createMany({
@@ -589,6 +666,27 @@ export async function createChat(
       include: { members: { where: { leftAt: null }, include: { user: true } } },
     });
   });
+  const actorName = await resolveDisplayName(userId);
+  void publishGroupActivityMessage({
+    chatId: chat.id,
+    senderId: userId,
+    meta: { type: "group_created", actorId: userId, actorName, title: body.title },
+  }).catch(() => {});
+  for (const uid of memberIds) {
+    if (uid === userId) continue;
+    const targetName = await resolveDisplayName(uid);
+    void publishGroupActivityMessage({
+      chatId: chat.id,
+      senderId: userId,
+      meta: {
+        type: "member_joined",
+        actorId: userId,
+        actorName,
+        targetUserId: uid,
+        targetName,
+      },
+    }).catch(() => {});
+  }
   return { chat, created: true };
 }
 
@@ -696,8 +794,10 @@ export async function searchMessagesInChat(
     where: { id: chatId },
     select: { type: true, e2eeMode: true },
   });
-  const isE2eeDm = chat?.type === "DIRECT" && chat?.e2eeMode === "DM_V1";
-  if (isE2eeDm) {
+  const isE2ee =
+    (chat?.type === "DIRECT" && chat?.e2eeMode === "DM_V1") ||
+    (chat?.type === "GROUP" && chat?.e2eeMode === "GROUP_V1");
+  if (isE2ee) {
     return { data: [], nextCursor: null, searchUnavailable: true };
   }
 
@@ -761,7 +861,7 @@ export async function searchMessagesInChat(
         id: row.sender_id,
         email: row.sender_email,
         displayName: row.sender_displayName,
-        avatarUrl: row.sender_avatarUrl,
+        avatarUrl: expandAvatarUrl(row.sender_avatarUrl),
         username: row.sender_username,
       },
     })),
@@ -785,7 +885,6 @@ export async function listThreadMessages(
   opts: { limit: number; cursor?: string },
 ): Promise<{ data: ReturnType<typeof publicMessage>[]; nextCursor: string | null; root: ReturnType<typeof publicMessage> }> {
   await requireActiveMember(userId, chatId);
-  await requireDmChatForThreads(chatId);
   const prisma = getPrisma();
 
   const rootRow = await prisma.message.findFirst({
@@ -870,7 +969,7 @@ export async function createMessage(
   idempotent: boolean;
   threadUpdated?: { rootMessageId: string; replyCount: number; lastReplyAt: Date };
 }> {
-  await requireActiveMember(userId, chatId);
+  const me = await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
 
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, e2eeMode: true } });
@@ -878,7 +977,9 @@ export async function createMessage(
     throw new AppError(404, "NOT_FOUND", "Chat not found");
   }
   const isE2eeDm = chat.type === "DIRECT" && chat.e2eeMode === "DM_V1";
-  if (isE2eeDm) {
+  const isE2eeGroup = chat.type === "GROUP" && chat.e2eeMode === "GROUP_V1";
+  const isE2ee = isE2eeDm || isE2eeGroup;
+  if (isE2ee) {
     const ct = input.ciphertext ?? null;
     if (!ct || ct.length < 1) {
       throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only messages");
@@ -889,7 +990,7 @@ export async function createMessage(
     }
     const v = (meta as Record<string, unknown>).e2eeVersion;
     if (typeof v !== "string" || v.length < 1) {
-      throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE DMs");
+      throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE chats");
     }
   }
 
@@ -915,7 +1016,6 @@ export async function createMessage(
   let broadcastToChannel = false;
 
   if (input.threadRootId) {
-    await requireDmChatForThreads(chatId);
     canonicalThreadRootId = await resolveCanonicalThreadRoot(chatId, input.threadRootId);
     broadcastToChannel = Boolean(input.broadcastToChannel);
   } else if (input.broadcastToChannel) {
@@ -936,6 +1036,14 @@ export async function createMessage(
   });
 
   let contentMetaForInsert = input.contentMeta;
+  if (contentMetaForInsert && typeof contentMetaForInsert === "object" && chat.type === "GROUP") {
+    contentMetaForInsert = (await validateAndMergeMentions(
+      userId,
+      chatId,
+      me.role,
+      contentMetaForInsert as Record<string, unknown>,
+    )) as typeof contentMetaForInsert;
+  }
   const cfg = loadConfig();
   const textBody = input.ciphertext ?? "";
   const clientHasPreview =
@@ -946,7 +1054,7 @@ export async function createMessage(
 
   if (
     input.kind === "TEXT" &&
-    !isE2eeDm &&
+    !isE2ee &&
     cfg.linkPreviewEnabled &&
     textBody.length > 0 &&
     !clientHasPreview
@@ -1239,7 +1347,7 @@ export async function listPins(userId: string, chatId: string) {
             id: p.pinnedBy.id,
             email: p.pinnedBy.email,
             displayName: p.pinnedBy.displayName,
-            avatarUrl: p.pinnedBy.avatarUrl,
+            avatarUrl: expandAvatarUrl(p.pinnedBy.avatarUrl),
             username: p.pinnedBy.username,
           }
         : undefined,
@@ -1404,11 +1512,11 @@ export async function createPollOnChat(
   return { poll: pollSnapshot, message: published };
 }
 
-/** Group metadata: title / avatar - ADMIN+ */
+/** Group metadata: title / avatar / visibility - ADMIN+ */
 export async function patchGroupChat(
   userId: string,
   chatId: string,
-  data: { title?: string; avatarUrl?: string | null },
+  data: { title?: string; avatarUrl?: string | null; groupVisibility?: "PRIVATE" | "PUBLIC" },
 ) {
   const member = await requireActiveMemberMinRole(userId, chatId, "ADMIN");
   const prisma = getPrisma();
@@ -1419,14 +1527,87 @@ export async function patchGroupChat(
   if (!canManageGroupMeta(member.role)) {
     throw new AppError(403, "FORBIDDEN", "Insufficient permissions");
   }
-  return prisma.chat.update({
+  const updated = await prisma.chat.update({
     where: { id: chatId },
     data: {
       ...(data.title !== undefined ? { title: data.title } : {}),
-      ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+      ...(data.avatarUrl !== undefined
+        ? { avatarUrl: normalizeAvatarDbValue(data.avatarUrl) }
+        : {}),
+      ...(data.groupVisibility !== undefined ? { groupVisibility: data.groupVisibility } : {}),
     },
     include: { members: { where: { leftAt: null }, include: { user: true } } },
   });
+  const actorName = await resolveDisplayName(userId);
+  if (data.title !== undefined && data.title !== chat.title) {
+    void publishGroupActivityMessage({
+      chatId,
+      senderId: userId,
+      meta: { type: "title_changed", actorId: userId, actorName, title: data.title },
+    }).catch(() => {});
+  }
+  if (data.avatarUrl !== undefined && data.avatarUrl !== chat.avatarUrl) {
+    const { uploadDir } = loadConfig();
+    await deleteReplacedAvatarUpload(uploadDir, chat.avatarUrl, data.avatarUrl);
+    void publishGroupActivityMessage({
+      chatId,
+      senderId: userId,
+      meta: { type: "avatar_changed", actorId: userId, actorName },
+    }).catch(() => {});
+  }
+  return updated;
+}
+
+/** Self-join a public group. Private groups require an invite from owner or moderator. */
+export async function joinPublicGroup(userId: string, chatId: string) {
+  const prisma = getPrisma();
+  const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+  if (!chat || chat.type !== "GROUP") {
+    throw new AppError(404, "NOT_FOUND", "Group not found");
+  }
+  if (chat.groupVisibility !== "PUBLIC") {
+    throw new AppError(
+      403,
+      "PRIVATE_GROUP",
+      "This group is private. Only owners or moderators can add members.",
+    );
+  }
+  const existing = await prisma.chatMember.findFirst({
+    where: { chatId, userId },
+  });
+  if (existing?.leftAt === null) {
+    return prisma.chat.findUniqueOrThrow({
+      where: { id: chatId },
+      include: { members: { where: { leftAt: null }, include: { user: true } } },
+    });
+  }
+  if (existing) {
+    await prisma.chatMember.update({
+      where: { id: existing.id },
+      data: { leftAt: null, role: "MEMBER", joinedAt: new Date() },
+    });
+  } else {
+    await prisma.chatMember.create({
+      data: { chatId, userId, role: "MEMBER" },
+    });
+  }
+  const chatOut = await prisma.chat.findUniqueOrThrow({
+    where: { id: chatId },
+    include: { members: { where: { leftAt: null }, include: { user: true } } },
+  });
+  const actorName = await resolveDisplayName(userId);
+  void publishGroupActivityMessage({
+    chatId,
+    senderId: userId,
+    meta: {
+      type: "member_joined",
+      actorId: userId,
+      actorName,
+      targetUserId: userId,
+      targetName: actorName,
+    },
+  }).catch(() => {});
+  return chatOut;
 }
 
 export async function addGroupMember(userId: string, chatId: string, newUserId: string) {
@@ -1436,7 +1617,10 @@ export async function addGroupMember(userId: string, chatId: string, newUserId: 
   if (await isBlockedPair(userId, newUserId)) {
     throw new AppError(403, "BLOCKED", "Cannot add this user");
   }
-  await requireActiveMemberMinRole(userId, chatId, "ADMIN");
+  const actor = await requireActiveMemberMinRole(userId, chatId, "MOD");
+  if (!canInviteGroupMembers(actor.role)) {
+    throw new AppError(403, "FORBIDDEN", "Insufficient permissions to add members");
+  }
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
   if (!chat || chat.type !== "GROUP") {
@@ -1447,18 +1631,39 @@ export async function addGroupMember(userId: string, chatId: string, newUserId: 
     throw new AppError(404, "NOT_FOUND", "User not found");
   }
   const existing = await prisma.chatMember.findFirst({
-    where: { chatId, userId: newUserId, leftAt: null },
+    where: { chatId, userId: newUserId },
   });
-  if (existing) {
+  if (existing?.leftAt === null) {
     throw new AppError(409, "ALREADY_MEMBER", "User is already a member");
   }
-  await prisma.chatMember.create({
-    data: { chatId, userId: newUserId, role: "MEMBER" },
-  });
-  return prisma.chat.findUniqueOrThrow({
+  if (existing) {
+    await prisma.chatMember.update({
+      where: { id: existing.id },
+      data: { leftAt: null, role: "MEMBER", joinedAt: new Date() },
+    });
+  } else {
+    await prisma.chatMember.create({
+      data: { chatId, userId: newUserId, role: "MEMBER" },
+    });
+  }
+  const chatOut = await prisma.chat.findUniqueOrThrow({
     where: { id: chatId },
     include: { members: { where: { leftAt: null }, include: { user: true } } },
   });
+  const actorName = await resolveDisplayName(userId);
+  const targetName = await resolveDisplayName(newUserId);
+  void publishGroupActivityMessage({
+    chatId,
+    senderId: userId,
+    meta: {
+      type: "member_joined",
+      actorId: userId,
+      actorName,
+      targetUserId: newUserId,
+      targetName,
+    },
+  }).catch(() => {});
+  return chatOut;
 }
 
 export async function removeGroupMember(actorId: string, chatId: string, targetUserId: string) {
@@ -1489,6 +1694,22 @@ export async function removeGroupMember(actorId: string, chatId: string, targetU
     where: { id: target.id },
     data: { leftAt: new Date() },
   });
+  const actorName = await resolveDisplayName(actorId);
+  const targetName = await resolveDisplayName(targetUserId);
+  const isSelf = actorId === targetUserId;
+  void publishGroupActivityMessage({
+    chatId,
+    senderId: actorId,
+    meta: isSelf
+      ? { type: "member_left", actorId, actorName, targetUserId, targetName }
+      : {
+          type: "member_removed",
+          actorId,
+          actorName,
+          targetUserId,
+          targetName,
+        },
+  }).catch(() => {});
 }
 
 export async function patchGroupMemberRole(
@@ -1519,6 +1740,20 @@ export async function patchGroupMemberRole(
     where: { id: target.id },
     data: { role: newRole },
   });
+  const actorName = await resolveDisplayName(actorId);
+  const targetName = await resolveDisplayName(targetUserId);
+  void publishGroupActivityMessage({
+    chatId,
+    senderId: actorId,
+    meta: {
+      type: "role_changed",
+      actorId,
+      actorName,
+      targetUserId,
+      targetName,
+      newRole: newRole,
+    },
+  }).catch(() => {});
 }
 
 export async function markMessagesDelivered(userId: string, chatId: string, messageIds: string[]) {

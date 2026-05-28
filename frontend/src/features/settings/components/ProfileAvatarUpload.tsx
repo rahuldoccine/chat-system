@@ -11,7 +11,7 @@ import {
 } from '../hooks/useUserSettings';
 import {
   getAvatarImageSrc,
-  toStoredAvatarUrl,
+  avatarFileNameFromUpload,
   validateAvatarFile,
 } from '../utils/avatarUrl';
 import styles from './ProfileAvatarUpload.module.css';
@@ -69,10 +69,14 @@ const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
       }
       const uploaded = result.data;
 
-      const avatarUrl = toStoredAvatarUrl(uploaded.url);
-      const optimistic = { ...profile, avatarUrl };
+      const fileName = avatarFileNameFromUpload(uploaded);
+      if (!fileName) {
+        toast.error('Upload succeeded but the file name was missing');
+        return;
+      }
+      const optimistic = { ...profile, avatarUrl: uploaded.url };
       syncProfileEverywhere(optimistic);
-      const updated = await updateProfile({ avatarUrl });
+      const updated = await updateProfile({ avatarUrl: fileName });
       onUpdated(updated);
       toast.success('Profile photo updated');
     } catch (err) {

@@ -188,6 +188,22 @@ class SocketService {
     this.socket.on('call:transcript', (data) => {
       this.trigger('call:transcript', data);
     });
+
+    this.socket.on('groupCall:started', (data) => {
+      this.trigger('groupCall:started', data);
+    });
+
+    this.socket.on('groupCall:participantUpdate', (data) => {
+      this.trigger('groupCall:participantUpdate', data);
+    });
+
+    this.socket.on('groupCall:ended', (data) => {
+      this.trigger('groupCall:ended', data);
+    });
+
+    this.socket.on('groupCall:signal', (data) => {
+      this.trigger('groupCall:signal', data);
+    });
   }
 
   connect(token: string) {

@@ -7,7 +7,9 @@ import type { Chat } from '../types';
 import { isDmE2eeChat } from '../../e2ee/chatE2ee';
 import { getConversationLastMessagePreview } from '../utils/messagePreview';
 import { motion } from 'framer-motion';
-import { Loader2, Hash } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import ChatAvatar from './ChatAvatar';
+import UserAvatar from './UserAvatar';
 
 const ConversationList: React.FC = () => {
   const { activeId, setActiveId } = useChat();
@@ -20,11 +22,6 @@ const ConversationList: React.FC = () => {
   const getChatName = (chat: Chat) => {
     if (chat.type === 'GROUP') return chat.title || 'Untitled Group';
     return chat.dmPeer?.displayName || chat.dmPeer?.email || 'Unknown User';
-  };
-
-  const getChatAvatar = (chat: Chat) => {
-    const name = getChatName(chat);
-    return name.charAt(0).toUpperCase();
   };
 
   if (isLoading) {
@@ -61,7 +58,18 @@ const ConversationList: React.FC = () => {
             >
               <div className={styles.avatarWrapper}>
                 <div className={styles.avatar}>
-                  {chat.type === 'GROUP' ? <Hash size={20} /> : getChatAvatar(chat)}
+                  {chat.type === 'GROUP' ? (
+                    <ChatAvatar chat={chat} chatName={chatName} size={40} borderRadius="50%" />
+                  ) : (
+                    <UserAvatar
+                      userId={chat.dmPeer?.id}
+                      avatarUrl={chat.dmPeer?.avatarUrl}
+                      displayName={chat.dmPeer?.displayName}
+                      email={chat.dmPeer?.email}
+                      fallbackFontSize="1rem"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  )}
                 </div>
                 {chat.type === 'DIRECT' && chat.dmPeer && (chat.dmPeer.isOnline || onlineUsers.has(chat.dmPeer.id)) && (
                   <div className={styles.onlineIndicator} />

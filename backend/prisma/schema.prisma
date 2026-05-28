@@ -100,6 +100,7 @@ enum ChatType {
 enum ChatE2eeMode {
   NONE
   DM_V1
+  GROUP_V1
 }
 
 enum ChatMemberRole {
@@ -109,6 +110,11 @@ enum ChatMemberRole {
   MEMBER
 }
 
+enum GroupVisibility {
+  PRIVATE
+  PUBLIC
+}
+
 /// Direct chats: set `dmKey` to a stable canonical key (e.g. sorted user ids joined by ":") - @@unique prevents duplicate DMs. Null for GROUP.
 model Chat {
   id        String   @id @default(uuid())
@@ -116,7 +122,8 @@ model Chat {
   dmKey     String?  @unique
   title     String?
   avatarUrl String?
-  e2eeMode  ChatE2eeMode @default(NONE)
+  e2eeMode         ChatE2eeMode     @default(NONE)
+  groupVisibility  GroupVisibility  @default(PRIVATE)
 
   createdById String
   createdBy   User   @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
@@ -152,6 +159,20 @@ model ChatMember {
 
   @@unique([chatId, userId])
   @@index([userId, leftAt])
+}
+
+/// Opaque sender-key distribution blobs for GROUP_V1 (server-blind).
+model GroupSenderKey {
+  id           String   @id @default(uuid())
+  chatId       String
+  senderId     String
+  epoch        Int      @default(0)
+  distribution String   @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([chatId, senderId, epoch])
+  @@index([chatId, senderId])
 }
 
 enum MessageKind {

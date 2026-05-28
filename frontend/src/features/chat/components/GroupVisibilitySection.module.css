@@ -1,0 +1,65 @@
+.heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f2f3f5;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #dbdee1;
+}
+
+.option:hover:not(.optionDisabled) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.optionDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.option input {
+  margin-top: 0.2rem;
+  accent-color: var(--primary, #5865f2);
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.optionLabel {
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.optionHint {
+  font-size: 0.72rem;
+  color: #949ba4;
+  line-height: 1.35;
+}
+
+.sectionLight .heading {
+  color: #060607;
+}
+
+.sectionLight .option {
+  color: #2e3338;
+}
+
+.sectionLight .optionHint {
+  color: #5c6370;
+}

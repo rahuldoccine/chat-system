@@ -12,7 +12,7 @@ import type { Logger } from "../../lib/logger.js";
 
 import { createAuthHandlers } from "./auth.controller.js";
 
-import { getPrisma } from "../../lib/prisma.js";
+import * as usersService from "../users/users.service.js";
 
 export function createAuthRouter(config: AppConfig, logger: Logger): Router {
   const router = Router();
@@ -75,11 +75,7 @@ export function createAuthRouter(config: AppConfig, logger: Logger): Router {
     "/me",
     requireAuth,
     asyncHandler(async (req, res) => {
-      const prisma = getPrisma();
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.sub },
-        select: { id: true, email: true, displayName: true, avatarUrl: true, username: true }
-      });
+      const user = await usersService.getMe(req.user!.sub);
       res.json({ user });
     }),
   );

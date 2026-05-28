@@ -194,6 +194,10 @@
   text-align: left;
 }
 
+.channelAvatar {
+  flex-shrink: 0;
+}
+
 .navItem:hover {
   background-color: #35373c;
   color: #dbdee1;
@@ -441,6 +445,115 @@
   height: 100%;
   min-height: 0;
   min-width: 0;
+}
+
+.groupActionsOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;
+  padding: 1rem;
+}
+
+.groupActionsModal {
+  width: min(420px, 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1f2024;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.groupActionsTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f3f4f6;
+}
+
+.groupActionsHint {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #9ca3af;
+}
+
+.groupActionBtn {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid #35373c;
+  border-radius: 10px;
+  background: #2b2d31;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  text-align: left;
+}
+
+.groupActionBtn:hover {
+  background: #35373c;
+  border-color: #4b5563;
+}
+
+.publicGroupsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.publicGroupItem {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid #35373c;
+  border-radius: 10px;
+  background: #2b2d31;
+  color: #e5e7eb;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  text-align: left;
+}
+
+.publicGroupItem:hover {
+  background: #35373c;
+  border-color: #4b5563;
+}
+
+.publicGroupName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emptyPublicGroups {
+  border: 1px dashed #4b5563;
+  border-radius: 10px;
+  background: #26282d;
+  color: #9ca3af;
+  font-size: 0.83rem;
+  padding: 0.85rem;
+  text-align: center;
 }
 
 /* Responsive styling */

@@ -11,6 +11,8 @@ export function createGroupsRouter(config: AppConfig): Router {
   const requireAuth = createRequireAuth(config);
   router.use(requireAuth);
 
+  router.get("/:groupId", asyncHandler(groupsController.getGroup));
+  router.post("/:groupId/join", asyncHandler(groupsController.joinGroup));
   router.post("/", asyncHandler(groupsController.createGroup));
   router.patch("/:groupId", asyncHandler(groupsController.patchGroup));
   router.post("/:groupId/members", asyncHandler(groupsController.addMember));

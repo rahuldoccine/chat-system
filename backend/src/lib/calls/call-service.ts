@@ -1,6 +1,7 @@
 import type { CallKind, CallLog, CallStatus, Prisma } from "@prisma/client";
 
 import { AppError } from "../../errors/index.js";
+import { expandAvatarUrl } from "../avatar-urls.js";
 import { getPrisma } from "../prisma.js";
 import { getCallDirection } from "./call-helpers.js";
 
@@ -189,7 +190,7 @@ export async function listCallsForUser(
             id: peerUser.id,
             displayName: peerUser.displayName,
             email: peerUser.email,
-            avatarUrl: peerUser.avatarUrl,
+            avatarUrl: expandAvatarUrl(peerUser.avatarUrl),
           }
         : null,
     };

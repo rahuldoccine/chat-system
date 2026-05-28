@@ -4,6 +4,12 @@ import path from "node:path";
 import { Prisma, type MessageKind } from "@prisma/client";
 
 import { getPrisma } from "./prisma.js";
+import { resolveLogoStorageKey } from "./avatar-urls.js";
+import {
+  isSafeStorageKey,
+  resolveStorageAbsolutePath,
+  storageKeyFromUrl,
+} from "./upload-storage.js";
 
 export type UploadFileRefs = {
   storageKeys: string[];
@@ -15,16 +21,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function storageKeyFromUrl(url: unknown): string | null {
-  if (typeof url !== "string") return null;
-  const match = url.match(/\/files\/([^/?#]+)/);
-  if (!match?.[1]) return null;
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return match[1];
-  }
-}
+export { storageKeyFromUrl } from "./upload-storage.js";
 
 function addFileRef(target: UploadFileRefs, file: unknown): void {
   const rec = asRecord(file);
@@ -68,13 +65,7 @@ export function extractUploadRefsFromContentMeta(contentMeta: unknown): UploadFi
   return refs;
 }
 
-export function isSafeStorageKey(storageKey: string): boolean {
-  if (!storageKey || storageKey !== path.basename(storageKey)) return false;
-  if (storageKey.includes("..") || storageKey.includes("/") || storageKey.includes("\\")) {
-    return false;
-  }
-  return true;
-}
+export { isSafeStorageKey } from "./upload-storage.js";
 
 function mediaMessageKinds(): MessageKind[] {
   return ["IMAGE", "FILE"];
@@ -127,10 +118,8 @@ export async function isStorageKeyReferencedByActiveMessages(
 }
 
 export async function unlinkStorageFile(uploadDir: string, storageKey: string): Promise<void> {
-  if (!isSafeStorageKey(storageKey)) return;
-  const root = path.resolve(uploadDir);
-  const abs = path.resolve(root, storageKey);
-  if (abs !== root && !abs.startsWith(root + path.sep)) return;
+  const abs = resolveStorageAbsolutePath(uploadDir, storageKey);
+  if (!abs) return;
   await fs.unlink(abs).catch((err: NodeJS.ErrnoException) => {
     if (err.code !== "ENOENT") throw err;
   });
@@ -162,8 +151,9 @@ export async function deleteReplacedAvatarUpload(
 ): Promise<void> {
   if (!previousAvatarUrl || previousAvatarUrl === nextAvatarUrl) return;
 
-  const storageKey = storageKeyFromUrl(previousAvatarUrl);
-  if (!storageKey) return;
+  const storageKey =
+    resolveLogoStorageKey(previousAvatarUrl) ?? storageKeyFromUrl(previousAvatarUrl);
+  if (!storageKey || !isSafeStorageKey(storageKey)) return;
 
   const stillInMessages = await isStorageKeyReferencedByActiveMessages(storageKey);
   if (stillInMessages) return;

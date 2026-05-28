@@ -6,6 +6,7 @@ import { loadConfig } from "./config/index.js";
 import { createLogger, logDevBanner } from "./lib/logger.js";
 import { setPushWorkerLogger } from "./lib/push-queue.js";
 import { initPrisma } from "./lib/prisma.js";
+import { ensureCategoryDir, UPLOAD_CATEGORIES } from "./lib/upload-storage.js";
 import { initSocket } from "./sockets/index.js";
 import { setSocketIo } from "./sockets/socket-holder.js";
 
@@ -15,6 +16,9 @@ setPushWorkerLogger(logger);
 const prisma = initPrisma(config);
 
 fs.mkdirSync(config.uploadDir, { recursive: true });
+for (const category of UPLOAD_CATEGORIES) {
+  await ensureCategoryDir(config.uploadDir, category);
+}
 
 const app = createApp({ config, logger });
 const httpServer = http.createServer(app);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Message, LinkPreviewMeta } from '../chat/types';
 import { useAuth } from '../../context/AuthContext';
 import { decryptDirectMessage, isE2eeMessage } from './directChat';
+import { isGroupE2eeMessage } from './protocol';
 import { getLocalKeyMaterial } from './keyAccess';
 import { rememberPeerDevice } from './peerDevice';
 import {
@@ -112,6 +113,10 @@ export function useMessageBodies(
             };
             continue;
           }
+          if (isGroupE2eeMessage(msg)) {
+            toDecrypt.push(msg);
+            continue;
+          }
           initial[msg.id] = { text: '[Sent message unavailable on this device]' };
           continue;
         }
@@ -161,8 +166,21 @@ export function useMessageBodies(
               }
               void rememberPayload(user.id, msg.id, fp, body);
             } else {
-              const plain = await decryptDirectMessage(user.id, msg, user.id);
-              body = { text: plain ?? '[Unable to decrypt]' };
+              if (isGroupE2eeMessage(msg)) {
+                // Group messages cannot be decrypted via direct-chat fallback.
+                // When this user is the sender but plaintext cache is unavailable on this device,
+                // keep parity with DM behavior instead of showing a misleading decrypt error.
+                if (msg.senderId === user.id) {
+                  body = {
+                    text: messageHasMediaAttachments(msg) ? '' : '[Sent message unavailable on this device]',
+                  };
+                } else {
+                  body = { text: '[Unable to decrypt]' };
+                }
+              } else {
+                const plain = await decryptDirectMessage(user.id, msg, user.id);
+                body = { text: plain ?? '[Unable to decrypt]' };
+              }
             }
 
             if (cancelled) return;
