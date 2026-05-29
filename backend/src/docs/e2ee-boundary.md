@@ -17,6 +17,12 @@ This backend supports **ciphertext-only** storage and transport for **private (D
 ### Recovery support (server-blind)
 Account verification (email/MFA step-up) may gate access to **wrapped** key backups, but the backend never decrypts:
 - `KeyBackup.wrappedPrivateKeyMaterial` is opaque and only usable with client-held recovery material.
+- Backup payload **v2** (client-side JSON before wrapping) may include: identity/device/prekey material, sent-plaintext index, and group sender keys. The server stores only the wrapped blob.
+
+### Group sender-key distribution (`group-v1`)
+- `GroupSenderKey.distribution` is opaque JSON. Preferred shape: `{ v: 2, self: { key, epoch }, wrapped: { userId: dmCiphertext } }`.
+- Legacy `{ key, epoch }` plaintext self rows remain readable by all members for backward compatibility.
+- Identity keys cannot be overwritten via `PUT /e2ee/identity` when the fingerprint changes unless the client sends `x-identity-rotate: true`.
 
 ### Client envelope (`dm-v1`)
 All new DIRECT messages use mandatory `Chat.e2eeMode = DM_V1`. The browser stores:

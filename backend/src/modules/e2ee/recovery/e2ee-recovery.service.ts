@@ -4,6 +4,7 @@ import type { Logger } from "../../../lib/logger.js";
 import { hashOpaqueToken, newOpaqueToken } from "../../../lib/opaque-token.js";
 import { getPrisma } from "../../../lib/prisma.js";
 import { sendRecoveryEmailChallenge } from "../../../lib/mailer.js";
+import { getIdentityKeySummary } from "../e2ee.service.js";
 
 const PURPOSE_RECOVERY = "E2EE_RECOVERY";
 const CODE_TTL_MS = 10 * 60_000;
@@ -134,5 +135,29 @@ export async function hasKeyBackup(userId: string): Promise<boolean> {
   const prisma = getPrisma();
   const count = await prisma.keyBackup.count({ where: { userId } });
   return count > 0;
+}
+
+export async function getAccountKeyStatus(userId: string): Promise<{
+  hasBackup: boolean;
+  hasIdentityKey: boolean;
+  identityFingerprint: string | null;
+  deviceCount: number;
+  backupUpdatedAt: string | null;
+}> {
+  const prisma = getPrisma();
+  const [backup, identity] = await Promise.all([
+    prisma.keyBackup.findUnique({
+      where: { userId },
+      select: { updatedAt: true },
+    }),
+    getIdentityKeySummary(userId),
+  ]);
+  return {
+    hasBackup: Boolean(backup),
+    hasIdentityKey: identity.hasIdentityKey,
+    identityFingerprint: identity.fingerprint,
+    deviceCount: identity.deviceCount,
+    backupUpdatedAt: backup?.updatedAt.toISOString() ?? null,
+  };
 }
 

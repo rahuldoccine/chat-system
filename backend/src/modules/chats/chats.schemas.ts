@@ -96,6 +96,18 @@ export const patchChatMuteBodySchema = z.object({
   mutedUntil: z.union([z.string().min(1), z.null()]),
 });
 
+export const patchChatPinBodySchema = z.object({
+  pinned: z.boolean(),
+});
+
+export const patchChatFavoriteBodySchema = z.object({
+  favorited: z.boolean(),
+});
+
+export const patchChatCloseBodySchema = z.object({
+  closed: z.boolean(),
+});
+
 export const patchChatE2eeBodySchema = z.object({
   e2eeMode: z.enum(["NONE", "DM_V1", "GROUP_V1"]),
 });

@@ -38,8 +38,8 @@ export function createE2eeRecoveryHandlers(config: AppConfig, logger: Logger) {
 
     /** Whether a wrapped key backup exists (no key material returned). */
     getBackupStatus: async (req: Request, res: Response) => {
-      const hasBackup = await recoveryService.hasKeyBackup(req.user!.sub);
-      res.status(200).json({ ok: true, data: { hasBackup } });
+      const status = await recoveryService.getAccountKeyStatus(req.user!.sub);
+      res.status(200).json({ ok: true, data: status });
     },
 
     /** Restore keys on a new browser after sign-in (session auth; ciphertext still opaque to server). */

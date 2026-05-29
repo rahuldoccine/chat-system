@@ -58,6 +58,18 @@ export type AppConfig = {
 
 let cached: AppConfig | null = null;
 
+function cleanEnvString(value?: string): string | undefined {
+  if (value == null || value === "") return undefined;
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
 function resolveUploadDir(relativeOrAbsolute: string): string {
   if (path.isAbsolute(relativeOrAbsolute)) {
     return relativeOrAbsolute;
@@ -92,11 +104,11 @@ export function loadConfig(overrides?: Partial<NodeJS.ProcessEnv>): AppConfig {
     frontendUrl: env.FRONTEND_URL,
     refreshCookieName: env.REFRESH_COOKIE_NAME,
     smtp: {
-      host: env.SMTP_HOST,
+      host: cleanEnvString(env.SMTP_HOST),
       port: env.SMTP_PORT,
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-      from: env.SMTP_FROM,
+      user: cleanEnvString(env.SMTP_USER),
+      pass: cleanEnvString(env.SMTP_PASS),
+      from: cleanEnvString(env.SMTP_FROM),
     },
     corsOrigins: env.CORS_ORIGIN,
     uploadDir: resolveUploadDir(env.UPLOAD_DIR),

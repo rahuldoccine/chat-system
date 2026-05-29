@@ -28,7 +28,7 @@ import {
   getCachedLinkPreview,
   type LinkPreview,
 } from "../../lib/link-preview.js";
-import { SOCKET_PROTOCOL_VERSION } from "../../sockets/constants.js";
+import { isUserMentioned } from "../../lib/groups/mentions.js";
 import { emitToChatMembers } from "../../sockets/chat-broadcast.js";
 import { getSocketIo } from "../../sockets/socket-holder.js";
 import {
@@ -386,6 +386,15 @@ export async function listChats(
   });
 
   const page = rows.slice(0, opts.limit);
+  page.sort((a, b) => {
+    const aPin = a.pinnedAt ? a.pinnedAt.getTime() : 0;
+    const bPin = b.pinnedAt ? b.pinnedAt.getTime() : 0;
+    if (aPin !== bPin) return bPin - aPin;
+    const aUpd = a.chat.updatedAt.getTime();
+    const bUpd = b.chat.updatedAt.getTime();
+    if (aUpd !== bUpd) return bUpd - aUpd;
+    return b.chat.id.localeCompare(a.chat.id);
+  });
   const chatIds = page.map((r) => r.chatId);
 
   const lastByChat = new Map<string, Awaited<ReturnType<typeof prisma.message.findFirst>>>();
@@ -398,6 +407,7 @@ export async function listChats(
   }
 
   const unreadByChat = new Map<string, number>();
+  const unreadMentionByChat = new Map<string, number>();
   for (const chatId of chatIds) {
     const n = await prisma.receipt.count({
       where: {
@@ -407,12 +417,27 @@ export async function listChats(
       },
     });
     unreadByChat.set(chatId, n);
+
+    const unreadReceipts = await prisma.receipt.findMany({
+      where: {
+        userId,
+        readAt: null,
+        message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
+      },
+      select: { message: { select: { contentMeta: true } } },
+      take: 200,
+    });
+    const mentionCount = unreadReceipts.filter((r) =>
+      isUserMentioned(userId, r.message.contentMeta),
+    ).length;
+    unreadMentionByChat.set(chatId, mentionCount);
   }
 
   const lastMessageIds = [...lastByChat.values()].map((lm) => lm?.id).filter((id): id is string => Boolean(id));
   const lastSummaries = await reactionsSummariesForMessages(prisma, lastMessageIds, userId);
 
-  const data = page.map((m) => {
+  const data = page
+    .map((m) => {
     const chat = m.chat;
     const last = lastByChat.get(chat.id);
     let dmPeer: unknown = undefined;
@@ -434,11 +459,16 @@ export async function listChats(
       dmPeer,
       lastMessage: last ? publicMessage(last, lastSummaries.get(last.id) ?? []) : null,
       unreadCount: unreadByChat.get(chat.id) ?? 0,
+      unreadMentionCount: unreadMentionByChat.get(chat.id) ?? 0,
+      pinnedAt: m.pinnedAt ? m.pinnedAt.toISOString() : null,
+      favoritedAt: m.favoritedAt ? m.favoritedAt.toISOString() : null,
+      closedAt: m.closedAt ? m.closedAt.toISOString() : null,
       updatedAt: chat.updatedAt,
       lastMessageAt: chat.lastMessageAt,
       mutedUntil: m.mutedUntil ? m.mutedUntil.toISOString() : null,
     };
-  });
+  })
+    .filter((row) => row.type !== "DIRECT" || row.dmPeer != null);
 
   const memberChatIds = new Set(page.map((r) => r.chatId));
   if ((!opts.type || opts.type === "GROUP") && (!opts.cursor || opts.cursor.length === 0)) {
@@ -506,6 +536,41 @@ export async function patchChatMute(userId: string, chatId: string, mutedUntil: 
   await prisma.chatMember.updateMany({
     where: { chatId, userId, leftAt: null },
     data: { mutedUntil },
+  });
+}
+
+export async function patchChatPin(userId: string, chatId: string, pinned: boolean): Promise<void> {
+  await requireActiveMember(userId, chatId);
+  const prisma = getPrisma();
+  await prisma.chatMember.updateMany({
+    where: { chatId, userId, leftAt: null },
+    data: { pinnedAt: pinned ? new Date() : null },
+  });
+}
+
+export async function patchChatFavorite(userId: string, chatId: string, favorited: boolean): Promise<void> {
+  await requireActiveMember(userId, chatId);
+  const prisma = getPrisma();
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+  if (!chat || (chat.type !== "DIRECT" && chat.type !== "GROUP")) {
+    throw new AppError(400, "INVALID_CHAT", "Only chats can be favorited");
+  }
+  await prisma.chatMember.updateMany({
+    where: { chatId, userId, leftAt: null },
+    data: { favoritedAt: favorited ? new Date() : null },
+  });
+}
+
+export async function patchChatClose(userId: string, chatId: string, closed: boolean): Promise<void> {
+  await requireActiveMember(userId, chatId);
+  const prisma = getPrisma();
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+  if (!chat || chat.type !== "DIRECT") {
+    throw new AppError(400, "INVALID_CHAT", "Only direct messages can be closed");
+  }
+  await prisma.chatMember.updateMany({
+    where: { chatId, userId, leftAt: null },
+    data: { closedAt: closed ? new Date() : null },
   });
 }
 
@@ -596,6 +661,10 @@ export async function createChat(
       include: { members: { where: { leftAt: null } } },
     });
     if (existing && existing.type === "DIRECT") {
+      await prisma.chatMember.updateMany({
+        where: { chatId: existing.id, userId, leftAt: null },
+        data: { closedAt: null },
+      });
       if (existing.e2eeMode === "NONE") {
         const upgraded = await prisma.chat.update({
           where: { id: existing.id },
@@ -1118,6 +1187,10 @@ export async function createMessage(
     await tx.chat.update({
       where: { id: chatId },
       data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
+    });
+    await tx.chatMember.updateMany({
+      where: { chatId, leftAt: null, closedAt: { not: null } },
+      data: { closedAt: null },
     });
     return { msg, threadUpdated };
   });

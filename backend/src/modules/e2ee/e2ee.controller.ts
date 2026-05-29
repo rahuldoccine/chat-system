@@ -6,8 +6,24 @@ import * as groupKeysService from "./group-keys.service.js";
 
 export async function putIdentityKey(req: Request, res: Response) {
   const body = putIdentityKeySchema.parse(req.body);
-  const row = await e2eeService.upsertIdentityKey(req.user!.sub, body);
+  const allowRotation = String(req.header("x-identity-rotate") ?? "").toLowerCase() === "true";
+  const row = await e2eeService.upsertIdentityKey(req.user!.sub, body, { allowRotation });
   res.status(200).json({ ok: true, data: { userId: row.userId, fingerprint: row.fingerprint, updatedAt: row.updatedAt } });
+}
+
+export async function getOwnIdentityKey(req: Request, res: Response) {
+  const userId = req.user!.sub;
+  try {
+    const row = await e2eeService.getIdentityKey(userId);
+    res.status(200).json({ ok: true, data: row });
+  } catch (err: unknown) {
+    const status = (err as { httpStatus?: number })?.httpStatus;
+    if (status === 404) {
+      res.status(200).json({ ok: true, data: null });
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function getIdentityKey(req: Request, res: Response) {

@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import type { AppConfig } from "../../config/index.js";
 import { AppError } from "../../errors/index.js";
 import { signAccessTokenWithExpiry } from "../../lib/jwt.js";
-import { sendPasswordResetEmail } from "../../lib/mailer.js";
+import { sendPasswordResetEmailAsync } from "../../lib/mailer.js";
 import type { Logger } from "../../lib/logger.js";
 import { hashOpaqueToken, newOpaqueToken } from "../../lib/opaque-token.js";
 import { getPrisma } from "../../lib/prisma.js";
@@ -237,7 +237,7 @@ export async function forgotPassword(
   });
 
   const resetLink = `${config.frontendUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(raw)}`;
-  await sendPasswordResetEmail(config, logger, user.email, resetLink);
+  sendPasswordResetEmailAsync(config, logger, user.email, resetLink);
 }
 
 export async function resetPasswordWithToken(

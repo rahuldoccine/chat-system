@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * Remove ALL chat data (messages, files/media on disk, chats, receipts, polls, pins, call logs).
- * User accounts, auth sessions, friends, blocks, settings, and E2EE keys are kept.
+ * User accounts, auth sessions, friends, blocks, settings, E2EE keys, and profile photos (logos/) are kept.
+ *
+ * Chat files live under uploads/groupchats/ and uploads/onetoonechats/ (not the upload root).
  *
  * Usage (from backend/):
  *   CONFIRM=YES npm run db:clear-chats
@@ -16,6 +18,9 @@ import { PrismaClient } from "@prisma/client";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(__dirname, "..");
 
+/** Subfolders under UPLOAD_DIR that hold chat attachments (see upload-storage.ts). */
+const CHAT_UPLOAD_DIRS = ["groupchats", "onetoonechats"];
+
 const dryRun = process.argv.includes("--dry-run");
 const confirmed = process.env.CONFIRM === "YES";
 
@@ -25,7 +30,7 @@ if (!dryRun && !confirmed) {
       "Refusing to run without confirmation.",
       "",
       "This permanently deletes every chat, message, upload, and call log.",
-      "User accounts are kept.",
+      "User accounts and profile photos (uploads/logos/) are kept.",
       "",
       "Dry run:  npm run db:clear-chats -- --dry-run",
       "Execute:  CONFIRM=YES npm run db:clear-chats",
@@ -38,6 +43,15 @@ function resolveUploadDir() {
   const raw = process.env.UPLOAD_DIR ?? "./uploads";
   return path.isAbsolute(raw) ? raw : path.resolve(backendRoot, raw);
 }
+
+/** Prisma filter: chat/media uploads only (not profile logos). */
+const chatUploadWhere = {
+  OR: [
+    { chatId: { not: null } },
+    { storageKey: { startsWith: "groupchats/" } },
+    { storageKey: { startsWith: "onetoonechats/" } },
+  ],
+};
 
 async function countAll(prisma) {
   const [
@@ -53,6 +67,7 @@ async function countAll(prisma) {
     callLogs,
     reports,
     chatMembers,
+    logoUploads,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.chat.count(),
@@ -62,10 +77,11 @@ async function countAll(prisma) {
     prisma.poll.count(),
     prisma.pollVote.count(),
     prisma.pinnedMessage.count(),
-    prisma.uploadedFile.count(),
+    prisma.uploadedFile.count({ where: chatUploadWhere }),
     prisma.callLog.count(),
     prisma.report.count(),
     prisma.chatMember.count(),
+    prisma.uploadedFile.count({ where: { storageKey: { startsWith: "logos/" } } }),
   ]);
 
   return {
@@ -81,10 +97,35 @@ async function countAll(prisma) {
     callLogs,
     reports,
     chatMembers,
+    logoUploadsKept: logoUploads,
   };
 }
 
-async function listUploadFiles(uploadDir) {
+/** Recursively list files under a directory (skips .gitkeep). */
+async function walkFiles(dir) {
+  let entries = [];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === "ENOENT") return [];
+    throw err;
+  }
+
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await walkFiles(fullPath)));
+      continue;
+    }
+    if (!entry.isFile() || entry.name === ".gitkeep") continue;
+    files.push(fullPath);
+  }
+  return files;
+}
+
+/** Legacy flat files directly in the upload root (pre-category layout). */
+async function listLegacyRootUploadFiles(uploadDir) {
   let entries = [];
   try {
     entries = await fs.readdir(uploadDir, { withFileTypes: true });
@@ -96,17 +137,29 @@ async function listUploadFiles(uploadDir) {
   const files = [];
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const name = entry.name;
-    if (name === ".gitkeep") continue;
-    files.push(path.join(uploadDir, name));
+    if (entry.name === ".gitkeep") continue;
+    files.push(path.join(uploadDir, entry.name));
   }
   return files;
 }
 
-async function wipeUploadDirectory(uploadDir) {
-  const files = await listUploadFiles(uploadDir);
+/** All chat media files on disk (groupchats/, onetoonechats/, legacy root files). */
+async function listChatUploadFilesOnDisk(uploadDir) {
+  const files = [];
+  for (const subdir of CHAT_UPLOAD_DIRS) {
+    files.push(...(await walkFiles(path.join(uploadDir, subdir))));
+  }
+  files.push(...(await listLegacyRootUploadFiles(uploadDir)));
+  return files;
+}
+
+async function wipeChatUploadFilesOnDisk(uploadDir) {
+  const files = await listChatUploadFilesOnDisk(uploadDir);
   if (dryRun) {
-    console.log(`[dry-run] Would delete ${files.length} file(s) under ${uploadDir}`);
+    console.log(`[dry-run] Would delete ${files.length} chat file(s) under ${uploadDir}`);
+    for (const subdir of CHAT_UPLOAD_DIRS) {
+      console.log(`  - ${path.join(uploadDir, subdir)}/`);
+    }
     return files.length;
   }
 
@@ -136,7 +189,7 @@ async function clearDatabase(prisma) {
     deleted.receipts = (await tx.receipt.deleteMany()).count;
     deleted.reactions = (await tx.reaction.deleteMany()).count;
     deleted.messages = (await tx.message.deleteMany()).count;
-    deleted.uploadedFiles = (await tx.uploadedFile.deleteMany()).count;
+    deleted.uploadedFiles = (await tx.uploadedFile.deleteMany({ where: chatUploadWhere })).count;
     deleted.callLogs = (await tx.callLog.deleteMany()).count;
     deleted.chatMembers = (await tx.chatMember.deleteMany()).count;
     deleted.chats = (await tx.chat.deleteMany()).count;
@@ -155,17 +208,19 @@ try {
   const uploadDir = resolveUploadDir();
   console.log(dryRun ? "=== DRY RUN ===" : "=== CLEAR ALL CHAT DATA ===");
   console.log(`Database: ${process.env.DATABASE_URL?.replace(/:[^:@]+@/, ":***@") ?? "(DATABASE_URL not set)"}`);
-  console.log(`Upload dir: ${uploadDir}\n`);
+  console.log(`Upload dir: ${uploadDir}`);
+  console.log(`Chat media dirs: ${CHAT_UPLOAD_DIRS.map((d) => path.join(uploadDir, d)).join(", ")}`);
+  console.log(`Profile logos kept: ${path.join(uploadDir, "logos")}/\n`);
 
   const before = await countAll(prisma);
   console.log("Before:");
   console.table(before);
 
-  const diskFiles = await listUploadFiles(uploadDir);
-  console.log(`\nFiles on disk: ${diskFiles.length}`);
+  const diskFiles = await listChatUploadFilesOnDisk(uploadDir);
+  console.log(`\nChat files on disk: ${diskFiles.length}`);
 
   const deleted = await clearDatabase(prisma);
-  const diskRemoved = await wipeUploadDirectory(uploadDir);
+  const diskRemoved = await wipeChatUploadFilesOnDisk(uploadDir);
 
   const after = await countAll(prisma);
   console.log("\nAfter:");
@@ -176,8 +231,8 @@ try {
   } else {
     console.log("\nDeleted rows:");
     console.table(deleted);
-    console.log(`Removed ${diskRemoved} file(s) from disk.`);
-    console.log(`\nKept ${after.users} user account(s).`);
+    console.log(`Removed ${diskRemoved} chat file(s) from disk (logos/ untouched).`);
+    console.log(`\nKept ${after.users} user account(s), ${after.logoUploadsKept} profile logo upload(s).`);
   }
 } catch (err) {
   console.error("Clear failed:", err);

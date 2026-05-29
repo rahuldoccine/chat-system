@@ -14,6 +14,7 @@ export function createE2eeRouter(config: AppConfig, logger: Logger): Router {
   const recovery = createE2eeRecoveryHandlers(config, logger);
 
   router.put("/identity", requireAuth, asyncHandler(e2eeController.putIdentityKey));
+  router.get("/identity/me", requireAuth, asyncHandler(e2eeController.getOwnIdentityKey));
   router.get("/identity/:userId", requireAuth, asyncHandler(e2eeController.getIdentityKey));
 
   router.put("/devices/:deviceId", requireAuth, asyncHandler(e2eeController.putDeviceKey));

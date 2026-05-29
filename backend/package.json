@@ -17,7 +17,9 @@
     "test:socket": "vitest run src/sockets/socket.integration.test.ts",
     "test:uploads": "vitest run src/modules/uploads/uploads.integration.test.ts",
     "cleanup-uploads": "node scripts/cleanup-orphan-uploads.mjs",
-    "db:clear-chats": "node scripts/clear-all-chat-data.mjs"
+    "db:clear-chats": "node scripts/clear-all-chat-data.mjs",
+    "db:seed-test": "node scripts/seed-dummy-test-data.mjs",
+    "db:remove-seed": "node scripts/remove-dummy-test-data.mjs"
   },
   "engines": {
     "node": ">=20"

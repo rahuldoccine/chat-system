@@ -20,6 +20,9 @@ export function createChatsRouter(config: AppConfig): Router {
     asyncHandler(chatsController.getLinkPreview),
   );
   router.patch("/:chatId/mute", asyncHandler(chatsController.patchChatMute));
+  router.patch("/:chatId/pin", asyncHandler(chatsController.patchChatPin));
+  router.patch("/:chatId/favorite", asyncHandler(chatsController.patchChatFavorite));
+  router.patch("/:chatId/close", asyncHandler(chatsController.patchChatClose));
   router.patch("/:chatId/e2ee", asyncHandler(chatsController.patchChatE2ee));
   router.get("/:chatId", asyncHandler(chatsController.getChat));
   router.get("/:chatId/unread", asyncHandler(chatsController.getChatUnread));

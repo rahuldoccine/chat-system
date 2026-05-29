@@ -1,10 +1,36 @@
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport/index.js";
 
 import type { AppConfig } from "../config/index.js";
+import { buildPasswordResetEmail, buildRecoveryCodeEmail } from "./email/templates.js";
 import type { Logger } from "./logger.js";
+
+const MAIL_FROM_NAME = "Chat System";
 
 function isSmtpConfigured(config: AppConfig): boolean {
   return Boolean(config.smtp.host && config.smtp.port && config.smtp.from);
+}
+
+function formatFromAddress(from: string): string {
+  if (from.includes("<")) return from;
+  return `"${MAIL_FROM_NAME}" <${from}>`;
+}
+
+function createSmtpTransporter(config: AppConfig) {
+  const port = config.smtp.port!;
+  return nodemailer.createTransport({
+    host: config.smtp.host,
+    port,
+    secure: port === 465,
+    requireTLS: port === 587,
+    auth:
+      config.smtp.user && config.smtp.pass
+        ? { user: config.smtp.user, pass: config.smtp.pass }
+        : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  } satisfies SMTPTransport.Options);
 }
 
 export async function sendPasswordResetEmail(
@@ -21,23 +47,29 @@ export async function sendPasswordResetEmail(
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.port === 465,
-    auth:
-      config.smtp.user && config.smtp.pass
-        ? { user: config.smtp.user, pass: config.smtp.pass }
-        : undefined,
+  const { subject, text, html } = buildPasswordResetEmail({
+    resetLink,
+    expiresMinutes: config.passwordResetTokenTtlMinutes,
   });
 
-  await transporter.sendMail({
-    from: config.smtp.from,
-    to,
-    subject: "Reset your password",
-    text: `You requested a password reset. Open this link (valid for a limited time):\n\n${resetLink}\n\nIf you did not request this, ignore this email.`,
-    html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Reset your password</a></p><p>If you did not request this, ignore this email.</p>`,
-  });
+  const transporter = createSmtpTransporter(config);
+
+  try {
+    await transporter.sendMail({
+      from: formatFromAddress(config.smtp.from!),
+      to,
+      subject,
+      text,
+      html,
+    });
+    logger.info({ to }, "Password reset email sent");
+  } catch (err) {
+    const smtpError = err instanceof Error ? err.message : String(err);
+    logger.error({ err, to, smtpError }, "Failed to send password reset email");
+    throw err;
+  } finally {
+    transporter.close();
+  }
 }
 
 export async function sendRecoveryEmailChallenge(
@@ -51,21 +83,36 @@ export async function sendRecoveryEmailChallenge(
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.port === 465,
-    auth:
-      config.smtp.user && config.smtp.pass
-        ? { user: config.smtp.user, pass: config.smtp.pass }
-        : undefined,
-  });
+  const { subject, text, html } = buildRecoveryCodeEmail({ code });
 
-  await transporter.sendMail({
-    from: config.smtp.from,
-    to,
-    subject: "Your recovery verification code",
-    text: `Use this verification code to continue account recovery:\n\n${code}\n\nIf you did not request this, you can ignore this email.`,
-    html: `<p>Use this verification code to continue account recovery:</p><p><b style="font-size:18px; letter-spacing:2px;">${code}</b></p><p>If you did not request this, you can ignore this email.</p>`,
+  const transporter = createSmtpTransporter(config);
+
+  try {
+    await transporter.sendMail({
+      from: formatFromAddress(config.smtp.from!),
+      to,
+      subject,
+      text,
+      html,
+    });
+    logger.info({ to }, "Recovery verification email sent");
+  } catch (err) {
+    const smtpError = err instanceof Error ? err.message : String(err);
+    logger.error({ err, to, smtpError }, "Failed to send recovery verification email");
+    throw err;
+  } finally {
+    transporter.close();
+  }
+}
+
+/** Fire-and-forget wrapper so auth endpoints respond before SMTP finishes. */
+export function sendPasswordResetEmailAsync(
+  config: AppConfig,
+  logger: Logger,
+  to: string,
+  resetLink: string,
+): void {
+  void sendPasswordResetEmail(config, logger, to, resetLink).catch(() => {
+    // Errors already logged in sendPasswordResetEmail
   });
 }

@@ -106,22 +106,24 @@ Routers are mounted in `src/routes/index.ts`. Typical patterns:
 
 - **URL:** same origin as the API host (browser often uses `window.location.origin`); path **`/socket.io`**.
 - **Auth:** `Authorization: Bearer <accessToken>` or `handshake.auth.token`.
-- **Server events** (examples): `session:ready`, `message:new`, `message:updated`, `message:deleted`, `reaction:*`, `receipt:*`, `typing:update`, `presence:changed`, **`call:incoming`**, **`call:ringing`**, **`call:answered`**, **`call:rejected`**, **`call:ended`**, **`call:ice`**.
-- **Client events** (examples): `message:send`, `receipt:delivered`, `receipt:read`, `typing:start` / `typing:stop`, `presence:update`, **`call:offer`**, **`call:answer`**, **`call:reject`**, **`call:end`**, **`call:ice`** (many use ack callbacks `{ ok, data } | { ok: false, code, message }`).
+- **Server events** (examples): `session:ready`, `message:new`, `message:updated`, `message:deleted`, `reaction:*`, `receipt:*`, `typing:update`, `presence:changed`, **`call:incoming`**, **`call:ringing`**, **`call:answered`**, **`call:rejected`**, **`call:ended`**, **`call:ice`**, **`groupCall:started`**, **`groupCall:participantUpdate`**, **`groupCall:ended`**, **`groupCall:signal`**.
+- **Client events** (examples): `message:send`, `receipt:delivered`, `receipt:read`, `typing:start` / `typing:stop`, `presence:update`, **`call:offer`**, **`call:answer`**, **`call:reject`**, **`call:end`**, **`call:ice`**, **`groupCall:start`**, **`groupCall:join`**, **`groupCall:leave`**, **`groupCall:signal`** (many use ack callbacks `{ ok, data } | { ok: false, code, message }`).
 
 Implementation: `src/sockets/handlers.ts` + `src/sockets/schemas.ts`. Optional **Redis** enables horizontal scaling of Socket.IO via `@socket.io/redis-adapter`.
 
 ## Core functionality
 
 - **Accounts:** email/password, JWT access + refresh sessions, optional password reset email (SMTP).
-- **Chats:** direct and group threads, members, roles, last message, unread counts.
-- **Messages:** ciphertext for E2EE, attachments metadata, replies, edits, soft delete, reactions.
-- **E2EE (DM):** server stores public keys / wrapped backups; message bodies are opaque ciphertext for `DM_V1`.
-- **Friends:** request / accept / reject / remove; blocks and reports.
+- **Chats:** direct and group threads, members, roles (Owner/Admin/Mod/Member), public/private visibility, last message, unread counts.
+- **Messages:** ciphertext for E2EE, attachments metadata, replies, edits, soft delete, reactions, `@mention` metadata.
+- **E2EE:** `DM_V1` (mandatory direct chats) and `GROUP_V1` (sender-key group envelopes); server stores public keys / wrapped backups only.
+- **Groups:** create, patch, add/remove members, role changes, public join, system activity messages.
+- **Friends:** request / accept / reject / remove (API ready; frontend UI pending).
 - **Polls:** create in chat, vote, tallies.
 - **Uploads:** size/type limits, disk storage under `UPLOAD_DIR`.
-- **Push:** device tokens; Web Push (VAPID) and/or FCM when configured.
-- **Calls:** signaling only on the server (SDP/ICE are not logged); **`CallLog`** rows for history REST.
+- **Push:** device tokens; Web Push (VAPID) and/or FCM; mention-aware routing (`notification-router.ts`).
+- **Calls:** 1:1 and group signaling (SDP/ICE not logged); **`CallLog`** + group call system messages for history.
+- **Search & previews:** in-chat message search (ILIKE); SSRF-safe link preview fetch + cache.
 
 ## Environment variables
 
@@ -167,4 +169,8 @@ See **`.env.example`** for the full list. Important entries:
 
 ## Related
 
-- **Frontend:** `../frontend` - Vite SPA consuming `/api/v1` and Socket.IO (see `frontend/README.md`).
+- **Frontend:** `../frontend` — Vite SPA consuming `/api/v1` and Socket.IO (see `frontend/README.md`).
+- **Integration:** `../docs/INTEGRATION.md` — auth, proxy, socket contract.
+- **Feature status:** `../docs/CODEBASE_FEATURE_ANALYSIS.md` — implemented vs pending, roadmap, UI suggestions.
+- **E2EE boundaries:** `src/docs/e2ee-boundary.md`
+- **TURN (calls):** `../docs/coturn.md`

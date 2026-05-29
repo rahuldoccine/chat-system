@@ -13,6 +13,9 @@ import {
   linkPreviewQuerySchema,
   patchChatE2eeBodySchema,
   patchChatMuteBodySchema,
+  patchChatPinBodySchema,
+  patchChatFavoriteBodySchema,
+  patchChatCloseBodySchema,
   markMessagesReadBodySchema,
   markMessagesDeliveredBodySchema,
 } from "./chats.schemas.js";
@@ -49,6 +52,27 @@ export async function patchChatMute(req: Request, res: Response): Promise<void> 
   const chatId = req.params.chatId as string;
   const mutedUntil = body.mutedUntil === null ? null : new Date(body.mutedUntil);
   await chatsService.patchChatMute(req.user!.sub, chatId, mutedUntil);
+  res.status(204).end();
+}
+
+export async function patchChatPin(req: Request, res: Response): Promise<void> {
+  const body = parseBody(patchChatPinBodySchema, req.body);
+  const chatId = req.params.chatId as string;
+  await chatsService.patchChatPin(req.user!.sub, chatId, body.pinned);
+  res.status(204).end();
+}
+
+export async function patchChatFavorite(req: Request, res: Response): Promise<void> {
+  const body = parseBody(patchChatFavoriteBodySchema, req.body);
+  const chatId = req.params.chatId as string;
+  await chatsService.patchChatFavorite(req.user!.sub, chatId, body.favorited);
+  res.status(204).end();
+}
+
+export async function patchChatClose(req: Request, res: Response): Promise<void> {
+  const body = parseBody(patchChatCloseBodySchema, req.body);
+  const chatId = req.params.chatId as string;
+  await chatsService.patchChatClose(req.user!.sub, chatId, body.closed);
   res.status(204).end();
 }
 

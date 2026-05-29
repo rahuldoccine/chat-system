@@ -152,10 +152,13 @@ model ChatMember {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  role       ChatMemberRole @default(MEMBER)
-  joinedAt   DateTime       @default(now())
-  mutedUntil DateTime?
-  leftAt     DateTime?
+  role         ChatMemberRole @default(MEMBER)
+  joinedAt     DateTime       @default(now())
+  mutedUntil   DateTime?
+  pinnedAt     DateTime?
+  favoritedAt  DateTime?
+  closedAt     DateTime?
+  leftAt       DateTime?
 
   @@unique([chatId, userId])
   @@index([userId, leftAt])

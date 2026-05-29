@@ -1,13 +1,62 @@
 import { AppError } from "../../errors/index.js";
 import { getPrisma } from "../../lib/prisma.js";
 
-export async function upsertIdentityKey(userId: string, input: { publicKey: string; fingerprint: string }) {
+export async function upsertIdentityKey(
+  userId: string,
+  input: { publicKey: string; fingerprint: string },
+  options?: { allowRotation?: boolean },
+) {
   const prisma = getPrisma();
+  const existing = await prisma.userIdentityKey.findUnique({
+    where: { userId },
+    select: { fingerprint: true, revokedAt: true },
+  });
+  if (
+    existing &&
+    !existing.revokedAt &&
+    existing.fingerprint !== input.fingerprint &&
+    !options?.allowRotation
+  ) {
+    throw new AppError(
+      409,
+      "IDENTITY_EXISTS",
+      "Identity key already registered; restore keys instead of creating new ones",
+    );
+  }
   return prisma.userIdentityKey.upsert({
     where: { userId },
     create: { userId, publicKey: input.publicKey, fingerprint: input.fingerprint },
     update: { publicKey: input.publicKey, fingerprint: input.fingerprint, revokedAt: null },
   });
+}
+
+export async function hasIdentityKey(userId: string): Promise<boolean> {
+  const prisma = getPrisma();
+  const row = await prisma.userIdentityKey.findUnique({
+    where: { userId },
+    select: { revokedAt: true },
+  });
+  return Boolean(row && !row.revokedAt);
+}
+
+export async function getIdentityKeySummary(userId: string): Promise<{
+  hasIdentityKey: boolean;
+  fingerprint: string | null;
+  deviceCount: number;
+}> {
+  const prisma = getPrisma();
+  const identity = await prisma.userIdentityKey.findUnique({
+    where: { userId },
+    select: { fingerprint: true, revokedAt: true },
+  });
+  const deviceCount = await prisma.deviceKey.count({
+    where: { userId, revokedAt: null },
+  });
+  return {
+    hasIdentityKey: Boolean(identity && !identity.revokedAt),
+    fingerprint: identity && !identity.revokedAt ? identity.fingerprint : null,
+    deviceCount,
+  };
 }
 
 export async function getIdentityKey(userId: string) {
