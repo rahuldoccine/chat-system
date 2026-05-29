@@ -1,0 +1,82 @@
+/* Shared layout tokens for 1:1 and group call UIs (mobile / tablet / desktop) */
+
+:root {
+  --call-ctrl-size: 52px;
+  --call-ctrl-gap: 1.15rem;
+  --call-controls-pad-y: 1.25rem;
+  --call-controls-pad-bottom: calc(1.75rem + var(--safe-bottom));
+  --call-header-pad-x: 1.25rem;
+  --call-header-pad-top: calc(1rem + var(--safe-top));
+  --call-pip-width: 120px;
+  --call-pip-height: 160px;
+  --call-pip-inset: 1rem;
+  --call-pip-bottom: calc(5.5rem + var(--safe-bottom));
+  --call-stage-max-width: none;
+  --call-grid-max-width: min(880px, calc(100vw - 2rem));
+  --call-modal-max-width: 360px;
+  --call-avatar-lg: 96px;
+}
+
+/* Mobile */
+@media (max-width: 576px) {
+  :root {
+    --call-ctrl-size: 48px;
+    --call-ctrl-gap: 0.55rem;
+    --call-controls-pad-y: 0.85rem;
+    --call-controls-pad-bottom: calc(1rem + var(--safe-bottom));
+    --call-header-pad-x: max(0.85rem, var(--safe-left));
+    --call-pip-width: 88px;
+    --call-pip-height: 118px;
+    --call-pip-inset: max(0.65rem, var(--safe-right));
+    --call-pip-bottom: calc(6.75rem + var(--safe-bottom));
+    --call-grid-max-width: 100%;
+    --call-modal-max-width: 100%;
+    --call-avatar-lg: 80px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 577px) and (max-width: 1024px) {
+  :root {
+    --call-ctrl-size: 54px;
+    --call-ctrl-gap: 0.95rem;
+    --call-header-pad-x: 1.5rem;
+    --call-pip-width: 132px;
+    --call-pip-height: 176px;
+    --call-pip-inset: 1.25rem;
+    --call-pip-bottom: calc(5.25rem + var(--safe-bottom));
+    --call-grid-max-width: min(720px, calc(100vw - 2.5rem));
+    --call-modal-max-width: 400px;
+    --call-avatar-lg: 112px;
+  }
+}
+
+/* Landscape phones — compact controls */
+@media (max-width: 896px) and (orientation: landscape) {
+  :root {
+    --call-controls-pad-y: 0.5rem;
+    --call-controls-pad-bottom: calc(0.5rem + var(--safe-bottom));
+    --call-pip-bottom: calc(4.5rem + var(--safe-bottom));
+    --call-pip-height: 96px;
+    --call-avatar-lg: 72px;
+  }
+}
+
+/* Desktop / laptop */
+@media (min-width: 1025px) {
+  :root {
+    --call-ctrl-size: 56px;
+    --call-ctrl-gap: 1.35rem;
+    --call-controls-pad-y: 1.5rem;
+    --call-controls-pad-bottom: calc(2rem + var(--safe-bottom));
+    --call-header-pad-x: 2rem;
+    --call-pip-width: 176px;
+    --call-pip-height: 234px;
+    --call-pip-inset: 1.75rem;
+    --call-pip-bottom: calc(5rem + var(--safe-bottom));
+    --call-stage-max-width: 1280px;
+    --call-grid-max-width: min(960px, calc(100vw - 4rem));
+    --call-modal-max-width: 420px;
+    --call-avatar-lg: 128px;
+  }
+}

@@ -4,9 +4,9 @@
   align-items: flex-start;
   gap: 0.875rem;
   padding: 1rem 1.25rem;
-  background: #fef2f2;
-  border-top: 1px solid #fecaca;
-  color: #7f1d1d;
+  background: var(--destructive-surface);
+  border-top: 1px solid var(--border);
+  color: var(--destructive-foreground);
 }
 
 .iconWrap {
@@ -18,7 +18,7 @@
   height: 40px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
+  color: var(--destructive);
 }
 
 .text {
@@ -32,12 +32,12 @@
   margin: 0;
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #991b1b;
+  color: var(--destructive);
 }
 
 .description {
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.45;
-  color: #b91c1c;
+  color: var(--muted-foreground);
 }

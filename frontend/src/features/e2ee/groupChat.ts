@@ -1,8 +1,4 @@
 import { aesGcmDecrypt, aesGcmEncrypt } from './crypto';
-
-async function importRawAesKey(bytes: Uint8Array): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-}
 import {
   decodeGroupEnvelope,
   encodeGroupEnvelope,
@@ -13,10 +9,15 @@ import {
 } from './protocol';
 import {
   fetchGroupSenderKeys,
+  getOwnSenderKeyFromServer,
   getRememberedSenderKey,
   publishSenderKey,
   rememberSenderKey,
 } from './groupSenderKeys';
+
+async function importRawAesKey(bytes: Uint8Array): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
 
 export async function ensureGroupSenderKey(
   userId: string,
@@ -25,6 +26,10 @@ export async function ensureGroupSenderKey(
 ): Promise<Uint8Array> {
   const existing = getRememberedSenderKey(chatId, userId, 0);
   if (existing) return existing;
+
+  const fromServer = await getOwnSenderKeyFromServer(userId, chatId, 0);
+  if (fromServer) return fromServer;
+
   const key = crypto.getRandomValues(new Uint8Array(32));
   await publishSenderKey(userId, chatId, 0, key, memberUserIds);
   rememberSenderKey(chatId, userId, 0, key);
@@ -59,13 +64,15 @@ export async function decryptGroupMessage(
   senderId: string,
   ciphertext: string,
   epoch = 0,
+  viewerUserId?: string,
 ): Promise<DmV1Payload | null> {
   const envelope = decodeGroupEnvelope(ciphertext);
   if (!envelope) return null;
-  let key = getRememberedSenderKey(chatId, senderId, envelope.epoch ?? epoch);
-  if (!key) {
-    await fetchGroupSenderKeys(chatId);
-    key = getRememberedSenderKey(chatId, senderId, envelope.epoch ?? epoch);
+  const targetEpoch = envelope.epoch ?? epoch;
+  let key = getRememberedSenderKey(chatId, senderId, targetEpoch);
+  if (!key && viewerUserId) {
+    await fetchGroupSenderKeys(chatId, viewerUserId);
+    key = getRememberedSenderKey(chatId, senderId, targetEpoch);
   }
   if (!key) return null;
   try {

@@ -1,0 +1,307 @@
+.dashboardWrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chatLayout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.chatMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chatHeader {
+  height: 72px;
+  padding: 0 2rem;
+  padding-top: calc(0.5rem + var(--safe-top));
+  background: var(--surface-elevated);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.chatHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.chatHeaderBackBtn {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.chatHeaderTitleBlock h4 {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.e2eeHint {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.chatHeaderStatus {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.chatHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.headerIconBtn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.joinGroupEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: var(--muted-foreground);
+  background: var(--chat-canvas);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.joinGroupEmpty p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.groupCallJoinBtn {
+  min-height: 32px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--info-border);
+  background: var(--info-surface);
+  color: var(--info-foreground);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.groupCallJoinBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.chatMainColumn {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messagesSection {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.messagesSectionHidden {
+  display: none;
+}
+
+.headerIconBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.statusBlocked {
+  color: var(--destructive);
+}
+
+.statusOnline {
+  color: var(--success);
+}
+
+.statusMuted {
+  color: var(--muted-foreground);
+}
+
+.joinGroupBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.joinGroupBannerText {
+  font-size: 0.85rem;
+}
+
+.joinGroupBtn {
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.joinGroupBtn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.groupCallBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.72rem 1rem;
+  border-bottom: 1px solid var(--info-border);
+  background: var(--info-surface);
+}
+
+.groupCallBannerText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.groupCallBannerTitle {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--info-foreground);
+}
+
+.groupCallBannerMeta {
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.groupCallBannerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.groupCallJoinVideoBtn {
+  min-height: 32px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.groupCallJoinVideoBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.chatMotionWrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (max-width: 576px) {
+  .chatHeader {
+    height: auto;
+    min-height: 56px;
+    padding: 0.5rem 1rem;
+    padding-top: calc(0.5rem + var(--safe-top));
+  }
+
+  .headerCallBtn {
+    display: none;
+  }
+
+  .sectionBackBar {
+    display: flex;
+  }
+}
+
+@media (max-width: 400px) {
+  .chatHeaderActions {
+    gap: 0.65rem;
+  }
+}
+
+.sectionBackBar {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-elevated);
+  flex-shrink: 0;
+}
+
+.sectionBackBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.sectionBackBtn:hover {
+  background: var(--surface-muted);
+}
+
+.sectionBackLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+}

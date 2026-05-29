@@ -1,8 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { Mic, MicOff, PhoneOff, Subtitles, Users, Video, VideoOff } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Mic, MicOff, PhoneOff, Subtitles, Users, Video, VideoOff, WifiOff } from 'lucide-react';
 import styles from './GroupCallOverlay.module.css';
 import { useCallTimer } from '../useCallTimer';
 import { useCallTranscript } from '../useCallTranscript';
+import GroupCallParticipantGrid from './GroupCallParticipantGrid';
+import { useAuth } from '../../../context/AuthContext';
+import { useSocket } from '../../../context/SocketContext';
 
 type GroupCallOverlayProps = {
   sessionId: string;
@@ -18,6 +22,7 @@ type GroupCallOverlayProps = {
 
 const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
   sessionId,
+  chatId,
   kind,
   participants,
   localStream,
@@ -26,7 +31,8 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
   onToggleMute,
   onToggleCamera,
 }) => {
-  const localRef = useRef<HTMLVideoElement>(null);
+  const { user } = useAuth();
+  const { isConnected } = useSocket();
   const timer = useCallTimer(Boolean(localStream && startedAtMs), startedAtMs);
   const muted = !localStream?.getAudioTracks()[0]?.enabled;
   const cameraOff = !localStream?.getVideoTracks()[0]?.enabled;
@@ -37,13 +43,20 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
   });
 
   useEffect(() => {
-    if (localRef.current) {
-      localRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
-  return (
+  const overlay = (
     <div className={styles.overlay} data-session-id={sessionId}>
+      {!isConnected && (
+        <div className={styles.reconnectBanner}>
+          <WifiOff size={14} />
+          Reconnecting…
+        </div>
+      )}
       <div className={styles.header}>
         <Users size={18} />
         <span>Group {kind === 'VIDEO' ? 'video' : 'voice'} call</span>
@@ -54,14 +67,13 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
       </div>
 
       <div className={styles.stage}>
-        {kind === 'VIDEO' && localStream ? (
-          <video ref={localRef} className={styles.localVideo} autoPlay playsInline muted />
-        ) : (
-          <div className={styles.audioState}>
-            <Users size={44} />
-            <p>Voice call in progress</p>
-          </div>
-        )}
+        <GroupCallParticipantGrid
+          chatId={chatId}
+          participantIds={participants.length ? participants : user?.id ? [user.id] : []}
+          localUserId={user?.id}
+          kind={kind}
+          localStream={localStream}
+        />
         {transcript.enabled && (
           <div className={styles.captions}>
             {transcript.displayRows.map((row) => (
@@ -85,7 +97,7 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
           onClick={onToggleMute}
           aria-label={muted ? 'Unmute' : 'Mute'}
         >
-          {muted ? <MicOff size={20} /> : <Mic size={20} />}
+          {muted ? <MicOff size={22} /> : <Mic size={22} />}
         </button>
         {kind === 'VIDEO' && (
           <button
@@ -94,7 +106,7 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
             onClick={onToggleCamera}
             aria-label={cameraOff ? 'Camera on' : 'Camera off'}
           >
-            {cameraOff ? <VideoOff size={20} /> : <Video size={20} />}
+            {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
           </button>
         )}
         {transcript.supported && (
@@ -104,15 +116,17 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
             onClick={transcript.toggle}
             aria-label={transcript.enabled ? 'Captions on' : 'Captions off'}
           >
-            <Subtitles size={20} />
+            <Subtitles size={22} />
           </button>
         )}
         <button type="button" className={`${styles.ctrlBtn} ${styles.endBtn}`} onClick={onLeave}>
-          <PhoneOff size={20} />
+          <PhoneOff size={22} />
         </button>
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 };
 
 export default GroupCallOverlay;

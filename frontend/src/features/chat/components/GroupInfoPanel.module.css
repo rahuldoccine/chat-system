@@ -2,17 +2,17 @@
   flex: 1;
   overflow-y: auto;
   padding: 1rem 1.25rem 1.5rem;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--chat-canvas);
+  color: var(--foreground);
 }
 
 .header {
   max-width: 900px;
   margin: 0 auto 0.9rem;
   padding: 1rem 1.2rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--surface-panel);
   text-align: center;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
 }
@@ -32,7 +32,7 @@
 .subtitle {
   margin: 0.2rem 0 0;
   font-size: 0.83rem;
-  color: #64748b;
+  color: var(--muted-foreground);
   font-weight: 600;
 }
 
@@ -43,9 +43,9 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem 1.15rem 1.15rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--surface-panel);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
 }
 
@@ -53,10 +53,10 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--surface-panel);
 }
 
 .memberRow {
@@ -64,7 +64,7 @@
   align-items: center;
   gap: 0.65rem;
   padding: 0.65rem 0.8rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--surface-muted);
 }
 
 .memberRow:last-child {
@@ -86,12 +86,12 @@
   display: block;
   font-weight: 700;
   font-size: 0.86rem;
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .roleBadge {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .memberActions {
@@ -105,19 +105,20 @@
   min-height: 28px;
   padding: 0.2rem 0.45rem;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  color: var(--foreground);
   font-size: 0.75rem;
 }
 
 .memberActions button {
-  min-height: 28px;
+  min-height: 36px;
+  min-width: 36px;
   padding: 0.2rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #334155;
+  border: 1px solid var(--border);
+  background: var(--chat-canvas);
+  color: var(--foreground);
   font-size: 0.74rem;
   cursor: pointer;
 }
@@ -130,15 +131,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-color: #fecaca !important;
-  background: #fff5f5 !important;
-  color: #dc2626 !important;
+  border-color: var(--destructive) !important;
+  background: var(--destructive-surface) !important;
+  color: var(--destructive) !important;
 }
 
 .removeBtn:hover {
-  background: #fee2e2 !important;
-  border-color: #fca5a5 !important;
-  color: #b91c1c !important;
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: var(--destructive) !important;
+  color: var(--destructive) !important;
 }
 
 .removeBtn:active {
@@ -151,10 +152,10 @@
   gap: 0.55rem;
   min-height: 40px;
   padding: 0 0.7rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #ffffff;
-  color: #64748b;
+  background: var(--surface-panel);
+  color: var(--muted-foreground);
 }
 
 .addRow input {
@@ -163,7 +164,7 @@
   outline: none;
   background: transparent;
   font-size: 0.9rem;
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .candidates {
@@ -171,9 +172,9 @@
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.4rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--chat-canvas);
 }
 
 .candidateItem {
@@ -185,15 +186,15 @@
   padding: 0.45rem 0.55rem;
   border-radius: 9px;
   border: 1px solid transparent;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--surface-panel);
+  color: var(--foreground);
   cursor: pointer;
   text-align: left;
 }
 
 .candidateItem:hover {
-  border-color: #c7d2fe;
-  background: #eef2ff;
+  border-color: var(--primary);
+  background: var(--accent);
 }
 
 .candidateAvatar {
@@ -212,7 +213,7 @@
 .candidateName {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -220,7 +221,7 @@
 
 .candidateEmail {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--muted-foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -230,7 +231,7 @@
   display: block;
   font-size: 0.76rem;
   margin-bottom: 0.35rem;
-  color: #64748b;
+  color: var(--muted-foreground);
   font-weight: 700;
 }
 
@@ -239,23 +240,23 @@
   min-height: 40px;
   padding: 0 0.75rem;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  color: var(--foreground);
   font-size: 0.9rem;
 }
 
 .field input:disabled {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--chat-canvas);
+  color: var(--muted-foreground);
   cursor: not-allowed;
 }
 
 .settingsBlock {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.8rem;
-  background: #ffffff;
+  background: var(--surface-panel);
 }
 
 .blockTitle {
@@ -263,7 +264,7 @@
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.01em;
-  color: #334155;
+  color: var(--foreground);
   text-transform: uppercase;
 }
 
@@ -272,7 +273,7 @@
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.01em;
-  color: #b91c1c;
+  color: var(--destructive);
   text-transform: uppercase;
 }
 
@@ -283,19 +284,19 @@
   padding: 0.25rem 0;
   font-size: 0.88rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--foreground);
 }
 
 .muteLabel {
   font-size: 0.86rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .muteHint {
   margin-top: 0.15rem;
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .toggle {
@@ -313,7 +314,7 @@
 .toggleSlider {
   position: absolute;
   inset: 0;
-  background: #cbd5e1;
+  background: var(--border);
   border-radius: 24px;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -327,13 +328,13 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--surface-panel);
   transition: transform 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .toggle input:checked + .toggleSlider {
-  background: #6366f1;
+  background: var(--primary);
 }
 
 .toggle input:checked + .toggleSlider::after {
@@ -348,9 +349,9 @@
   margin-top: 0.5rem;
   min-height: 38px;
   width: 100%;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  background: #fef2f2;
+  border: 1px solid var(--destructive);
+  color: var(--destructive);
+  background: var(--destructive-surface);
   border-radius: 10px;
   cursor: pointer;
   font-weight: 700;
@@ -358,14 +359,14 @@
 
 .dangerHint {
   font-size: 0.75rem;
-  color: #7f1d1d;
+  color: var(--destructive);
   margin-bottom: 0.55rem;
 }
 
 .readOnlyHint {
   margin-top: 0.45rem;
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .spinner {

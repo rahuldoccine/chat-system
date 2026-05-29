@@ -8,7 +8,8 @@ import {
 
 const STORAGE_KEY = 'chat-e2ee-sent-plain';
 const META_STORAGE_KEY = 'chat-e2ee-sent-meta';
-const MAX_ENTRIES = 500;
+/** SessionStorage mirror only — IndexedDB has no cap. */
+const MAX_SESSION_ENTRIES = 5000;
 
 const byClientId = new Map<string, string>();
 const byMessageId = new Map<string, string>();
@@ -34,9 +35,9 @@ function loadPersisted(): Record<string, string> {
 function savePersisted(data: Record<string, string>): void {
   if (typeof sessionStorage === 'undefined') return;
   const keys = Object.keys(data);
-  if (keys.length > MAX_ENTRIES) {
+  if (keys.length > MAX_SESSION_ENTRIES) {
     const trimmed: Record<string, string> = {};
-    for (const k of keys.slice(-MAX_ENTRIES)) {
+    for (const k of keys.slice(-MAX_SESSION_ENTRIES)) {
       trimmed[k] = data[k]!;
     }
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
@@ -94,9 +95,9 @@ function loadPersistedMeta(): Record<string, Record<string, unknown>> {
 function savePersistedMeta(data: Record<string, Record<string, unknown>>): void {
   if (typeof sessionStorage === 'undefined') return;
   const keys = Object.keys(data);
-  if (keys.length > MAX_ENTRIES) {
+  if (keys.length > MAX_SESSION_ENTRIES) {
     const trimmed: Record<string, Record<string, unknown>> = {};
-    for (const k of keys.slice(-MAX_ENTRIES)) {
+    for (const k of keys.slice(-MAX_SESSION_ENTRIES)) {
       trimmed[k] = data[k]!;
     }
     sessionStorage.setItem(META_STORAGE_KEY, JSON.stringify(trimmed));
@@ -155,13 +156,13 @@ export function ensureSentPlaintextHydrated(userId: string): Promise<void> {
   return idbHydratePromise;
 }
 
-function persistEntry(
+async function persistEntry(
   userId: string,
   kind: 'c' | 'm',
   id: string,
   text: string,
   meta?: Record<string, unknown>,
-): void {
+): Promise<void> {
   const key = storageKey(userId, kind, id);
   const data = loadPersisted();
   data[key] = text;
@@ -173,7 +174,7 @@ function persistEntry(
     savePersistedMeta(metaData);
   }
 
-  void idbPutSentEntry(key, {
+  await idbPutSentEntry(key, {
     text,
     ...(meta && Object.keys(meta).length ? { meta } : {}),
   });
@@ -189,8 +190,21 @@ export function rememberSentPlaintext(
   byClientId.set(clientMessageId, plaintext);
   if (messageId) byMessageId.set(messageId, plaintext);
 
-  persistEntry(userId, 'c', clientMessageId, plaintext);
-  if (messageId) persistEntry(userId, 'm', messageId, plaintext);
+  void persistEntry(userId, 'c', clientMessageId, plaintext);
+  if (messageId) void persistEntry(userId, 'm', messageId, plaintext);
+}
+
+export async function rememberSentPlaintextAwait(
+  userId: string,
+  clientMessageId: string,
+  plaintext: string,
+  messageId?: string,
+): Promise<void> {
+  ensureHydrated(userId);
+  byClientId.set(clientMessageId, plaintext);
+  if (messageId) byMessageId.set(messageId, plaintext);
+  await persistEntry(userId, 'c', clientMessageId, plaintext);
+  if (messageId) await persistEntry(userId, 'm', messageId, plaintext);
 }
 
 export async function getSentPlaintextAsync(
@@ -268,6 +282,31 @@ export function rememberSentPayloadMeta(
   }
 }
 
+/** Restore sent-plaintext entries from server escrow backup. */
+export async function importSentPlaintextEntries(
+  userId: string,
+  entries: Record<string, SentPlaintextEntry>,
+): Promise<void> {
+  ensureHydrated(userId);
+  for (const [key, entry] of Object.entries(entries)) {
+    if (!key.startsWith(`${userId}:`)) continue;
+    mergeEntryIntoMemory(key, entry);
+    await idbPutSentEntry(key, entry);
+    const parts = key.split(':');
+    if (parts.length >= 3) {
+      const kind = parts[1];
+      const id = parts.slice(2).join(':');
+      if (kind === 'c') {
+        savePersisted({ ...loadPersisted(), [key]: entry.text });
+        if (entry.meta) {
+          savePersistedMeta({ ...loadPersistedMeta(), [key]: entry.meta });
+        }
+      }
+    }
+  }
+  idbHydratedUserId = userId;
+}
+
 export function getSentPayloadMeta(
   userId: string,
   msg: { id: string; clientMessageId?: string },
@@ -296,8 +335,8 @@ export function linkSentMessageId(
     byClientId.get(clientMessageId) ?? loadPersisted()[storageKey(userId, 'c', clientMessageId)];
   if (text !== undefined) {
     byMessageId.set(messageId, text);
-    persistEntry(userId, 'm', messageId, text);
-    persistEntry(userId, 'c', clientMessageId, text);
+    void persistEntry(userId, 'm', messageId, text);
+    void persistEntry(userId, 'c', clientMessageId, text);
   }
 
   const meta =

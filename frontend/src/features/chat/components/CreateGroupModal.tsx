@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
@@ -15,6 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSocket } from '../../../context/SocketContext';
 import { useSearchUsers, type DiscoverableUser } from '../hooks/useChatData';
+import { invalidateUsersSearch } from '../utils/invalidateChatCaches';
 import { useUpload } from '../hooks/useUpload';
 import { createGroup, patchGroup } from '../api/groupsApi';
 import type { GroupVisibility } from '../types';
@@ -55,6 +57,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose, onChatCrea
   const busy = submitting || uploadingAvatar;
 
   const canCreate = Boolean(title.trim()) && selected.length >= 1;
+
+  useEffect(() => {
+    void invalidateUsersSearch(queryClient);
+  }, [queryClient]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -160,20 +166,19 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose, onChatCrea
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose} role="presentation">
+    <Dialog.Root open onOpenChange={(open) => !open && !busy && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className={styles.overlay} />
+        <Dialog.Content className={styles.panelWrap} aria-describedby={undefined}>
       <motion.div
         className={styles.panel}
-        onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
         transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-        role="dialog"
-        aria-labelledby="create-group-title"
-        aria-modal="true"
       >
         <header className={styles.header}>
-          <h3 id="create-group-title">Create Group</h3>
+          <Dialog.Title id="create-group-title" className={styles.headerTitle}>Create Group</Dialog.Title>
           <button
             type="button"
             className={styles.closeBtn}
@@ -426,8 +431,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose, onChatCrea
             )}
           </button>
         </footer>
-      </motion.div>
-    </div>
+          </motion.div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 };
 

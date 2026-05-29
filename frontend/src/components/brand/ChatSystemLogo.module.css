@@ -1,0 +1,154 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.stacked {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.85rem;
+}
+
+.markWrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.markWrap::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.38) 0%, rgba(99, 102, 241, 0) 72%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mark {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  display: block;
+}
+
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.stacked .wordmark {
+  align-items: center;
+}
+
+.titleRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+  white-space: nowrap;
+}
+
+.titleAccent {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #f8fafc;
+}
+
+.titleMuted {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.titleAccentLight {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #312e81 0%, #4338ca 55%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.titleMutedLight {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #64748b;
+}
+
+.subtitle {
+  font-size: 0.58em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.subtitleLight {
+  color: var(--muted-foreground);
+}
+
+.sizeXs .titleRow {
+  font-size: 0;
+}
+
+.sizeSm .titleRow {
+  font-size: 0.95rem;
+}
+
+.sizeMd .titleRow {
+  font-size: 1.0625rem;
+}
+
+.sizeLg .titleRow {
+  font-size: 1.25rem;
+}
+
+.sizeXl .titleRow {
+  font-size: 1.875rem;
+}
+
+.sizeXl .subtitle {
+  font-size: 0.52rem;
+}
+
+.authHeader {
+  margin-bottom: 1.85rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.authTagline {
+  margin: 0.65rem 0 0;
+  max-width: 18rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.72);
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .markPulse {
+    animation: markFloat 4s ease-in-out infinite;
+  }
+}
+
+@keyframes markFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}

@@ -1,9 +1,66 @@
-# **Mernchat – Secure, End-to-End Encrypted (E2EE) Real-Time Messaging** 🗨️  
+# **Chat Module — Secure E2EE Real-Time Messaging** 🗨️  
 
-**[Mernchat](https://mernchat.in)** is a **secure, real-time messaging platform** built with **React.js, Socket.IO, and end-to-end encryption (E2EE)** to ensure **privacy-first communication**. Designed for seamless **group chats, reactions, file sharing, and normal login (email/username + password)**, this app is the perfect solution for **secure online conversations**.
+A **full-stack chat application** (React + Express + PostgreSQL + Socket.IO) with **mandatory E2EE for direct messages**, **group sender-key encryption**, **WebRTC calls**, **PWA**, and a **Slack-style sidebar** (Favorites, Channels, Direct Messages).
+
+> **What is implemented today:** [docs/CODEBASE_FEATURE_ANALYSIS.md](docs/CODEBASE_FEATURE_ANALYSIS.md)  
+> **Run locally:** [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) · **API ↔ UI wiring:** [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
 ---
+
+## **🚀 Quick start**
+
+```bash
+# Terminal 1 — backend
+cd backend && cp .env.example .env
+# Set DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
+npm install && npm run db:generate && npm run db:migrate:dev && npm run dev
+
+# Terminal 2 — frontend
+cd frontend && cp .env.example .env
+npm install && npm run dev
+```
+
+Open **http://localhost:5173** · API **http://localhost:4000/api/v1** · Swagger **http://localhost:4000/api/docs** (when enabled).
+
+**Optional dev seed data** (dummy users + groups):
+
+```bash
+cd backend && npm run db:seed-test
+# Remove later: CONFIRM=YES npm run db:remove-seed
+```
+
+---
+
+## **📖 Documentation**
+
+| Document | Description |
+|----------|-------------|
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, env, npm scripts, test seed, sidebar APIs |
+| [docs/INTEGRATION.md](docs/INTEGRATION.md) | Auth, Axios, React Query, Socket.IO, routes |
+| [docs/CODEBASE_FEATURE_ANALYSIS.md](docs/CODEBASE_FEATURE_ANALYSIS.md) | Feature matrix & gaps |
+| [backend/README.md](backend/README.md) | API modules, sockets, database |
+| [frontend/README.md](frontend/README.md) | UI features, structure, PWA |
+| [docs/coturn.md](docs/coturn.md) | TURN server for calls |
+
+---
+
+## **✨ Highlights (current build)**
+
+- **Sidebar:** Favorites (channels + DMs) → Channels → Direct Messages; per-chat **⋯** menu
+- **DM settings:** Favorite, Close DM (reappears on new messages)
+- **Channel settings:** Favorite, Leave group (with confirmation)
+- **Jump to…** (`⌘K` / `Ctrl+K`) — search chats and users, start DMs
+- **404 page** for unknown routes
+- **Responsive UI** — mobile-friendly chat, calls, settings, composer
+- **E2EE** — `DM_V1` (all DMs), `GROUP_V1` (new groups)
+- **Calls** — 1:1 and group audio/video (WebRTC + Socket signaling)
+- **PWA** — installable app, offline shell, Web Push
+
+---
+
 ## **📚 Table of Contents**  
+- [Quick start](#-quick-start)  
+- [Documentation](#-documentation)  
 - [Pre-requirements](#-pre-requirements)  
 - [Backend (Required)](#-backend-required)  
 - [Technical Plan: How to Build](#-technical-plan-how-to-build)  
@@ -285,8 +342,9 @@ chat-module/
 
 
 ### 📞 **Audio & Video Calling**
-- **Peer-to-Peer Calls** – High-quality, voice and video calls (powered by WebRTC).
-- **Call History** – View and manage past call logs.
+- **Peer-to-Peer Calls** – High-quality voice and video calls (WebRTC) for 1:1 and groups.
+- **Group Calls** – Multiple users join the same audio/video session with join prompts and in-call controls.
+- **Call History** – View past call logs with duration, status, and filters (1:1 and group).
 
 ### 📢 **Notifications & Presence**  
 - **Push Notifications** – Stay updated with real-time alerts (powered by Firebase).  
@@ -295,10 +353,11 @@ chat-module/
 - **Mute Chats** – Mute notifications per chat/group.  
 
 ### 🤝 **Social Features**  
-- **Friends System** – Add friends and chat with them.  
-- **Group Chats** – Create and participate in group conversations.  
-- **Group Roles & Permissions** – Admin/mod controls (add/remove members, promote/demote).  
-- **Group Invites** – Invite links / join via invite (optional approval).  
+- **Friends System** – Add friends and chat with them *(backend API ready; frontend UI pending)*.  
+- **Group Chats** – Create and participate in group conversations *(implemented)*.  
+- **Group Roles & Permissions** – Owner/Admin/Mod/Member controls (add/remove members, promote/demote) *(implemented)*.  
+- **Group Invites** – Invite links / join via invite (optional approval) *(public join implemented; invite links planned)*.  
+- **@Mentions** – `@user` and `@all` (admin) with targeted push notifications *(implemented)*.  
 - **Polling** – Create polls with single/multiple voting options.  
 
 ### 👤 **Profile & Account**  
@@ -311,7 +370,7 @@ chat-module/
 - **Report Users/Content** – Basic reporting flow for abuse/spam.  
 
 ### 📁 **Media & File Sharing**  
-- **GIF Support** – Send animated GIFs (powered by Tenor).  
+- **GIF Support** – Send animated GIFs (powered by **Giphy**).  
 - **File Sharing** – Send and receive files securely.  
 
 ### 🔒 **Privacy & Security**  
@@ -319,7 +378,9 @@ chat-module/
 - **Private Key Recovery** – Retrieve your encryption key with MFA-protected email verification.  
 
 ### 🛠️ **Other Features**  
-- **PWA Support** – Install the app as a Progressive Web App for a native-like experience.  
+- **PWA Support** – Install as a Progressive Web App: manifest, offline caching, install prompt, update toast *(implemented)*.  
+- **Jump to / in-chat search** – Global jump (`Cmd/Ctrl+K`) plus search inside the open conversation.  
+- **Message Threads** – Reply threads in DMs and groups.  
 
 ---
 
@@ -399,10 +460,9 @@ For **full transparency**, here’s a snapshot of how private messages and priva
 
 ### **What’s Not E2EE?**  
 
-❌ **Group chats**  
-❌ **Audio & video calls (WebRTC)** — signaling only; media path is not E2EE  
+❌ **Audio & video calls (WebRTC)** — signaling only; media path is not E2EE (group call media key distribution is optional/experimental)
 
-Direct chats use mandatory client E2EE for text, voice notes, and uploaded attachments (blobs stored encrypted; keys stay inside the message envelope).  
+Direct chats use mandatory client E2EE (`DM_V1`) for text, voice notes, and uploaded attachments. **Group chats** use **GROUP_V1** sender-key encryption for message bodies and attachments on newly created groups.
 
 At [Mernchat](https://mernchat.in), i am committed to transparency and security. As i continue improving, my aim is to enhance encryption features for even greater privacy in future updates.
 
@@ -420,18 +480,14 @@ At [Mernchat](https://mernchat.in), i am committed to transparency and security.
 ## **🛠️ Tech Stack**  
 
 ### **Frontend**  
-- **⚛️ React.js** – Frontend UI.  
-- **🛠️ Redux Toolkit + React-Redux** – Efficient global state management.  
+- **⚛️ React 19 + Vite** – SPA UI with HMR.  
+- **🔄 TanStack React Query + React Context** – Server state and session/socket/call context.  
 - **🔗 React Hook Form + Zod** – Form handling & schema validation.  
 - **🔄 Socket.IO Client** – Real-time communication.  
-- **📅 Date-fns** – Date & time utilities.  
-- **🎥 Framer Motion + Lottie-React** – Animations & dynamic UI effects.  
-- **🔥 Firebase** – Push notifications & backend integration.  
-- **💅 Tailwind CSS** – Responsive & scalable UI.  
-- **🚀 Nodemailer** – Email handling.  
-- **🔐 bcryptjs + jose** – Authentication & encryption.  
-- **💬 Emoji-Picker-React + Gif-Picker-React** – Interactive media in chat.  
-- **🛠️ Prisma ORM** – Database management.  
+- **🎥 Framer Motion** – Animations & transitions.  
+- **💅 CSS Modules** – Scoped component styles (design tokens in `variables.css`).  
+- **📱 vite-plugin-pwa + Workbox** – PWA manifest, service worker, offline cache.  
+- **💬 Emoji-Picker-React + Giphy** – Interactive media in chat.  
 
 ### **Backend**  
 - **🟢 Node.js + Express** – Scalable backend API.  
@@ -442,7 +498,7 @@ At [Mernchat](https://mernchat.in), i am committed to transparency and security.
 - **📧 Nodemailer** – Email notifications & MFA verification.  
 - **🔥 Firebase Admin SDK** – Push notifications.  
 - **🛡️ Helmet** – Security headers for protection.  
-- **📝 Morgan** – HTTP request logging.  
+- **📝 Pino** – Structured HTTP logging.  
 - **🍪 Cookie-Parser** – Secure cookie handling.  
 - **🛠️ Multer** – File uploads.  
 - **🔄 CORS** – Cross-origin requests.  
@@ -451,5 +507,10 @@ At [Mernchat](https://mernchat.in), i am committed to transparency and security.
 
 ---
 ## **🗺️ Roadmap (Planned / Future)**  
-- **OAuth Integration (Google/GitHub)** – Social login (planned).  
-- **Group E2EE** – End-to-end encryption for group chats (planned).  
+- **Friends UI** – Wire existing `/friends/*` API into sidebar (requests, accept/reject).  
+- **OAuth Integration (Google/GitHub)** – Social login.  
+- **SFU for group video** – Scale beyond mesh WebRTC for large groups.  
+- **Screen sharing** – 1:1 and group calls.  
+- **CI / E2E** – GitHub Actions + Playwright smoke tests.  
+- **Full offline outbox** – Reliable send queue on reconnect.  
+- **Group invite links** – Shareable URLs with optional approval.

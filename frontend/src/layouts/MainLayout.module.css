@@ -1,6 +1,6 @@
 .container {
   display: flex;
-  height: 100vh;
+  height: var(--app-height);
   width: 100%;
   overflow: hidden;
   background-color: #1e1f22;
@@ -79,28 +79,15 @@
   padding: 0 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
-  cursor: pointer;
 }
 
-.sidebarHeader:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+.sidebarBrandMark {
+  display: none;
 }
 
-.platformName {
-  font-size: 1rem;
-  font-weight: 700;
-  color: white;
-}
-
-.notificationBtn {
-  color: #b5bac1;
-  transition: 0.2s;
-}
-
-.notificationBtn:hover {
-  color: white;
+.sidebarBrandFull {
+  min-width: 0;
 }
 
 .searchContainer {
@@ -108,23 +95,49 @@
 }
 
 .searchBar {
-  background-color: #1e1f22;
-  height: 28px;
-  border-radius: 4px;
+  background-color: #111214;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #3f4147;
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 10px;
   gap: 8px;
-  color: #949ba4;
+  color: #b5bac1;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.searchBar:hover {
+  border-color: #5c5e66;
+  background-color: #1a1b1e;
 }
 
 .searchBar input {
   background: transparent;
   border: none;
   outline: none;
-  color: #dbdee1;
+  color: #f2f3f5;
   font-size: 0.8rem;
   width: 100%;
+  cursor: pointer;
+}
+
+.searchBar input::placeholder {
+  color: #949ba4;
+  opacity: 1;
+}
+
+.searchKbd {
+  font-size: 0.6rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 4px;
+  background: #2b2d31;
+  color: #b5bac1;
+  border: 1px solid #4e5058;
+  flex-shrink: 0;
+  font-family: inherit;
 }
 
 .nav {
@@ -164,6 +177,81 @@
 
 .addIcon:hover {
   opacity: 1;
+}
+
+.sectionActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sectionIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #949ba4;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.sectionIconBtn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dmRowWrap {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.dmRowWrap .navItem {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding-right: 8px;
+}
+
+.dmMoreBtn {
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  margin-right: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #35373c;
+  color: #dbdee1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dmRowWrap:hover .dmMoreBtn,
+.dmRowWrap:focus-within .dmMoreBtn,
+.dmRowMenuOpen .dmMoreBtn,
+.dmMoreBtn:focus-visible {
+  opacity: 1;
+}
+
+.favoriteStar {
+  flex-shrink: 0;
+  color: #f0b232;
 }
 
 .emptyHint {
@@ -255,6 +343,73 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.mentionBadge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background-color: #6366f1;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pinIcon {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+
+.unreadDot {
+  display: none;
+}
+
+.tooltip {
+  background: #111214;
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  z-index: 2000;
+}
+
+.tooltipArrow {
+  fill: #111214;
+}
+
+.pinMenu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 120px;
+  background: #111214;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 0.25rem;
+}
+
+.pinMenu button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #e5e7eb;
+  text-align: left;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.pinMenu button:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .userSection {
@@ -569,7 +724,7 @@
   /* When there is NO active conversation, show sidebar at full width, hide the chat content */
   .container:not(.hasActiveChat) .sidebar {
     width: 100%;
-    height: 100vh;
+    height: var(--app-height);
     display: flex;
   }
 
@@ -584,8 +739,15 @@
 
   .hasActiveChat .main {
     width: 100%;
-    height: 100vh;
-    display: block;
+    height: var(--app-height);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .userSection {
+    padding-bottom: calc(10px + var(--safe-bottom));
   }
 }
 
@@ -598,18 +760,48 @@
     width: 64px;
   }
 
-  .sidebarHeader,
+  .sidebarHeader {
+    display: flex;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  .sidebarBrandFull {
+    display: none;
+  }
+
+  .sidebarBrandMark {
+    display: inline-flex;
+  }
+
   .searchContainer,
   .sectionLabel,
-  .navItem span,
+  .navItem span:not(.unreadDot),
   .onlineDot,
   .userInfo,
   .userActions {
     display: none;
   }
 
+  .unreadBadge,
+  .mentionBadge {
+    display: none;
+  }
+
+  .unreadDot {
+    display: block;
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #f23f43;
+  }
+
   .navItem {
     justify-content: center;
+    position: relative;
   }
 
   .userCard {

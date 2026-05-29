@@ -1,0 +1,39 @@
+/* Shared responsive breakpoints — use in @media (max-width: ...) via literal values
+   or reference --bp-* in JS (useBreakpoint hook). */
+:root {
+  --bp-mobile: 576px;
+  --bp-tablet: 768px;
+  --bp-tablet-lg: 900px;
+  --bp-desktop: 1024px;
+
+  --app-height: 100vh;
+  --touch-target-min: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
+.safe-top {
+  padding-top: var(--safe-top);
+}
+
+.safe-bottom {
+  padding-bottom: var(--safe-bottom);
+}
+
+.safe-x {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+.touch-target {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+}

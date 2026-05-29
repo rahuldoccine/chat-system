@@ -9,7 +9,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { getApiErrorMessage } from '../utils/userFriendlyErrors';
 
 const loginSchema = z.object({
@@ -57,7 +57,6 @@ const LoginPage: React.FC = () => {
 
   return (
     <AuthLayout>
-      <Toaster position="top-center" richColors />
       <div className={styles.header}>
         <motion.h1 
           initial={{ y: -10, opacity: 0 }}

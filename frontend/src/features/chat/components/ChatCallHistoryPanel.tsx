@@ -8,6 +8,7 @@ import type { Chat, Message } from '../types';
 import styles from './ChatCallHistoryPanel.module.css';
 import { useAuth } from '../../../context/AuthContext';
 import ChatAvatar from './ChatAvatar';
+import EmptyState from './EmptyState';
 
 type GroupCallEvent = {
   id: string;
@@ -250,11 +251,11 @@ const ChatCallHistoryPanel: React.FC = () => {
         </div>
         {groupHistoryLoading ? <p className={panelStyles.empty}>Loading…</p> : null}
         {!groupHistoryLoading && filtered.length === 0 ? (
-          <div className={styles.groupEmpty}>
-            <div className={styles.groupEmptyIcon}>📞</div>
-            <div className={styles.groupEmptyTitle}>No call history yet</div>
-            <div className={styles.groupEmptyHint}>Start your first call with teammates.</div>
-          </div>
+          <EmptyState
+            compact
+            title="No call history yet"
+            hint="Start your first call with teammates."
+          />
         ) : null}
         {!groupHistoryLoading && filtered.length > 0 ? (
           <div className={styles.timeline}>

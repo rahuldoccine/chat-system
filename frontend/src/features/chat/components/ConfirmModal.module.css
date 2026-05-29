@@ -2,20 +2,25 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
   padding: 1rem;
 }
 
 .modal {
-  width: 100%;
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  width: calc(100% - 2rem);
   max-width: 380px;
-  background: white;
+  background: var(--surface-panel);
   border-radius: 14px;
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
-  padding: 1.25rem 1.35rem 1.15rem;
+  box-shadow: var(--shadow-lg);
+  padding: 1.25rem 1.35rem calc(1.15rem + var(--safe-bottom));
+  z-index: 1001;
 }
 
 .title {
@@ -51,6 +56,7 @@
   align-items: center;
   justify-content: center;
   min-width: 5.5rem;
+  min-height: var(--touch-target-min);
 }
 
 .cancelBtn {

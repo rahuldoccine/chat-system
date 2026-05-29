@@ -4,7 +4,7 @@ import type { DecryptedBody } from './useMessageBodies';
 const DB_NAME = 'chat-e2ee-payload-v1';
 const DB_VERSION = 1;
 const STORE = 'payloads';
-const MAX_ENTRIES = 2000;
+const MAX_ENTRIES = 5000;
 
 export type CachedPayloadEntry = DecryptedBody & {
   /** Invalidate when ciphertext changes (edit / resend). */

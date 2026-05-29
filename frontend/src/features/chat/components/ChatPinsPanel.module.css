@@ -4,7 +4,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .list {
@@ -14,11 +14,11 @@
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .cardHeader {
@@ -32,8 +32,8 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: var(--primary, #6366f1);
-  color: white;
+  background: var(--primary);
+  color: var(--primary-foreground);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -51,12 +51,12 @@
 .sender {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .time {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .cardBody {
@@ -80,7 +80,7 @@
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: #0f172a;
+  color: var(--foreground);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -88,7 +88,7 @@
 .textMuted {
   margin: 0;
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--muted-foreground);
   font-style: italic;
 }
 
@@ -98,19 +98,19 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.6rem 1rem;
-  background: #f8fafc;
-  border-top: 1px solid #f1f5f9;
+  background: var(--surface-muted);
+  border-top: 1px solid var(--border);
 }
 
 .pinNote {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--muted-foreground);
 }
 
 .jumpBtn {
   border: none;
   background: transparent;
-  color: var(--primary, #6366f1);
+  color: var(--primary);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;

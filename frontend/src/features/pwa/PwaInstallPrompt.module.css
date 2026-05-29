@@ -1,0 +1,43 @@
+.prompt {
+  position: fixed;
+  right: max(16px, var(--safe-right));
+  bottom: calc(16px + var(--safe-bottom));
+  z-index: 9999;
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 2rem - var(--safe-left) - var(--safe-right));
+}
+
+.label {
+  font-size: 0.78rem;
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.installBtn {
+  border: 1px solid var(--info-border);
+  background: var(--info-surface);
+  color: var(--info-foreground);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: var(--touch-target-min);
+}
+
+.laterBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  cursor: pointer;
+  min-height: var(--touch-target-min);
+  padding: 0 0.5rem;
+}

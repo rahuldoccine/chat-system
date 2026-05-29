@@ -1,0 +1,57 @@
+.root {
+  padding: 0.35rem 0.5rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.5rem;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--muted, #e2e8f0);
+  flex-shrink: 0;
+}
+
+.lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.line {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--muted, #e2e8f0);
+}
+
+.lineShort {
+  width: 65%;
+}
+
+.avatar,
+.line {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar,
+  .line {
+    animation: none;
+  }
+}

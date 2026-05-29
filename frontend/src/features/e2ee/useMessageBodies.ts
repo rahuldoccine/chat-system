@@ -21,6 +21,8 @@ import {
 import { decryptMessagePayload } from './decryptMessagePayload';
 import { mergeContentMetaWithStubs } from './transportFileStubs';
 import { parseE2eePollMeta, type E2eePollPayload } from './pollMeta';
+import { logDecryptFailure, retryDecryptMessage } from './decryptRetry';
+import { onE2eeKeysUnlocked } from './e2eeEvents';
 
 export type DecryptedBody = {
   text: string;
@@ -63,11 +65,18 @@ function bodyFromPayload(payload: { text: string; meta?: Record<string, unknown>
   return { text: payload.text, preview, meta: payload.meta };
 }
 
+function unavailableSenderBody(msg: Message): DecryptedBody {
+  return {
+    text: messageHasMediaAttachments(msg) ? '' : '[Sent message unavailable on this device]',
+  };
+}
+
 export function useMessageBodies(
   messages: Message[] | undefined,
 ): Record<string, DecryptedBody> {
   const { user, e2eeKeysLocked } = useAuth();
   const [bodies, setBodies] = useState<Record<string, DecryptedBody>>({});
+  const [unlockGeneration, setUnlockGeneration] = useState(0);
 
   const messagesKey = useMemo(
     () =>
@@ -78,6 +87,15 @@ export function useMessageBodies(
         : '',
     [messages],
   );
+
+  useEffect(() => {
+    if (!user?.id) return;
+    return onE2eeKeysUnlocked((userId) => {
+      if (userId === user.id) {
+        setUnlockGeneration((n) => n + 1);
+      }
+    });
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id || !messages?.length || e2eeKeysLocked) return;
@@ -113,11 +131,7 @@ export function useMessageBodies(
             };
             continue;
           }
-          if (isGroupE2eeMessage(msg)) {
-            toDecrypt.push(msg);
-            continue;
-          }
-          initial[msg.id] = { text: '[Sent message unavailable on this device]' };
+          toDecrypt.push(msg);
           continue;
         }
 
@@ -149,12 +163,25 @@ export function useMessageBodies(
         await Promise.all(
           chunk.map(async (msg) => {
             const fp = ciphertextFingerprint(msg.ciphertext);
-            const payload = await decryptMessagePayload(
+            let payload = await decryptMessagePayload(
               user.id,
               msg,
               material,
               fingerprintCache,
             );
+
+            if (!payload) {
+              const retried = await retryDecryptMessage(
+                user.id,
+                msg,
+                material,
+                fingerprintCache,
+              );
+              payload = retried.payload;
+              if (!payload) {
+                logDecryptFailure(msg, retried.reason);
+              }
+            }
 
             let body: DecryptedBody;
             if (payload) {
@@ -165,22 +192,13 @@ export function useMessageBodies(
                 rememberPeerDevice(msg.senderId, senderDeviceId);
               }
               void rememberPayload(user.id, msg.id, fp, body);
+            } else if (msg.senderId === user.id) {
+              body = unavailableSenderBody(msg);
+            } else if (isGroupE2eeMessage(msg)) {
+              body = { text: '[Unable to decrypt]' };
             } else {
-              if (isGroupE2eeMessage(msg)) {
-                // Group messages cannot be decrypted via direct-chat fallback.
-                // When this user is the sender but plaintext cache is unavailable on this device,
-                // keep parity with DM behavior instead of showing a misleading decrypt error.
-                if (msg.senderId === user.id) {
-                  body = {
-                    text: messageHasMediaAttachments(msg) ? '' : '[Sent message unavailable on this device]',
-                  };
-                } else {
-                  body = { text: '[Unable to decrypt]' };
-                }
-              } else {
-                const plain = await decryptDirectMessage(user.id, msg, user.id);
-                body = { text: plain ?? '[Unable to decrypt]' };
-              }
+              const plain = await decryptDirectMessage(user.id, msg, user.id);
+              body = { text: plain ?? '[Unable to decrypt]' };
             }
 
             if (cancelled) return;
@@ -198,7 +216,7 @@ export function useMessageBodies(
     return () => {
       cancelled = true;
     };
-  }, [messagesKey, user?.id, e2eeKeysLocked]);
+  }, [messagesKey, user?.id, e2eeKeysLocked, unlockGeneration]);
 
   return bodies;
 }

@@ -1,5 +1,5 @@
 .container {
-  min-height: 100vh;
+  min-height: var(--app-height);
   width: 100%;
   display: flex;
   align-items: center;
@@ -67,7 +67,10 @@
   z-index: 10;
   width: 100%;
   max-width: 450px;
-  padding: 2rem;
+  padding: 2rem 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .cardWrapper {

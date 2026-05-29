@@ -1,0 +1,49 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.row {
+  display: flex;
+}
+
+.left {
+  justify-content: flex-start;
+}
+
+.right {
+  justify-content: flex-end;
+}
+
+.bubble {
+  height: 36px;
+  border-radius: 12px;
+  background: var(--muted, #e2e8f0);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.left .bubble {
+  width: min(55%, 280px);
+}
+
+.right .bubble {
+  width: min(45%, 220px);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+  }
+}

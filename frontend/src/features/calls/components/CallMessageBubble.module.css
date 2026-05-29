@@ -11,9 +11,9 @@
   gap: 0.4rem;
   padding: 0.4rem 0.85rem;
   border-radius: 999px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #475569;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--muted-foreground);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: default;
@@ -25,14 +25,15 @@
 }
 
 .pill:not(:disabled):hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--surface-panel);
+  border-color: var(--primary);
+  color: var(--foreground);
 }
 
 .missed {
-  color: #dc2626;
-  border-color: #fecaca;
-  background: #fef2f2;
+  color: var(--destructive);
+  border-color: var(--destructive);
+  background: var(--destructive-surface);
 }
 
 .badge {

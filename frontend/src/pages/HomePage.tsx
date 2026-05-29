@@ -13,11 +13,10 @@ import { useConversations } from '../features/chat/hooks/useChatData';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { formatLastSeen } from '../utils/timeFormat';
-import { MessageSquare, Phone, Video, Info, ArrowLeft, Search } from 'lucide-react';
+import { MessageSquare, Phone, Video, ArrowLeft, Search } from 'lucide-react';
 import ChatInMessageSearch from '../features/chat/components/ChatInMessageSearch';
 import ChatDetailsPanel from '../features/chat/components/ChatDetailsPanel';
 import ThreadPanel from '../features/chat/components/ThreadPanel';
-import ConnectionStatusBanner from '../features/chat/components/ConnectionStatusBanner';
 import DmHeaderMenu from '../features/chat/components/DmHeaderMenu';
 import MessagingRestrictedNotice from '../features/chat/components/MessagingRestrictedNotice';
 import { useBlockStatus } from '../features/chat/hooks/useBlockStatus';
@@ -31,6 +30,10 @@ import type { Chat } from '../features/chat/types';
 import UserAvatar from '../features/chat/components/UserAvatar';
 import ChatAvatar from '../features/chat/components/ChatAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
+import HomeDashboard from '../features/chat/components/HomeDashboard';
+import { useE2eeChatPrefetch } from '../features/e2ee/useE2eeChatPrefetch';
+import styles from './HomePage.module.css';
+import { useIsMobile } from '../hooks/useBreakpoint';
 
 const HomePage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -39,16 +42,17 @@ const HomePage: React.FC = () => {
     activeId,
     setActiveId,
     setActiveSection,
-    isDetailsOpen,
-    setDetailsOpen,
     activeSection,
     setGroupDetailsTab,
     activeThreadRootId,
     setInChatSearchOpen,
   } = useChat();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const { data: conversations } = useConversations();
-  const activeChat = (conversations as { data?: Chat[] })?.data?.find((c) => c.id === activeId);
+  const chatList = (conversations as { data?: Chat[] })?.data ?? [];
+  const activeChat = chatList.find((c) => c.id === activeId);
+  useE2eeChatPrefetch(activeId, activeChat);
   const [joiningGroup, setJoiningGroup] = React.useState(false);
   const canJoinPublicGroup = Boolean(
     activeChat?.type === 'GROUP' && activeChat.canJoin && activeChat.isMember === false,
@@ -184,74 +188,39 @@ const HomePage: React.FC = () => {
     <MainLayout>
       <div style={{ display: 'flex', flex: 1, minHeight: 0, maxHeight: '100%', overflow: 'hidden', width: '100%' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minHeight: 0, minWidth: 0 }}>
-          <AnimatePresence mode="wait">
-            {!activeId ? (
+          <AnimatePresence mode={isMobile ? 'sync' : 'wait'}>
+            {!activeId && !isMobile ? (
               <motion.div
-                key="empty"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                style={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  background: '#f8fafc',
-                  padding: '2rem',
-                  textAlign: 'center'
-                }}
-              >
-                <div style={{ 
-                  width: 80, 
-                  height: 80, 
-                  background: 'white', 
-                  borderRadius: 24, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  boxShadow: 'var(--shadow-lg)',
-                  marginBottom: '1.5rem',
-                  color: 'var(--primary)'
-                }}>
-                  <MessageSquare size={40} />
-                </div>
-                <h2 style={{ fontWeight: 800, marginBottom: '0.5rem' }}>Your Messages</h2>
-                <p style={{ color: 'var(--muted-foreground)', maxWidth: 300 }}>
-                  Select a conversation from the list to start chatting with your team.
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="chat"
+                key="dashboard"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className={styles.dashboardWrap}
               >
-                <header style={{ 
-                  height: '72px', 
-                  padding: '0 2rem', 
-                  backgroundColor: 'white', 
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  zIndex: 10
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <button 
+                <HomeDashboard
+                  userName={user?.name ?? undefined}
+                  conversations={chatList}
+                  onlineUserIds={onlineUsers}
+                  onSelectChat={setActiveId}
+                />
+              </motion.div>
+            ) : activeId ? (
+              <motion.div
+                key={`chat-${activeId}`}
+                initial={isMobile ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={isMobile ? undefined : { opacity: 0 }}
+                transition={isMobile ? { duration: 0 } : { duration: 0.2 }}
+                className={styles.chatMotionWrap}
+              >
+                <header className={styles.chatHeader}>
+                  <div className={styles.chatHeaderLeft}>
+                    <button
+                      type="button"
                       onClick={() => setActiveId(null)}
-                      style={{ 
-                        background: 'none', 
-                        border: 'none', 
-                        padding: '6px', 
-                        cursor: 'pointer',
-                        color: 'var(--muted-foreground)',
-                        display: 'none',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      className="back-btn-mobile"
+                      className={`${styles.chatHeaderBackBtn} back-btn-mobile`}
+                      aria-label="Back to home"
                     >
                       <ArrowLeft size={20} />
                     </button>
@@ -277,33 +246,22 @@ const HomePage: React.FC = () => {
                         borderRadius={12}
                       />
                     ) : null}
-                    <div>
-                      <h4 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--foreground)' }}>{chatName}</h4>
+                    <div className={styles.chatHeaderTitleBlock}>
+                      <h4>{chatName}</h4>
                       {(activeChat?.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1') ||
                       (activeChat?.type === 'GROUP' && activeChat.e2eeMode === 'GROUP_V1') ? (
-                        <span
-                          style={{
-                            display: 'block',
-                            fontSize: '0.7rem',
-                            fontWeight: 600,
-                            color: 'var(--muted-foreground)',
-                          }}
-                        >
+                        <span className={styles.e2eeHint}>
                           Messages are end-to-end encrypted
                         </span>
                       ) : null}
                       <span
-                        style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: blockStatus?.blockedByPeer
-                            ? '#dc2626'
-                            : blockStatus?.blockedByMe
-                              ? 'var(--muted-foreground)'
-                              : typingCount > 0 || isPeerOnline
-                                ? 'var(--success)'
-                                : 'var(--muted-foreground)',
-                        }}
+                        className={`${styles.chatHeaderStatus} ${
+                          blockStatus?.blockedByPeer
+                            ? styles.statusBlocked
+                            : typingCount > 0 || isPeerOnline
+                              ? styles.statusOnline
+                              : styles.statusMuted
+                        }`}
                       >
                         {blockStatus?.blockedByPeer
                           ? 'You have been blocked by this user'
@@ -324,20 +282,13 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', color: 'var(--muted-foreground)' }}>
+                  <div className={styles.chatHeaderActions}>
                     <button
                       type="button"
                       title="Search in chat (Ctrl+F)"
                       aria-label="Search in chat"
                       onClick={() => setInChatSearchOpen(true)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        padding: 0,
-                        color: 'inherit',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                      }}
+                      className={styles.headerIconBtn}
                     >
                       <Search size={20} />
                     </button>
@@ -364,15 +315,7 @@ const HomePage: React.FC = () => {
                           video: false,
                         });
                       }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        padding: 0,
-                        color: 'inherit',
-                        cursor: canCall ? 'pointer' : 'not-allowed',
-                        opacity: canCall ? 1 : 0.4,
-                        display: 'inline-flex',
-                      }}
+                      className={`${styles.headerIconBtn} ${styles.headerCallBtn}`}
                     >
                       <Phone size={20} />
                     </button>
@@ -399,25 +342,10 @@ const HomePage: React.FC = () => {
                           video: true,
                         });
                       }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        padding: 0,
-                        color: 'inherit',
-                        cursor: canCall ? 'pointer' : 'not-allowed',
-                        opacity: canCall ? 1 : 0.4,
-                        display: 'inline-flex',
-                      }}
+                      className={`${styles.headerIconBtn} ${styles.headerCallBtn}`}
                     >
                       <Video size={20} />
                     </button>
-                    <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
-                    <Info 
-                      size={20} 
-                      cursor="pointer" 
-                      style={{ color: isDetailsOpen ? 'var(--primary)' : 'currentColor' }}
-                      onClick={() => setDetailsOpen(!isDetailsOpen)} 
-                    />
                     {activeChat?.type === 'DIRECT' && activeChat.dmPeer && (
                       <DmHeaderMenu
                         peerId={activeChat.dmPeer.id}
@@ -428,36 +356,16 @@ const HomePage: React.FC = () => {
                   </div>
                 </header>
 
-                <ConnectionStatusBanner />
-
                 {canJoinPublicGroup && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '1rem',
-                      padding: '0.65rem 1rem',
-                      borderBottom: '1px solid var(--border)',
-                      background: 'rgba(88, 101, 242, 0.12)',
-                    }}
-                  >
-                    <span style={{ fontSize: '0.85rem' }}>
+                  <div className={styles.joinGroupBanner}>
+                    <span className={styles.joinGroupBannerText}>
                       This is a public group. Join to read and send messages.
                     </span>
                     <button
                       type="button"
                       disabled={joiningGroup}
                       onClick={() => void handleJoinPublicGroup()}
-                      style={{
-                        padding: '0.4rem 0.85rem',
-                        borderRadius: 6,
-                        border: 'none',
-                        background: 'var(--primary, #5865f2)',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: joiningGroup ? 'wait' : 'pointer',
-                      }}
+                      className={styles.joinGroupBtn}
                     >
                       {joiningGroup ? 'Joining…' : 'Join group'}
                     </button>
@@ -465,27 +373,17 @@ const HomePage: React.FC = () => {
                 )}
 
                 {activeChat?.type === 'GROUP' && activeGroupSessionInThisChat && !alreadyJoinedGroupSession && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '1rem',
-                      padding: '0.72rem 1rem',
-                      borderBottom: '1px solid #dbe4ff',
-                      background: '#f3f6ff',
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e3a8a' }}>
+                  <div className={styles.groupCallBanner}>
+                    <div className={styles.groupCallBannerText}>
+                      <span className={styles.groupCallBannerTitle}>
                         Ongoing group call
                       </span>
-                      <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                      <span className={styles.groupCallBannerMeta}>
                         {ongoingGroupCallParticipantCount} participant
                         {ongoingGroupCallParticipantCount > 1 ? 's' : ''} in this call
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <div className={styles.groupCallBannerActions}>
                       {groupCallState.kind === 'VIDEO' ? (
                         <button
                           type="button"
@@ -494,18 +392,7 @@ const HomePage: React.FC = () => {
                             if (!groupCallState.sessionId || !activeId || !canJoinExistingGroupCall) return;
                             void joinGroupCall(groupCallState.sessionId, activeId, true);
                           }}
-                          style={{
-                            minHeight: '32px',
-                            padding: '0.35rem 0.7rem',
-                            borderRadius: 999,
-                            border: 'none',
-                            background: '#2563eb',
-                            color: '#fff',
-                            fontWeight: 700,
-                            fontSize: '0.78rem',
-                            cursor: canJoinExistingGroupCall ? 'pointer' : 'not-allowed',
-                            opacity: canJoinExistingGroupCall ? 1 : 0.55,
-                          }}
+                          className={styles.groupCallJoinVideoBtn}
                         >
                           Join video
                         </button>
@@ -517,18 +404,7 @@ const HomePage: React.FC = () => {
                             if (!groupCallState.sessionId || !activeId || !canJoinExistingGroupCall) return;
                             void joinGroupCall(groupCallState.sessionId, activeId, false);
                           }}
-                          style={{
-                            minHeight: '32px',
-                            padding: '0.35rem 0.7rem',
-                            borderRadius: 999,
-                            border: '1px solid #bfdbfe',
-                            background: '#eff6ff',
-                            color: '#1d4ed8',
-                            fontWeight: 700,
-                            fontSize: '0.78rem',
-                            cursor: canJoinExistingGroupCall ? 'pointer' : 'not-allowed',
-                            opacity: canJoinExistingGroupCall ? 1 : 0.55,
-                          }}
+                          className={styles.groupCallJoinBtn}
                         >
                           Join audio
                         </button>
@@ -542,6 +418,32 @@ const HomePage: React.FC = () => {
                   restrictToMessages={canJoinPublicGroup}
                 />
 
+                {activeSection !== 'messages' && !canJoinPublicGroup && (
+                  <div className={styles.sectionBackBar}>
+                    <button
+                      type="button"
+                      className={styles.sectionBackBtn}
+                      onClick={() => setActiveSection('messages')}
+                      aria-label="Back to messages"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                    <span className={styles.sectionBackLabel}>
+                      {activeSection === 'files'
+                        ? 'Files & Media'
+                        : activeSection === 'pins'
+                          ? 'Pins'
+                          : activeSection === 'calls'
+                            ? 'Call History'
+                            : activeSection === 'members'
+                              ? 'Members'
+                              : activeSection === 'settings'
+                                ? 'Settings'
+                                : 'Messages'}
+                    </span>
+                  </div>
+                )}
+
                 {activeId && (
                   <ChatInMessageSearch
                     chatId={activeId}
@@ -551,33 +453,18 @@ const HomePage: React.FC = () => {
                   />
                 )}
 
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+                <div className={styles.chatMainColumn}>
                   <div
-                    style={{
-                      flex: 1,
-                      minHeight: 0,
-                      display: activeSection === 'messages' ? 'flex' : 'none',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                    }}
+                    className={
+                      activeSection === 'messages'
+                        ? styles.messagesSection
+                        : styles.messagesSectionHidden
+                    }
                   >
                     {canJoinPublicGroup ? (
-                      <div
-                        style={{
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexDirection: 'column',
-                          gap: '0.45rem',
-                          color: 'var(--muted-foreground)',
-                          background: '#f8fafc',
-                          padding: '1.5rem',
-                          textAlign: 'center',
-                        }}
-                      >
+                      <div className={styles.joinGroupEmpty}>
                         <MessageSquare size={26} />
-                        <p style={{ margin: 0, fontWeight: 600 }}>Join this public group to view messages.</p>
+                        <p>Join this public group to view messages.</p>
                       </div>
                     ) : (
                       <MessageStream />
@@ -604,7 +491,7 @@ const HomePage: React.FC = () => {
                   )}
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
 
@@ -612,34 +499,6 @@ const HomePage: React.FC = () => {
           <ThreadPanel />
         )}
 
-        <AnimatePresence>
-          {activeId && isDetailsOpen && !activeThreadRootId && (
-            <motion.div
-              initial={{ x: 300, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 300, opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              style={{
-                width: '300px',
-                borderLeft: '1px solid var(--border)',
-                background: 'var(--card)',
-                padding: '2rem',
-                display: 'flex',
-                flexDirection: 'column',
-                color: 'var(--foreground)',
-              }}
-            >
-              {activeChat && (
-                <ChatDetailsPanel
-                  chat={activeChat}
-                  chatName={chatName}
-                  isPeerOnline={Boolean(isPeerOnline)}
-                  onGroupLeave={() => setActiveId(null)}
-                />
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </MainLayout>
   );

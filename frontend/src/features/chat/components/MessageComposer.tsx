@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import styles from './MessageComposer.module.css';
 import {
@@ -48,6 +49,7 @@ import { debounce } from 'lodash-es';
 import EmojiPicker from 'emoji-picker-react';
 import { truncateFilenameMiddle } from '../utils/formatFilename';
 import { env, allowedFileAcceptAttribute } from '../../../config/env';
+import { useIsMobile } from '../../../hooks/useBreakpoint';
 import {
   formatAttachmentSize,
   isComposerAudioFile,
@@ -137,6 +139,8 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const [showPollModal, setShowPollModal] = useState(false);
   const [alert, setAlert] = useState<ComposerAlert | null>(null);
   const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const isMobile = useIsMobile();
 
   const showAlert = useCallback((title: string, description: string) => {
     setAlert({ title, description });
@@ -303,27 +307,39 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   }, [voice.error, voice.state]);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(target)) {
-        setShowEmojiPicker(false);
-      }
-      if (plusMenuRef.current && !plusMenuRef.current.contains(target)) {
-        setShowPlusMenu(false);
-        setShowGifPicker(false);
-      }
-      if (mentionMenuRef.current && !mentionMenuRef.current.contains(target)) {
-        setMentionOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  const closeComposerMenus = useCallback(() => {
+    setShowPlusMenu(false);
+    setShowGifPicker(false);
+    setShowEmojiPicker(false);
   }, []);
 
   useEffect(() => {
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (showEmojiPicker && emojiPickerRef.current && !emojiPickerRef.current.contains(target)) {
+        setShowEmojiPicker(false);
+      }
+      if (
+        (showPlusMenu || showGifPicker) &&
+        plusMenuRef.current &&
+        !plusMenuRef.current.contains(target)
+      ) {
+        setShowPlusMenu(false);
+        setShowGifPicker(false);
+      }
+      if (mentionOpen && mentionMenuRef.current && !mentionMenuRef.current.contains(target)) {
+        setMentionOpen(false);
+      }
+    };
+    if (!showEmojiPicker && !showPlusMenu && !showGifPicker && !mentionOpen) return;
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [showEmojiPicker, showPlusMenu, showGifPicker, mentionOpen]);
+
+  useEffect(() => {
     setMentionOpen(mentionCandidates.length > 0);
-  }, [mentionCandidates.length]);
+    setMentionIndex(0);
+  }, [mentionCandidates.length, mentionQuery]);
 
   const debouncedStopTyping = useCallback(
     debounce((chatId: string) => {
@@ -744,6 +760,29 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (mentionOpen && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((i) => Math.min(i + 1, mentionCandidates.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const picked = mentionCandidates[mentionIndex];
+        if (picked) applyMention(picked.handle);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionOpen(false);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void handleSend({ viaEnter: true });
@@ -858,8 +897,31 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const isUploading = uploadStatus === 'uploading';
   const voiceBusy = isUploading || voice.isRecording;
 
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardInset(inset > 50 ? inset : 0);
+    };
+
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   return (
-    <div className={`${styles.container} ${isThread ? styles.containerThread : ''}`}>
+    <div
+      className={`${styles.container} ${isThread ? styles.containerThread : ''}`}
+      style={keyboardInset > 0 ? { paddingBottom: `calc(1rem + ${keyboardInset}px)` } : undefined}
+    >
       <CreatePollModal
         open={showPollModal}
         onClose={() => setShowPollModal(false)}
@@ -872,6 +934,17 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
         description={alert?.description ?? ''}
         onClose={() => setAlert(null)}
       />
+      {isMobile &&
+        (showPlusMenu || showGifPicker || showEmojiPicker) &&
+        createPortal(
+          <button
+            type="button"
+            className={styles.composerMenuBackdrop}
+            aria-label="Close menu"
+            onClick={closeComposerMenus}
+          />,
+          document.body,
+        )}
       {editingMessage && (
         <div className={styles.replyBar}>
           <div className={styles.replyInfo}>
@@ -1049,7 +1122,9 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
           <button
             type="button"
             className={`${styles.actionBtn} ${showPlusMenu || showGifPicker ? styles.actionBtnActive : ''}`}
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={() => {
+              setShowEmojiPicker(false);
               setShowPlusMenu((open) => !open);
               if (showPlusMenu) setShowGifPicker(false);
             }}
@@ -1123,11 +1198,12 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
         />
         {mentionOpen && mentionCandidates.length > 0 && (
           <div className={styles.mentionMenu} ref={mentionMenuRef}>
-            {mentionCandidates.map((c) => (
+            {mentionCandidates.map((c, idx) => (
               <button
                 key={c.key}
                 type="button"
-                className={styles.mentionItem}
+                className={`${styles.mentionItem} ${idx === mentionIndex ? styles.mentionItemActive : ''}`}
+                onMouseEnter={() => setMentionIndex(idx)}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   applyMention(c.handle);
@@ -1163,7 +1239,12 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
           <button
             type="button"
             className={styles.actionBtn}
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => {
+              setShowPlusMenu(false);
+              setShowGifPicker(false);
+              setShowEmojiPicker((open) => !open);
+            }}
             disabled={voiceBusy}
           >
             <Smile size={20} />

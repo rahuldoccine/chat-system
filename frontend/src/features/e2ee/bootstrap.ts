@@ -25,7 +25,17 @@ export type EnsureE2eeOptions = {
 
 async function publishKeys(material: E2eeKeyMaterial, deviceId: string): Promise<void> {
   const fingerprint = await fingerprintPublicKeySpki(material.identityPublicSpki);
-  await e2eeApi.putIdentityKey(material.identityPublicSpki, fingerprint);
+  try {
+    await e2eeApi.putIdentityKey(material.identityPublicSpki, fingerprint);
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 409) {
+      throw new E2eeKeysLockedError(
+        'This device has different encryption keys than your account. Unlock with your password to restore.',
+      );
+    }
+    throw err;
+  }
   await e2eeApi.putDeviceKey(deviceId, material.devicePublicSpki, BOOTSTRAP_LABEL);
 
   const latestSpk = material.signedPreKeys[material.signedPreKeys.length - 1]!;

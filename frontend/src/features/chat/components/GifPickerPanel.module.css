@@ -154,3 +154,15 @@
 .attribution a:hover {
   text-decoration: underline;
 }
+
+@media (max-width: 576px) {
+  .panel {
+    position: fixed;
+    left: max(0.5rem, var(--safe-left));
+    right: max(0.5rem, var(--safe-right));
+    bottom: calc(5rem + var(--safe-bottom));
+    width: auto;
+    max-height: min(50dvh, 360px);
+    z-index: 50;
+  }
+}

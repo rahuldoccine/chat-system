@@ -23,6 +23,10 @@ export type Chat = {
     createdAt: string;
   };
   unreadCount: number;
+  unreadMentionCount?: number;
+  pinnedAt?: string | null;
+  favoritedAt?: string | null;
+  closedAt?: string | null;
   updatedAt: string;
   mutedUntil?: string | null;
 };

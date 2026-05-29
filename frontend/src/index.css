@@ -1,4 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import './styles/breakpoints.css';
+@import './styles/responsive-modal.css';
+@import './features/calls/styles/call-layout.css';
 
 :root {
   /* Premium Slate Palette */
@@ -45,6 +48,62 @@
   --sidebar-accent: #35373c;
   --sidebar-foreground: #dbdee1;
   --sidebar-muted: #949ba4;
+
+  /* Semantic surfaces */
+  --surface-page: #f8fafc;
+  --surface-panel: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f1f5f9;
+  --dashboard-gradient: linear-gradient(165deg, #f8fafc 0%, #eef2ff 42%, #f1f5f9 100%);
+  --chat-canvas: #f8fafc;
+  --info-surface: #eff6ff;
+  --info-foreground: #1d4ed8;
+  --info-border: #bfdbfe;
+  --warning-surface: #fef3c7;
+  --warning-foreground: #92400e;
+  --warning-border: #fde68a;
+  --destructive-surface: #fef2f2;
+}
+
+[data-theme='dark'] {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --accent: #334155;
+  --accent-foreground: #f8fafc;
+
+  --destructive-foreground: #fecaca;
+
+  --border: #334155;
+  --input: #334155;
+
+  --surface-page: #0f172a;
+  --surface-panel: #1e293b;
+  --surface-elevated: #1e293b;
+  --surface-muted: #334155;
+  --dashboard-gradient: linear-gradient(165deg, #0f172a 0%, #1e1b4b 42%, #0f172a 100%);
+  --chat-canvas: #0f172a;
+  --info-surface: rgba(59, 130, 246, 0.15);
+  --info-foreground: #93c5fd;
+  --info-border: rgba(59, 130, 246, 0.35);
+  --warning-surface: rgba(245, 158, 11, 0.15);
+  --warning-foreground: #fcd34d;
+  --warning-border: rgba(245, 158, 11, 0.35);
+  --destructive-surface: rgba(239, 68, 68, 0.12);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
 }
 
 * {
@@ -92,8 +151,12 @@ input {
   border-radius: 10px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {

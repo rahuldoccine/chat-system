@@ -1,23 +1,46 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 10000;
   background: rgba(15, 23, 42, 0.88);
   display: flex;
   flex-direction: column;
+  height: var(--app-height);
+  color: #e2e8f0;
+}
+
+.reconnectBanner {
+  position: absolute;
+  top: calc(56px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(180, 83, 9, 0.92);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  max-width: calc(100% - 2rem);
 }
 
 .header {
-  height: 52px;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0 1rem;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  padding: var(--call-header-pad-top) var(--call-header-pad-x) 0.65rem;
+  padding-right: max(var(--call-header-pad-x), var(--safe-right));
   color: #e2e8f0;
   border-bottom: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(2, 6, 23, 0.42);
+  background: rgba(2, 6, 23, 0.55);
   font-weight: 600;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .dot {
@@ -31,6 +54,12 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  width: 100%;
+  max-width: var(--call-stage-max-width);
+  margin: 0 auto;
+  padding: 0.5rem max(0.75rem, var(--safe-left)) 0.5rem max(0.75rem, var(--safe-right));
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .audioState {
@@ -44,8 +73,8 @@
 }
 
 .localVideo {
-  width: min(880px, calc(100vw - 2rem));
-  height: min(560px, calc(100vh - 180px));
+  width: min(880px, 100%);
+  height: min(560px, calc(var(--app-height) - 200px));
   border-radius: 14px;
   object-fit: cover;
   background: #020617;
@@ -54,15 +83,17 @@
 
 .captions {
   position: absolute;
-  bottom: 1rem;
+  bottom: max(0.75rem, var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
-  width: min(760px, calc(100vw - 2rem));
+  width: min(760px, calc(100% - 1.5rem));
   border-radius: 12px;
   padding: 0.55rem 0.75rem;
   background: rgba(15, 23, 42, 0.72);
   color: #f8fafc;
   font-size: 0.8rem;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .captions p {
@@ -74,18 +105,24 @@
 }
 
 .controls {
-  height: 72px;
+  min-height: 72px;
   border-top: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(2, 6, 23, 0.5);
+  background: rgba(2, 6, 23, 0.65);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
+  gap: var(--call-ctrl-gap);
+  padding: var(--call-controls-pad-y) max(1rem, var(--safe-left)) var(--call-controls-pad-bottom)
+    max(1rem, var(--safe-right));
+  flex-shrink: 0;
 }
 
 .ctrlBtn {
-  width: 44px;
-  height: 44px;
+  width: var(--call-ctrl-size);
+  height: var(--call-ctrl-size);
+  min-width: var(--call-ctrl-size);
+  min-height: var(--call-ctrl-size);
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.34);
   background: rgba(30, 41, 59, 0.9);
@@ -94,6 +131,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.ctrlBtn:active {
+  transform: scale(0.96);
 }
 
 .ctrlBtnOff {
@@ -110,4 +152,53 @@
   background: #dc2626;
   border-color: #ef4444;
   color: #fff;
+}
+
+@media (max-width: 576px) {
+  .header {
+    font-size: 0.78rem;
+    min-height: 48px;
+  }
+
+  .header span:not(:first-child) {
+    max-width: 100%;
+  }
+
+  .stage {
+    padding: 0.35rem max(0.5rem, var(--safe-left)) 0.35rem max(0.5rem, var(--safe-right));
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .captions {
+    font-size: 0.74rem;
+    width: calc(100% - 1rem);
+  }
+
+  .controls {
+    gap: 0.65rem;
+  }
+}
+
+@media (min-width: 577px) and (max-width: 1024px) {
+  .header {
+    font-size: 0.82rem;
+  }
+
+  .controls {
+    max-width: min(560px, 100%);
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1025px) {
+  .overlay {
+    background: radial-gradient(ellipse at top, #1e293b 0%, #0f172a 45%, #020617 100%);
+  }
+
+  .controls {
+    max-width: 640px;
+    margin: 0 auto;
+    width: 100%;
+  }
 }

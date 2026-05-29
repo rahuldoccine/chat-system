@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import styles from './PwaInstallPrompt.module.css'
+import ChatSystemLogo from '../../components/brand/ChatSystemLogo'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -21,51 +23,28 @@ const PwaInstallPrompt: React.FC = () => {
       event.preventDefault()
       setInstallEvent(event as BeforeInstallPromptEvent)
     }
-    const onInstalled = () => {
+    const onBeforeInstallPromptInstalled = () => {
       setInstallEvent(null)
       setDismissed(false)
     }
 
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-    window.addEventListener('appinstalled', onInstalled)
+    window.addEventListener('appinstalled', onBeforeInstallPromptInstalled)
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', onInstalled)
+      window.removeEventListener('appinstalled', onBeforeInstallPromptInstalled)
     }
   }, [])
 
   if (isStandalone || !installEvent || dismissed) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        right: 16,
-        bottom: 16,
-        zIndex: 9999,
-        border: '1px solid #dbeafe',
-        background: '#ffffff',
-        borderRadius: 12,
-        boxShadow: '0 10px 30px rgba(15,23,42,0.14)',
-        padding: '0.65rem 0.75rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-      }}
-    >
-      <span style={{ fontSize: '0.78rem', color: '#334155', fontWeight: 600 }}>Install Chat App</span>
+    <div className={styles.prompt}>
+      <ChatSystemLogo variant="mark" size="xs" />
+      <span className={styles.label}>Install Chat System</span>
       <button
         type="button"
-        style={{
-          border: '1px solid #c7d2fe',
-          background: '#eef2ff',
-          color: '#3730a3',
-          borderRadius: 8,
-          padding: '0.25rem 0.55rem',
-          fontSize: '0.74rem',
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
+        className={styles.installBtn}
         onClick={async () => {
           await installEvent.prompt()
           const choice = await installEvent.userChoice
@@ -77,17 +56,7 @@ const PwaInstallPrompt: React.FC = () => {
       >
         Install
       </button>
-      <button
-        type="button"
-        style={{
-          border: 'none',
-          background: 'transparent',
-          color: '#64748b',
-          fontSize: '0.72rem',
-          cursor: 'pointer',
-        }}
-        onClick={() => setDismissed(true)}
-      >
+      <button type="button" className={styles.laterBtn} onClick={() => setDismissed(true)}>
         Later
       </button>
     </div>

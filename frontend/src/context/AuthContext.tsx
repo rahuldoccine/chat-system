@@ -8,12 +8,20 @@ import {
 } from '../api/authSession';
 import { unregisterWebPush } from '../services/push';
 import { ensureE2eeReady, E2eeKeysLockedError } from '../features/e2ee/bootstrap';
-import { clearSessionUnlock } from '../features/e2ee/accountSync';
+import {
+  clearSessionUnlock,
+  unlockKeyMaterialWithPassword,
+} from '../features/e2ee/accountSync';
 import {
   ensureDecryptedPayloadHydrated,
   clearDecryptedPayloadForUser,
 } from '../features/e2ee/decryptedPayloadCache';
-import { ensureSentPlaintextHydrated, clearSentPlaintextForUser } from '../features/e2ee/sentPlaintextCache';
+import {
+  ensureSentPlaintextHydrated,
+  clearSentPlaintextForUser,
+} from '../features/e2ee/sentPlaintextCache';
+import { emitE2eeKeysUnlocked } from '../features/e2ee/e2eeEvents';
+import { hydrateGroupSenderKeysFromIdb } from '../features/e2ee/groupSenderKeys';
 
 interface User {
   id: string;
@@ -28,6 +36,7 @@ interface AuthContextType {
   login: (user: unknown, token: string, password?: string) => Promise<void>;
   e2eeKeysLocked: boolean;
   markE2eeUnlocked: () => void;
+  unlockE2eeWithPassword: (password: string) => Promise<void>;
   applyProfile: (profile: {
     id: string;
     email: string;
@@ -63,6 +72,14 @@ function mapApiUser(userData: {
 async function fetchCurrentUser(): Promise<User> {
   const response = await api.get<{ user: Parameters<typeof mapApiUser>[0] }>('/users/me');
   return mapApiUser(response.data.user);
+}
+
+async function hydrateE2eeCaches(userId: string): Promise<void> {
+  await Promise.all([
+    ensureSentPlaintextHydrated(userId),
+    ensureDecryptedPayloadHydrated(userId),
+    hydrateGroupSenderKeysFromIdb(),
+  ]);
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -110,10 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             await ensureE2eeReady(loadedUser.id);
             setE2eeKeysLocked(false);
-            void Promise.all([
-              ensureSentPlaintextHydrated(loadedUser.id),
-              ensureDecryptedPayloadHydrated(loadedUser.id),
-            ]);
+            void hydrateE2eeCaches(loadedUser.id);
           } catch (err) {
             if (err instanceof E2eeKeysLockedError) {
               setE2eeKeysLocked(true);
@@ -143,12 +157,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const markE2eeUnlocked = useCallback(() => {
     setE2eeKeysLocked(false);
     if (user?.id) {
-      void Promise.all([
-        ensureSentPlaintextHydrated(user.id),
-        ensureDecryptedPayloadHydrated(user.id),
-      ]);
+      void hydrateE2eeCaches(user.id);
+      emitE2eeKeysUnlocked(user.id);
     }
   }, [user?.id]);
+
+  const unlockE2eeWithPassword = useCallback(
+    async (password: string) => {
+      if (!user?.id) {
+        throw new E2eeKeysLockedError();
+      }
+      await unlockKeyMaterialWithPassword(user.id, password);
+      await ensureE2eeReady(user.id, { password });
+      setE2eeKeysLocked(false);
+      await hydrateE2eeCaches(user.id);
+      emitE2eeKeysUnlocked(user.id);
+    },
+    [user?.id],
+  );
 
   const login = useCallback(async (userData: unknown, newToken: string, password?: string) => {
     setAccessToken(newToken);
@@ -160,10 +186,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await ensureE2eeReady(mapped.id, { password });
         setE2eeKeysLocked(false);
-        void Promise.all([
-          ensureSentPlaintextHydrated(mapped.id),
-          ensureDecryptedPayloadHydrated(mapped.id),
-        ]);
+        void hydrateE2eeCaches(mapped.id);
+        emitE2eeKeysUnlocked(mapped.id);
       } catch (err) {
         if (err instanceof E2eeKeysLockedError) {
           setE2eeKeysLocked(true);
@@ -248,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         e2eeKeysLocked,
         markE2eeUnlocked,
+        unlockE2eeWithPassword,
         applyProfile,
         refreshProfile,
         logout,

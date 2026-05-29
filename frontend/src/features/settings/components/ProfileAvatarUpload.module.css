@@ -82,13 +82,13 @@
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--border);
-  background: white;
+  background: var(--surface-elevated);
   color: var(--foreground);
 }
 
 .btn:hover:not(:disabled),
 .btnSecondary:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: var(--surface-muted);
 }
 
 .btn:disabled,
@@ -100,7 +100,7 @@
 .btn {
   background: var(--primary);
   border-color: var(--primary);
-  color: white;
+  color: var(--primary-foreground);
 }
 
 .btn:hover:not(:disabled) {

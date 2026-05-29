@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useCreateDirectChat, useSearchUsers, type DiscoverableUser } from '../hooks/useChatData';
+import { invalidateUsersSearch } from '../utils/invalidateChatCaches';
 import UserAvatar from './UserAvatar';
+import EmptyState from './EmptyState';
 import styles from './NewDmModal.module.css';
 
 interface NewDmModalProps {
@@ -14,8 +18,13 @@ const getUserLabel = (user: DiscoverableUser) =>
 
 const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
   const [query, setQuery] = useState('');
+  const queryClient = useQueryClient();
   const { data, isLoading, isFetching } = useSearchUsers(query);
   const createChat = useCreateDirectChat();
+
+  useEffect(() => {
+    void invalidateUsersSearch(queryClient);
+  }, [queryClient]);
 
   const users = data?.data ?? [];
   const showSpinner = isLoading || isFetching;
@@ -26,7 +35,7 @@ const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
       onChatCreated(result.chat.id);
       onClose();
     } catch {
-      // axios interceptor handles auth errors
+      toast.error('Could not start this chat. The user list was refreshed — try again.');
     }
   };
 
@@ -56,11 +65,15 @@ const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
               <span>Loading people...</span>
             </div>
           ) : users.length === 0 ? (
-            <p className={styles.empty}>
-              {query.trim()
-                ? 'No users match your search.'
-                : 'No other users yet. Register another account in a second browser to chat.'}
-            </p>
+            <EmptyState
+              compact
+              title={query.trim() ? 'No users found' : 'No other users yet'}
+              hint={
+                query.trim()
+                  ? 'Try a different name or email.'
+                  : 'Register another account in a second browser to chat.'
+              }
+            />
           ) : (
             users.map((user) => (
               <button

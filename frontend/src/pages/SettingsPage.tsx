@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, LogOut, ShieldAlert, Loader2, User, Shield } from 'lucide-react';
+import { ArrowLeft, LogOut, ShieldAlert, Loader2, User, Shield, Palette } from 'lucide-react';
+import { useTheme, type ThemePreference } from '../context/ThemeContext';
 import { toast, Toaster } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../features/chat/components/ConfirmModal';
@@ -28,11 +29,15 @@ import {
   unregisterWebPush,
 } from '../services/push';
 import styles from './SettingsPage.module.css';
+import subNavStyles from '../features/chat/components/ChatSubNav.module.css';
+import ChatSystemLogo from '../components/brand/ChatSystemLogo';
+import { useIsMobile } from '../hooks/useBreakpoint';
 
-type SettingsSection = 'account' | 'privacy' | 'reports';
+type SettingsSection = 'account' | 'appearance' | 'privacy' | 'reports';
 
 const BASE_NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof User }[] = [
   { id: 'account', label: 'Account', icon: User },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'privacy', label: 'Privacy', icon: Shield },
 ];
 
@@ -54,6 +59,8 @@ const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { logout, logoutAll } = useAuth();
+  const isMobile = useIsMobile();
+  const { preference: themePreference, resolved: resolvedTheme, setPreference: setThemePreference } = useTheme();
   const { syncProfileEverywhere } = useProfileSync();
   const [section, setSection] = useState<SettingsSection>('account');
   const [busy, setBusy] = useState<'logout' | 'logoutAll' | null>(null);
@@ -95,7 +102,9 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     const requested = searchParams.get('section');
-    if (requested === 'reports') {
+    if (requested === 'appearance' || requested === 'privacy' || requested === 'account') {
+      setSection(requested);
+    } else if (requested === 'reports') {
       if (isAdmin) {
         setSection('reports');
       } else {
@@ -248,6 +257,14 @@ const SettingsPage: React.FC = () => {
       <Toaster position="top-center" richColors />
 
       <aside className={styles.sidebar}>
+        <ChatSystemLogo
+          variant="full"
+          size="sm"
+          theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+          showSubtitle={false}
+          className={styles.sidebarBrand}
+        />
+
         <button type="button" className={styles.backLink} onClick={() => navigate('/')}>
           <ArrowLeft size={16} />
           Back to chat
@@ -262,21 +279,46 @@ const SettingsPage: React.FC = () => {
           </p>
         </div>
 
-        <nav className={styles.nav} aria-label="Settings sections">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              className={`${styles.navItem} ${section === id ? styles.navItemActive : ''}`}
-              aria-current={section === id ? 'page' : undefined}
-              onClick={() => setSection(id)}
-            >
-              <Icon size={18} className={styles.navIcon} />
-              {label}
-            </button>
-          ))}
-        </nav>
+        {!isMobile && (
+          <nav className={styles.nav} aria-label="Settings sections">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                className={`${styles.navItem} ${section === id ? styles.navItemActive : ''}`}
+                aria-current={section === id ? 'page' : undefined}
+                onClick={() => setSection(id)}
+              >
+                <Icon size={18} className={styles.navIcon} aria-hidden />
+                <span className={styles.navLabel}>{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
       </aside>
+
+      {isMobile && (
+        <nav className={subNavStyles.nav} aria-label="Settings sections">
+          {navItems.map(({ id, label, icon: Icon }) => {
+            const isActive = section === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`${subNavStyles.tab} ${isActive ? subNavStyles.tabActive : ''}`}
+                aria-selected={isActive}
+                role="tab"
+                onClick={() => setSection(id)}
+              >
+                <span className={subNavStyles.tabIcon}>
+                  <Icon size={16} strokeWidth={2} aria-hidden />
+                </span>
+                <span className={subNavStyles.tabLabel}>{label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       <main className={styles.main}>
         {section === 'account' && (
@@ -386,6 +428,35 @@ const SettingsPage: React.FC = () => {
                   <ShieldAlert size={18} />
                   Sign out everywhere
                 </button>
+              </div>
+            </section>
+          </>
+        )}
+
+        {section === 'appearance' && (
+          <>
+            <header className={styles.mainHeader}>
+              <h2 className={styles.mainTitle}>Appearance</h2>
+              <p className={styles.mainDescription}>Customize how Chat System looks on your device</p>
+            </header>
+            <section className={styles.card}>
+              <h3 className={styles.cardTitle}>Theme</h3>
+              <p className={styles.mainDescription} style={{ marginBottom: '1rem' }}>
+                Choose light, dark, or match your system setting.
+              </p>
+              <div className={styles.themeOptions} role="radiogroup" aria-label="Theme">
+                {(['light', 'dark', 'system'] as ThemePreference[]).map((opt) => (
+                  <label key={opt} className={styles.themeOption}>
+                    <input
+                      type="radio"
+                      name="theme"
+                      value={opt}
+                      checked={themePreference === opt}
+                      onChange={() => setThemePreference(opt)}
+                    />
+                    <span>{opt === 'system' ? 'System default' : opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
+                  </label>
+                ))}
               </div>
             </section>
           </>

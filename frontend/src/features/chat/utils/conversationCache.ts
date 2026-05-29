@@ -11,7 +11,15 @@ export function clearConversationUnread(
   old: ConversationsCache | undefined,
   chatId: string,
 ): ConversationsCache | undefined {
-  return patchConversationUnreadCount(old, chatId, 0);
+  if (!old?.data) return old;
+  return {
+    ...old,
+    data: old.data.map((chat) =>
+      chat.id === chatId
+        ? { ...chat, unreadCount: 0, unreadMentionCount: 0 }
+        : chat,
+    ),
+  };
 }
 
 export function patchConversationUnreadCount(
@@ -26,6 +34,17 @@ export function patchConversationUnreadCount(
       chat.id === chatId ? { ...chat, unreadCount: Math.max(0, unreadCount) } : chat,
     ),
   };
+}
+
+function isUserMentionedInMessage(
+  userId: string,
+  contentMeta: Message['contentMeta'],
+): boolean {
+  if (!contentMeta || typeof contentMeta !== 'object') return false;
+  const mentions = (contentMeta as { mentions?: { userIds?: string[]; all?: boolean } }).mentions;
+  if (!mentions) return false;
+  if (mentions.all) return true;
+  return Array.isArray(mentions.userIds) && mentions.userIds.includes(userId);
 }
 
 export function applyIncomingMessageToConversations(
@@ -51,9 +70,18 @@ export function applyIncomingMessageToConversations(
       isViewingChat || !isIncoming
         ? 0
         : chat.unreadCount + 1;
+    const mentionBump =
+      isIncoming && !isViewingChat && isUserMentionedInMessage(viewerId, message.contentMeta)
+        ? 1
+        : 0;
+    const unreadMentionCount =
+      isViewingChat || !isIncoming
+        ? 0
+        : (chat.unreadMentionCount ?? 0) + mentionBump;
     return {
       ...chat,
       unreadCount,
+      unreadMentionCount,
       lastMessage: {
         ciphertext: lastMessagePreview(message),
         createdAt: message.createdAt,

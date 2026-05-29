@@ -1,0 +1,29 @@
+/* Shared mobile bottom-sheet pattern for modals — add overlay + panel classes in TSX or duplicate rules per modal */
+@media (max-width: 576px) {
+  .modalSheetOverlay {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  .modalSheetPanel {
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: min(92dvh, 100%) !important;
+    margin: 0 !important;
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    position: relative !important;
+  }
+
+  .modalSheetPanelFixed {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    top: auto !important;
+  }
+}

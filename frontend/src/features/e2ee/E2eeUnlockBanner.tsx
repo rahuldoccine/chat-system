@@ -20,8 +20,8 @@ const E2eeUnlockBanner: React.FC = () => {
       <ShieldAlert size={18} aria-hidden />
       <p className={styles.text}>
         Your encryption keys are stored on this account but are not loaded on this device.
-        Sign out and sign in with your password to unlock encrypted messages, or use Settings →
-        Privacy → account recovery if you reset your password by email.
+        Use the unlock dialog to enter your password, or sign in again. Settings → Privacy has
+        account recovery if you reset your password by email.
       </p>
       <button type="button" className={styles.action} onClick={() => void handleSignInAgain()}>
         Sign in again

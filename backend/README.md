@@ -114,7 +114,7 @@ Implementation: `src/sockets/handlers.ts` + `src/sockets/schemas.ts`. Optional *
 ## Core functionality
 
 - **Accounts:** email/password, JWT access + refresh sessions, optional password reset email (SMTP).
-- **Chats:** direct and group threads, members, roles (Owner/Admin/Mod/Member), public/private visibility, last message, unread counts.
+- **Chats:** direct and group threads, members, roles (Owner/Admin/Mod/Member), public/private visibility, last message, unread counts, per-member **favorite** / **close DM** / pin / mute.
 - **Messages:** ciphertext for E2EE, attachments metadata, replies, edits, soft delete, reactions, `@mention` metadata.
 - **E2EE:** `DM_V1` (mandatory direct chats) and `GROUP_V1` (sender-key group envelopes); server stores public keys / wrapped backups only.
 - **Groups:** create, patch, add/remove members, role changes, public join, system activity messages.
@@ -154,6 +154,24 @@ See **`.env.example`** for the full list. Important entries:
 | `npm run db:migrate` | Deploy migrations |
 | `npm test` | Vitest |
 | `npm run cleanup-uploads` | Orphan file maintenance script |
+| `npm run db:seed-test` | Dev-only dummy users & groups (see `scripts/seed-dummy-test-data.mjs`) |
+| `npm run db:remove-seed` | Remove seed data (`CONFIRM=YES` required) |
+| `npm run db:clear-chats` | Wipe chat/message data (destructive) |
+
+### Chat member preferences (REST)
+
+Per-user sidebar state on `ChatMember`:
+
+| Endpoint | Body | Notes |
+|----------|------|--------|
+| `PATCH /api/v1/chats/:chatId/favorite` | `{ favorited: boolean }` | DMs and groups |
+| `PATCH /api/v1/chats/:chatId/close` | `{ closed: boolean }` | DMs only; cleared when a new message arrives |
+| `PATCH /api/v1/chats/:chatId/pin` | `{ pinned: boolean }` | Pin in list |
+| `PATCH /api/v1/chats/:chatId/mute` | `{ mutedUntil: string \| null }` | Mute notifications |
+
+Leave a group: `DELETE /api/v1/groups/:groupId/members/:userId` (self-leave allowed).
+
+See [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) for seed script env vars (`SEED_JOIN_EMAIL`, `SEED_TEST_PASSWORD`).
 
 ## Testing
 

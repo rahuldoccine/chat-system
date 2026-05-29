@@ -16,8 +16,6 @@ interface ChatContextType {
   pendingScrollToMessageId: string | null;
   requestScrollToMessage: (messageId: string) => void;
   clearPendingScrollToMessage: () => void;
-  isDetailsOpen: boolean;
-  setDetailsOpen: (open: boolean) => void;
   drafts: Record<string, string>;
   setDraft: (id: string, text: string) => void;
   replyingTo: string | null;
@@ -53,7 +51,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { isAuthenticated } = useAuth();
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [chatFocusKey, setChatFocusKey] = useState(0);
-  const [isDetailsOpen, setDetailsOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
@@ -85,7 +82,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const openThread = useCallback((rootMessageId: string) => {
     setActiveThreadRootId(rootMessageId);
-    setDetailsOpen(false);
     setReplyingTo(null);
     setThreadReplyingTo(null);
   }, []);
@@ -137,24 +133,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearInChatSearch();
   }, [isAuthenticated, clearInChatSearch]);
 
+  const setActiveId = useCallback((id: string | null) => {
+    setActiveIdState(id);
+    setReplyingTo(null);
+    setEditingMessage(null);
+    setForwardingMessage(null);
+    setActiveSection('messages');
+    setGroupDetailsTab('members');
+    setPendingScrollToMessageId(null);
+    setActiveThreadRootId(null);
+    setAlsoSendToMain(false);
+    setThreadReplyingTo(null);
+    clearInChatSearch();
+    if (id) setChatFocusKey((k) => k + 1);
+  }, [clearInChatSearch]);
+
   return (
     <ChatContext.Provider value={{ 
       activeId, 
       chatFocusKey,
-      setActiveId: (id) => {
-        setActiveIdState(id);
-        setReplyingTo(null);
-        setEditingMessage(null);
-        setForwardingMessage(null);
-        setActiveSection('messages');
-        setGroupDetailsTab('members');
-        setPendingScrollToMessageId(null);
-        setActiveThreadRootId(null);
-        setAlsoSendToMain(false);
-        setThreadReplyingTo(null);
-        clearInChatSearch();
-        if (id) setChatFocusKey((k) => k + 1);
-      },
+      setActiveId,
       activeSection,
       setActiveSection,
       groupDetailsTab,
@@ -162,8 +160,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       pendingScrollToMessageId,
       requestScrollToMessage,
       clearPendingScrollToMessage,
-      isDetailsOpen, 
-      setDetailsOpen,
       drafts,
       setDraft,
       replyingTo,

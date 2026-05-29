@@ -62,6 +62,9 @@ export const useSearchUsers = (query: string, enabled = true) => {
       return response.data;
     },
     enabled,
+    // User directory changes after dev seed/remove; avoid stale IDs (404 on create DM).
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 };
 
@@ -75,6 +78,9 @@ export const useCreateDirectChat = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', 'search'] });
     },
   });
 };

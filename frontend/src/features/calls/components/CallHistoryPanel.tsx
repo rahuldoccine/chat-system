@@ -4,6 +4,7 @@ import { formatCallHistoryTimestamp } from '../../../utils/timeFormat';
 import { useCallHistory, type CallHistoryRow } from '../useCallHistory';
 import { useCall } from '../CallProvider';
 import UserAvatar from '../../chat/components/UserAvatar';
+import EmptyState from '../../chat/components/EmptyState';
 import styles from './CallHistoryPanel.module.css';
 
 type CallHistoryPanelProps = {
@@ -123,11 +124,11 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
       </div>
       {isLoading && <p className={styles.empty}>Loading…</p>}
       {!isLoading && filteredRows.length === 0 && (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyStateIcon}>📞</div>
-          <div className={styles.emptyStateTitle}>No call history yet</div>
-          <div className={styles.emptyStateHint}>Start your first call with teammates.</div>
-        </div>
+        <EmptyState
+          compact
+          title="No call history yet"
+          hint="Start your first call with teammates."
+        />
       )}
       <ul className={styles.list}>
         {filteredRows.map((row) => {

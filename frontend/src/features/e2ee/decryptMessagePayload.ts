@@ -34,7 +34,7 @@ export async function decryptMessagePayload(
   if (isGroupE2eeMessage(msg)) {
     const meta = msg.contentMeta as Record<string, unknown> | undefined;
     const epoch = typeof meta?.epoch === 'number' ? meta.epoch : 0;
-    return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch);
+    return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch, userId);
   }
 
   const envelope = decodeEnvelope(msg.ciphertext ?? '');

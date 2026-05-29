@@ -2,7 +2,7 @@
   margin: 0 0 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--foreground);
 }
 
 .options {
@@ -18,11 +18,11 @@
   padding: 0.45rem 0.5rem;
   border-radius: 6px;
   cursor: pointer;
-  color: #dbdee1;
+  color: var(--foreground);
 }
 
 .option:hover:not(.optionDisabled) {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-muted);
 }
 
 .optionDisabled {
@@ -32,7 +32,7 @@
 
 .option input {
   margin-top: 0.2rem;
-  accent-color: var(--primary, #5865f2);
+  accent-color: var(--primary);
 }
 
 .optionBody {
@@ -48,18 +48,6 @@
 
 .optionHint {
   font-size: 0.72rem;
-  color: #949ba4;
+  color: var(--muted-foreground);
   line-height: 1.35;
-}
-
-.sectionLight .heading {
-  color: #060607;
-}
-
-.sectionLight .option {
-  color: #2e3338;
-}
-
-.sectionLight .optionHint {
-  color: #5c6370;
 }

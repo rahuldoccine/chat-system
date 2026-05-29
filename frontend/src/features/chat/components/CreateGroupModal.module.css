@@ -32,7 +32,8 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.header h3 {
+.header h3,
+.headerTitle {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
@@ -536,4 +537,37 @@
 
 .hiddenInput {
   display: none;
+}
+
+.panelWrap {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: none;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  z-index: 1101;
+  max-height: calc(100vh - 2rem);
+}
+
+.panelWrap:focus {
+  outline: none;
+}
+
+@media (max-width: 576px) {
+  .visibilityGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .panelWrap {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    max-height: min(92dvh, 100%);
+    width: 100%;
+  }
 }

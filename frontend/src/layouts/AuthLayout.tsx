@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './AuthLayout.module.css';
 import { motion } from 'framer-motion';
+import AuthBrandHeader from '../components/brand/AuthBrandHeader';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -17,18 +18,16 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
       </div>
 
       <div className={styles.content}>
-        <motion.div 
+        <AuthBrandHeader />
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
           className={styles.cardWrapper}
         >
           {children}
         </motion.div>
       </div>
-
-      {/* Decorative Elements */}
-      <div className={styles.decorativeText}>Chat System</div>
     </div>
   );
 };

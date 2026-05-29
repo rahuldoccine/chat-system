@@ -3,11 +3,13 @@
   align-items: stretch;
   gap: 0;
   padding: 0 1.5rem;
-  background: #ffffff;
-  border-bottom: 1px solid var(--border, #e2e8f0);
+  background: var(--surface-elevated);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   overflow-x: auto;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .nav::-webkit-scrollbar {
@@ -22,22 +24,35 @@
   margin-bottom: -1px;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--muted-foreground);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+  .nav {
+    padding: 0 0.75rem;
+  }
+
+  .tab {
+    padding: 0.6rem 0.65rem;
+    font-size: 0.75rem;
+  }
 }
 
 .tab:hover {
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .tabActive {
-  color: #0f172a;
-  border-bottom-color: var(--primary, #6366f1);
+  color: var(--foreground);
+  border-bottom-color: var(--primary);
 }
 
 .tabIcon {
@@ -49,7 +64,7 @@
 
 .tabActive .tabIcon {
   opacity: 1;
-  color: var(--primary, #6366f1);
+  color: var(--primary);
 }
 
 .tabLabel {

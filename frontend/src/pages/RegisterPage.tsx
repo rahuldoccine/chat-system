@@ -5,11 +5,11 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { getApiErrorMessage } from '../utils/userFriendlyErrors';
 
 const registerSchema = z.object({
@@ -27,6 +27,8 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -62,7 +64,6 @@ const RegisterPage: React.FC = () => {
 
   return (
     <AuthLayout>
-      <Toaster position="top-center" richColors />
       <div className={styles.header}>
         <motion.h1 
           initial={{ y: -10, opacity: 0 }}
@@ -130,10 +131,18 @@ const RegisterPage: React.FC = () => {
             <Lock size={18} strokeWidth={2.5} className={styles.icon} />
             <input
               {...register('password')}
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
               className={errors.password ? styles.inputError : ''}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className={styles.visibilityToggle}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+            </button>
           </div>
           {errors.password && <span className={styles.errorText}>{errors.password.message}</span>}
         </motion.div>
@@ -149,10 +158,18 @@ const RegisterPage: React.FC = () => {
             <ShieldCheck size={18} strokeWidth={2.5} className={styles.icon} />
             <input
               {...register('confirmPassword')}
-              type="password"
+              type={showConfirmPassword ? 'text' : 'password'}
               placeholder="••••••••"
               className={errors.confirmPassword ? styles.inputError : ''}
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              className={styles.visibilityToggle}
+              aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+            >
+              {showConfirmPassword ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+            </button>
           </div>
           {errors.confirmPassword && <span className={styles.errorText}>{errors.confirmPassword.message}</span>}
         </motion.div>

@@ -1,9 +1,7 @@
 import { wrapKeyBackup, unwrapKeyBackup } from './crypto';
-import {
-  exportKeyMaterialJson,
-  importKeyMaterialJson,
-  type E2eeKeyMaterial,
-} from './keyStore';
+import { importKeyMaterialJson, type E2eeKeyMaterial } from './keyStore';
+import { buildBackupPayloadJson, parseBackupPayloadJson } from './backupPayload';
+import { restoreAuxiliaryBackupData } from './backupRestore';
 
 export const ACCOUNT_BACKUP_WRAP_ALG = 'account-login-pbkdf2-v1';
 
@@ -17,7 +15,7 @@ export async function wrapKeyMaterialForAccount(
   password: string,
   userId: string,
 ): Promise<{ wrapAlg: string; wrappedPrivateKeyMaterial: string }> {
-  const json = await exportKeyMaterialJson(material);
+  const json = await buildBackupPayloadJson(material);
   const { wrapped } = await wrapKeyBackup(accountEscrowSecret(password, userId), json);
   return { wrapAlg: ACCOUNT_BACKUP_WRAP_ALG, wrappedPrivateKeyMaterial: wrapped };
 }
@@ -36,5 +34,8 @@ export async function unwrapKeyMaterialFromAccount(
       ? accountEscrowSecret(password, userId)
       : password;
   const json = await unwrapKeyBackup(secret, wrappedPrivateKeyMaterial);
-  return importKeyMaterialJson(userId, json);
+  const restored = parseBackupPayloadJson(userId, json);
+  await importKeyMaterialJson(userId, JSON.stringify(restored.material));
+  await restoreAuxiliaryBackupData(restored);
+  return restored.material;
 }

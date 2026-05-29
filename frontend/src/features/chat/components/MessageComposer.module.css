@@ -5,15 +5,22 @@
 }
 
 .container {
+  position: relative;
   flex-shrink: 0;
   padding: 1rem;
-  background: white;
+  padding-bottom: calc(1rem + var(--safe-bottom));
+  padding-left: max(1rem, var(--safe-left));
+  padding-right: max(1rem, var(--safe-right));
+  background: var(--surface-elevated);
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  z-index: 5;
+  z-index: 30;
   overflow: visible;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Thread panel footer — no double border; room for checkbox + menus */
@@ -21,7 +28,7 @@
   border-top: none;
   padding: 0.5rem 0.75rem 0.75rem;
   gap: 0.45rem;
-  background: #ffffff;
+  background: var(--surface-elevated);
   overflow: visible;
   box-sizing: border-box;
   width: 100%;
@@ -258,23 +265,29 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background-color: #f1f5f9;
+  background-color: var(--surface-muted);
   padding: 0.625rem 1rem;
   border-radius: 16px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   transition: all 0.2s ease;
   border: 1px solid transparent;
   position: relative;
+  overflow: visible;
 }
 
 .wrapper:focus-within {
-  background-color: white;
+  background-color: var(--surface-elevated);
   border-color: var(--primary);
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
 }
 
 .input {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 0;
   background: transparent;
   border: none;
   outline: none;
@@ -288,7 +301,7 @@
   left: 0.75rem;
   right: 0.75rem;
   bottom: calc(100% + 0.5rem);
-  background: #ffffff;
+  background: var(--surface-elevated);
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 12px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
@@ -314,14 +327,19 @@
   cursor: pointer;
 }
 
-.mentionItem:hover {
+.mentionItem:hover,
+.mentionItemActive {
   background: rgba(99, 102, 241, 0.08);
+}
+
+.mentionItemActive {
+  outline: 1px solid rgba(99, 102, 241, 0.35);
 }
 
 .mentionHandle {
   font-size: 0.84rem;
   font-weight: 700;
-  color: #3730a3;
+  color: var(--primary);
 }
 
 .mentionLabel {
@@ -337,6 +355,9 @@
   justify-content: center;
   padding: 0.5rem;
   border-radius: 10px;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  flex-shrink: 0;
 }
 
 .actionBtn:hover {
@@ -354,6 +375,28 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  overflow: visible;
+  z-index: 2;
+}
+
+.emojiContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: visible;
+  z-index: 2;
+}
+
+.composerMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  padding: 0;
+  cursor: default;
 }
 
 .plusMenu {
@@ -362,7 +405,7 @@
   left: -17px;
   min-width: 212px;
   padding: 0.35rem;
-  background: #ffffff;
+  background: var(--surface-elevated);
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 12px;
   box-shadow: 0 10px 32px rgba(15, 23, 42, 0.12);
@@ -403,6 +446,7 @@
 .sendBtn {
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
   background-color: var(--muted);
   color: var(--muted-foreground);
   border-radius: 12px;
@@ -411,6 +455,8 @@
   justify-content: center;
   transition: all 0.3s ease;
   cursor: not-allowed;
+  border: none;
+  padding: 0;
 }
 
 .active {
@@ -425,13 +471,6 @@
   box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4);
 }
 
-.emojiContainer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .emojiPickerWrapper {
   position: absolute;
   bottom: 120%;
@@ -440,6 +479,58 @@
   box-shadow: var(--shadow-lg);
   border-radius: 8px;
   overflow: hidden;
+  max-height: min(50dvh, 360px);
+}
+
+@media (max-width: 576px) {
+  .container {
+    padding: 0.5rem max(0.5rem, var(--safe-right)) calc(0.5rem + var(--safe-bottom)) max(0.5rem, var(--safe-left));
+    gap: 0.4rem;
+  }
+
+  .wrapper {
+    gap: 0.3rem;
+    padding: 0.4rem 0.45rem;
+    border-radius: 14px;
+  }
+
+  .input {
+    font-size: 1rem;
+    padding: 0.2rem 0;
+  }
+
+  .actionBtn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.35rem;
+  }
+
+  .sendBtn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .plusMenu {
+    position: fixed;
+    left: max(0.75rem, var(--safe-left));
+    bottom: calc(5rem + var(--safe-bottom));
+    z-index: 50;
+    min-width: min(212px, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
+  }
+
+  .emojiPickerWrapper {
+    position: fixed;
+    left: max(0.5rem, var(--safe-left));
+    right: max(0.5rem, var(--safe-right));
+    bottom: calc(5rem + var(--safe-bottom));
+    z-index: 50;
+    max-height: min(50dvh, 320px);
+  }
+
+  .mentionMenu {
+    max-height: min(50dvh, 240px);
+  }
 }
 
 .recordingBar {
@@ -448,15 +539,15 @@
   gap: 0.65rem;
   padding: 0.65rem 0.85rem;
   border-radius: 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--destructive-surface);
+  border: 1px solid var(--destructive);
 }
 
 .recordingPulse {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--destructive);
   flex-shrink: 0;
   animation: recordingPulse 1s ease-in-out infinite;
 }
@@ -474,7 +565,7 @@
 }
 
 .recordingMicIcon {
-  color: #dc2626;
+  color: var(--destructive);
   flex-shrink: 0;
 }
 
@@ -488,35 +579,31 @@
 .recordingTitle {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #991b1b;
+  color: var(--destructive);
 }
 
 .recordingHint {
   font-size: 0.75rem;
-  color: #b91c1c;
+  color: var(--destructive-foreground);
 }
 
 .recordingTimer {
   font-size: 0.875rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #991b1b;
+  color: var(--destructive);
 }
 
 .recordingCancel {
   border: none;
-  background: white;
-  color: #991b1b;
+  background: var(--surface-elevated);
+  color: var(--destructive);
   font-size: 0.8125rem;
   font-weight: 600;
   padding: 0.35rem 0.65rem;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid #fecaca;
-}
-
-.recordingCancel:hover {
-  background: #fee2e2;
+  border: 1px solid var(--destructive);
 }
 
 .micBtn {
@@ -524,8 +611,8 @@
 }
 
 .micBtnRecording {
-  color: #dc2626 !important;
-  background-color: #fee2e2 !important;
+  color: var(--destructive) !important;
+  background-color: var(--destructive-surface) !important;
 }
 
 .actionBtn:disabled {

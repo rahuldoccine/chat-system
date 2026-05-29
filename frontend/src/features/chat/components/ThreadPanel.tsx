@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, Loader2, MessageSquare, ExternalLink } from 'lucide-react';
+import { X, Loader2, MessageSquare, ExternalLink, ArrowLeft } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -205,6 +205,14 @@ const ThreadPanel: React.FC = () => {
     <aside className={styles.panel} aria-label="Thread">
       <div className={styles.header}>
         <div className={styles.headerMain}>
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={closeThread}
+            aria-label="Back to chat"
+          >
+            <ArrowLeft size={20} />
+          </button>
           <MessageSquare size={18} className={styles.headerIcon} aria-hidden />
           <div>
             <h3 className={styles.title}>Thread</h3>

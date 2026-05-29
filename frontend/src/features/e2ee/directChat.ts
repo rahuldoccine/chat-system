@@ -182,6 +182,66 @@ export async function encryptDirectMessage(
   };
 }
 
+export async function decryptDirectPayload(
+  userId: string,
+  msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId' | 'clientMessageId'>,
+  viewerId: string,
+): Promise<DmV1Payload | null> {
+  if (!isE2eeMessage(msg)) {
+    return msg.ciphertext ? { text: msg.ciphertext } : null;
+  }
+
+  if (msg.senderId === viewerId) {
+    const cached = getSentPlaintext(userId, msg);
+    if (cached !== undefined) return { text: cached };
+    return null;
+  }
+
+  const envelope = decodeEnvelope(msg.ciphertext ?? '');
+  if (!envelope) return null;
+
+  const material = await getLocalKeyMaterial(userId);
+  if (!material) return null;
+
+  const meta = msg.contentMeta as Record<string, unknown> | undefined;
+  let fingerprint =
+    typeof meta?.senderFingerprint === 'string' ? meta.senderFingerprint : null;
+  if (!fingerprint) {
+    try {
+      fingerprint = await getSenderFingerprint(msg.senderId);
+    } catch {
+      return null;
+    }
+  }
+
+  const spkIdsToTry = [
+    envelope.spkId,
+    ...material.signedPreKeys.map((k) => k.keyId).filter((id) => id !== envelope.spkId),
+  ];
+
+  for (const spkId of spkIdsToTry) {
+    const spkPrivate = await getSignedPreKeyPrivate(material, spkId);
+    if (!spkPrivate) continue;
+    try {
+      const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
+      const aesKey = await deriveAesGcmKey(shared, hkdfSalt(fingerprint, envelope.spkId));
+      const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
+      const payload = decodePayload(plainBuf);
+      if (!payload) continue;
+
+      const senderDeviceId = meta?.senderDeviceId;
+      if (typeof senderDeviceId === 'string') {
+        rememberPeerDevice(msg.senderId, senderDeviceId);
+      }
+      return payload;
+    } catch {
+      /* try next local signed pre-key */
+    }
+  }
+
+  return null;
+}
+
 export async function decryptDirectMessage(
   userId: string,
   msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId' | 'clientMessageId'>,
@@ -199,56 +259,16 @@ export async function decryptDirectMessage(
     return null;
   }
 
-  const envelope = decodeEnvelope(msg.ciphertext ?? '');
-  if (!envelope) return null;
+  const payload = await decryptDirectPayload(userId, msg, viewerId);
+  if (!payload) return null;
 
-  const material = await getLocalKeyMaterial(userId);
-  if (!material) return null;
-
-  const meta = msg.contentMeta as Record<string, unknown> | undefined;
-  let fingerprint =
-    typeof meta?.senderFingerprint === 'string' ? meta.senderFingerprint : null;
-  if (!fingerprint && msg.senderId !== viewerId) {
-    try {
-      fingerprint = await getSenderFingerprint(msg.senderId);
-    } catch {
-      return null;
-    }
-  }
-  if (!fingerprint) return null;
-
-  const spkIdsToTry = [
-    envelope.spkId,
-    ...material.signedPreKeys.map((k) => k.keyId).filter((id) => id !== envelope.spkId),
-  ];
-
-  for (const spkId of spkIdsToTry) {
-    const spkPrivate = await getSignedPreKeyPrivate(material, spkId);
-    if (!spkPrivate) continue;
-    try {
-      const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
-      const aesKey = await deriveAesGcmKey(shared, hkdfSalt(fingerprint, envelope.spkId));
-      const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
-      const payload = decodePayload(plainBuf);
-      if (!payload) continue;
-
-      if (payload.meta && typeof payload.meta === 'object') {
-        const mediaBlob = (payload.meta as Record<string, unknown>).mediaBlob;
-        if (typeof mediaBlob === 'string' && payload.text === '[encrypted-media]') {
-          return payload.text;
-        }
-      }
-      const senderDeviceId = meta?.senderDeviceId;
-      if (typeof senderDeviceId === 'string') {
-        rememberPeerDevice(msg.senderId, senderDeviceId);
-      }
+  if (payload.meta && typeof payload.meta === 'object') {
+    const mediaBlob = (payload.meta as Record<string, unknown>).mediaBlob;
+    if (typeof mediaBlob === 'string' && payload.text === '[encrypted-media]') {
       return payload.text;
-    } catch {
-      /* try next local signed pre-key */
     }
   }
-
-  return null;
+  return payload.text;
 }
 
 export { isE2eeMessage };

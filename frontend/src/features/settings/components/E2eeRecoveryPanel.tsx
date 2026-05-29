@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
@@ -14,6 +14,14 @@ const E2eeRecoveryPanel: React.FC = () => {
   const [stepUpToken, setStepUpToken] = useState<string | null>(null);
   const [restorePass, setRestorePass] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [backupStatus, setBackupStatus] = useState<e2eeRecovery.AccountKeyStatus | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void e2eeRecovery.getServerAccountKeyStatus().then(setBackupStatus).catch(() => {
+      setBackupStatus(null);
+    });
+  }, [user?.id]);
 
   const handleCreateBackup = async () => {
     if (!user?.id) return;
@@ -31,6 +39,8 @@ const E2eeRecoveryPanel: React.FC = () => {
       toast.success('Encryption backup saved');
       setPassphrase('');
       setConfirmPass('');
+      const status = await e2eeRecovery.getServerAccountKeyStatus();
+      setBackupStatus(status);
     } catch {
       toast.error('Could not save backup');
     } finally {
@@ -93,6 +103,23 @@ const E2eeRecoveryPanel: React.FC = () => {
         If you used &quot;Forgot password&quot; by email, restore keys here with your recovery
         passphrase or sign-in password after email verification.
       </p>
+
+      {backupStatus ? (
+        <p className={styles.statusLine}>
+          {backupStatus.hasBackup ? (
+            <>
+              Keys protected
+              {backupStatus.backupUpdatedAt
+                ? ` · backup updated ${new Date(backupStatus.backupUpdatedAt).toLocaleString()}`
+                : ''}
+            </>
+          ) : backupStatus.hasIdentityKey ? (
+            <>Encryption active but no password backup yet — sign in with password to create one.</>
+          ) : (
+            <>No encryption keys registered on this account yet.</>
+          )}
+        </p>
+      ) : null}
 
       <div className={styles.block}>
         <h4>Create backup</h4>

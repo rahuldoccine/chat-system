@@ -12,9 +12,9 @@
   bottom: 1.2rem;
   width: min(360px, calc(100vw - 2rem));
   border-radius: 14px;
-  background: #ffffff;
-  color: #0f172a;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-elevated, #ffffff);
+  color: var(--foreground, #0f172a);
+  border: 1px solid var(--border, #e2e8f0);
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.24);
   padding: 0.9rem;
 }
@@ -34,7 +34,7 @@
 .header p {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
-  color: #475569;
+  color: var(--muted-foreground, #475569);
   font-weight: 600;
 }
 
@@ -69,6 +69,66 @@
 }
 
 .dismissBtn {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--foreground, #334155);
+}
+
+/* Mobile — bottom sheet */
+@media (max-width: 576px) {
+  .card {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+    padding: 1rem max(1rem, var(--safe-right)) calc(1rem + var(--safe-bottom)) max(1rem, var(--safe-left));
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .actions button {
+    min-height: var(--touch-target-min);
+    width: 100%;
+    justify-content: center;
+    font-size: 0.85rem;
+    padding: 0 1rem;
+  }
+}
+
+/* Tablet */
+@media (min-width: 577px) and (max-width: 1024px) {
+  .card {
+    right: 1rem;
+    bottom: 1rem;
+    width: min(400px, calc(100vw - 2rem));
+  }
+
+  .actions button {
+    min-height: 40px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Desktop / laptop */
+@media (min-width: 1025px) {
+  .card {
+    right: 1.5rem;
+    bottom: 1.5rem;
+    width: min(380px, calc(100vw - 3rem));
+    padding: 1rem 1.1rem;
+  }
+
+  .actions button {
+    min-height: 38px;
+    padding: 0 0.85rem;
+    font-size: 0.8rem;
+  }
+
+  .actions button:hover {
+    filter: brightness(0.97);
+  }
 }

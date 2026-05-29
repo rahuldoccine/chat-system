@@ -10,6 +10,7 @@ import { SocketProvider } from './context/SocketContext';
 import { CallProvider } from './features/calls/CallProvider';
 import { GroupCallProvider } from './features/calls/GroupCallProvider';
 import { ChatProvider } from './context/ChatContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ProfileSyncListener from './features/settings/components/ProfileSyncListener';
 import PushSubscriptionSync from './features/settings/components/PushSubscriptionSync';
 import NotificationContextSync from './features/chat/components/NotificationContextSync';
@@ -47,6 +48,7 @@ const updateSW = registerSW({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
           <SocketProvider>
@@ -68,6 +70,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           </SocketProvider>
         </AuthProvider>
       </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

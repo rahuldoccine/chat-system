@@ -17,13 +17,36 @@ export class E2eeKeysLockedError extends Error {
   }
 }
 
-export async function serverHasKeyBackup(): Promise<boolean> {
+export type AccountKeyStatus = {
+  hasBackup: boolean;
+  hasIdentityKey: boolean;
+  identityFingerprint: string | null;
+  deviceCount: number;
+  backupUpdatedAt: string | null;
+};
+
+export async function getServerAccountKeyStatus(): Promise<AccountKeyStatus> {
   try {
-    const status = await e2eeApi.getAccountKeyBackupStatus();
-    return status.hasBackup;
+    return await e2eeApi.getAccountKeyBackupStatus();
   } catch {
-    return false;
+    return {
+      hasBackup: false,
+      hasIdentityKey: false,
+      identityFingerprint: null,
+      deviceCount: 0,
+      backupUpdatedAt: null,
+    };
   }
+}
+
+export async function serverHasKeyBackup(): Promise<boolean> {
+  const status = await getServerAccountKeyStatus();
+  return status.hasBackup;
+}
+
+export async function serverHasRegisteredIdentity(): Promise<boolean> {
+  const status = await getServerAccountKeyStatus();
+  return status.hasIdentityKey;
 }
 
 export async function restoreKeyMaterialFromServer(
@@ -75,8 +98,8 @@ export async function resolveKeyMaterial(
   }
 
   if (!material) {
-    const hasBackup = await serverHasKeyBackup();
-    if (hasBackup) {
+    const status = await getServerAccountKeyStatus();
+    if (status.hasBackup || status.hasIdentityKey) {
       throw new E2eeKeysLockedError();
     }
     material = await createKeyMaterial(userId);
@@ -88,6 +111,26 @@ export async function resolveKeyMaterial(
     await uploadKeyMaterialToServer(material, password, userId);
   }
 
+  return material;
+}
+
+/** Unlock keys in-session with password (no full sign-out). */
+export async function unlockKeyMaterialWithPassword(
+  userId: string,
+  password: string,
+): Promise<E2eeKeyMaterial> {
+  let material = await restoreKeyMaterialFromServer(userId, password);
+  if (!material) {
+    material = await loadKeyMaterial(userId);
+  }
+  if (!material) {
+    throw new E2eeKeysLockedError(
+      'Could not unlock encryption keys. Check your password and try again.',
+    );
+  }
+  await saveKeyMaterial(material);
+  await persistSessionUnlock(userId, material);
+  await uploadKeyMaterialToServer(material, password, userId);
   return material;
 }
 

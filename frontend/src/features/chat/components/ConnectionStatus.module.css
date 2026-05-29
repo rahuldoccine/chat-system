@@ -13,6 +13,10 @@
   pointer-events: none;
 }
 
+.bar.online {
+  top: 3.25rem;
+}
+
 .content {
   display: flex;
   align-items: center;

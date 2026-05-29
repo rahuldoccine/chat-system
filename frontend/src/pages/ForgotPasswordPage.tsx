@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import styles from './LoginPage.module.css';
 import AuthLayout from '../layouts/AuthLayout';
+import api from '../api/axios';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, ArrowLeft, Loader2, Send } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
+import { getApiErrorMessage } from '../utils/userFriendlyErrors';
 
 const forgotSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -27,25 +29,23 @@ const ForgotPasswordPage: React.FC = () => {
     resolver: zodResolver(forgotSchema),
   });
 
-  const onSubmit = async (_data: ForgotFormValues) => {
+  const onSubmit = async (data: ForgotFormValues) => {
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSent(true);
-    toast.success('Reset link sent to your email');
+    try {
+      await api.post('/auth/forgot-password', { email: data.email });
+      setIsSent(true);
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error, 'Could not send reset link. Please try again.');
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <AuthLayout>
-      <Toaster position="top-center" richColors />
       <div className={styles.header}>
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className={styles.iconCircle}
-        >
-          <Lock size={32} color="var(--primary)" />
-        </motion.div>
-        <motion.h1 
+        <motion.h1
           initial={{ y: -10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
@@ -57,15 +57,15 @@ const ForgotPasswordPage: React.FC = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          {isSent 
-            ? "We've sent a password reset link to your email." 
+          {isSent
+            ? "If an account exists for that email, we've sent password reset instructions."
             : "Enter your email and we'll send you a reset link."}
         </motion.p>
       </div>
 
       {!isSent ? (
         <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-          <motion.div 
+          <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -107,13 +107,13 @@ const ForgotPasswordPage: React.FC = () => {
           animate={{ opacity: 1 }}
           className={styles.successState}
         >
-          <button onClick={() => setIsSent(false)} className={styles.secondaryBtn}>
+          <button type="button" onClick={() => setIsSent(false)} className={styles.secondaryBtn}>
             Try another email
           </button>
         </motion.div>
       )}
 
-      <motion.p 
+      <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
@@ -126,8 +126,5 @@ const ForgotPasswordPage: React.FC = () => {
     </AuthLayout>
   );
 };
-
-// Internal components/styles for the forgot password page
-import { Lock } from 'lucide-react';
 
 export default ForgotPasswordPage;

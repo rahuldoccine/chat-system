@@ -74,15 +74,36 @@ export async function putKeyBackup(
   wrappedPrivateKeyMaterial: string,
 ): Promise<void> {
   await api.put('/e2ee/backup', {
-    version: 1,
+    version: 2,
     wrapAlg,
     wrappedPrivateKeyMaterial,
   });
 }
 
-export async function getAccountKeyBackupStatus(): Promise<{ hasBackup: boolean }> {
-  const res = await api.get<ApiOk<{ hasBackup: boolean }>>('/e2ee/backup/status');
-  return unwrap(res.data);
+export async function getAccountKeyBackupStatus(): Promise<{
+  hasBackup: boolean;
+  hasIdentityKey: boolean;
+  identityFingerprint: string | null;
+  deviceCount: number;
+  backupUpdatedAt: string | null;
+}> {
+  const res = await api.get<
+    ApiOk<{
+      hasBackup: boolean;
+      hasIdentityKey: boolean;
+      identityFingerprint: string | null;
+      deviceCount: number;
+      backupUpdatedAt: string | null;
+    }>
+  >('/e2ee/backup/status');
+  const data = unwrap(res.data);
+  return {
+    hasBackup: Boolean(data.hasBackup),
+    hasIdentityKey: Boolean(data.hasIdentityKey),
+    identityFingerprint: data.identityFingerprint ?? null,
+    deviceCount: data.deviceCount ?? 0,
+    backupUpdatedAt: data.backupUpdatedAt ?? null,
+  };
 }
 
 /** Session-authenticated fetch of own wrapped keys (login restore). */

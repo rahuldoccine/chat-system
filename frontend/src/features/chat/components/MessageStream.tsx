@@ -19,6 +19,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Reply, Smile, MoreHorizontal, MessageCircle, Sparkles, ChevronDown, Pin } from 'lucide-react';
+import MessageListSkeleton from './MessageListSkeleton';
 import MediaAttachment from './MediaAttachment';
 import MessageMeta from './MessageMeta';
 import {
@@ -1492,8 +1493,7 @@ const MessageStream: React.FC = () => {
   if (isLoading) {
     return (
       <div className={styles.loading}>
-        <Loader2 className={styles.spinner} />
-        <span>Loading messages...</span>
+        <MessageListSkeleton count={7} />
       </div>
     );
   }
