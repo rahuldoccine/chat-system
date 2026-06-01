@@ -13,14 +13,14 @@ function getBreakpoint(width: number): Breakpoint {
 
 export function useBreakpoint(): Breakpoint {
   const [bp, setBp] = useState<Breakpoint>(() =>
-    typeof window !== 'undefined' ? getBreakpoint(window.innerWidth) : 'desktop',
+    typeof globalThis.window !== 'undefined' ? getBreakpoint(globalThis.innerWidth) : 'desktop',
   );
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const update = () => {
-      setBp(getBreakpoint(window.innerWidth));
+      setBp(getBreakpoint(globalThis.innerWidth));
     };
 
     const onResize = () => {
@@ -28,18 +28,18 @@ export function useBreakpoint(): Breakpoint {
       timer = setTimeout(update, 100);
     };
 
-    const mobileMq = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
-    const tabletMq = window.matchMedia(`(max-width: ${TABLET_MAX}px)`);
+    const mobileMq = globalThis.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
+    const tabletMq = globalThis.matchMedia(`(max-width: ${TABLET_MAX}px)`);
 
     mobileMq.addEventListener('change', onResize);
     tabletMq.addEventListener('change', onResize);
-    window.addEventListener('orientationchange', onResize);
+    globalThis.addEventListener('orientationchange', onResize);
 
     return () => {
       clearTimeout(timer);
       mobileMq.removeEventListener('change', onResize);
       tabletMq.removeEventListener('change', onResize);
-      window.removeEventListener('orientationchange', onResize);
+      globalThis.removeEventListener('orientationchange', onResize);
     };
   }, []);
 

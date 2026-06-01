@@ -169,7 +169,7 @@ export async function listCallsForUser(
   }
 
   const page = slice.slice(0, limit);
-  const nextCursor = slice.length > limit ? page[page.length - 1]?.id ?? null : null;
+  const nextCursor = slice.length > limit ? page.at(-1)?.id ?? null : null;
 
   const data: EnrichedCallRow[] = page.map((row) => {
     const peerUser = row.initiatorId === userId ? row.peer : row.initiator;

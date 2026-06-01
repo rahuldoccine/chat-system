@@ -148,7 +148,7 @@ export async function listAdminReports(input: {
 
   const hasMore = rows.length > input.limit;
   const page = hasMore ? rows.slice(0, input.limit) : rows;
-  const last = page[page.length - 1];
+  const last = page.at(-1);
   const nextCursor =
     hasMore && last ? encodeMessageCursor(last.createdAt, last.id) : null;
 

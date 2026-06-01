@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { getPrisma } from "../prisma.js";
 import { publicMessage } from "../../modules/chats/chats.service.js";
 import { notifyNewMessage } from "../notification-router.js";
@@ -93,7 +94,7 @@ export async function publishGroupActivityMessage(input: {
   const contentMeta = { groupActivity: input.meta };
   const clientMessageId =
     input.clientMessageId ??
-    `grp-${input.meta.type}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    `grp-${input.meta.type}-${Date.now()}-${randomUUID()}`;
 
   const members = await prisma.chatMember.findMany({
     where: { chatId: input.chatId, leftAt: null },

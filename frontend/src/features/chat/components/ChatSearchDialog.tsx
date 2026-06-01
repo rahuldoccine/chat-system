@@ -40,8 +40,8 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    globalThis.addEventListener('keydown', onKey);
+    return () => globalThis.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   if (!open) return null;

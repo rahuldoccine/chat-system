@@ -13,8 +13,8 @@ const STORAGE_KEY = 'chat-theme';
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function systemTheme(): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  if (typeof globalThis.window === 'undefined') return 'light';
+  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function readStoredPreference(): ThemePreference {
@@ -42,7 +42,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     if (preference !== 'system') return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => applyTheme('system');
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);

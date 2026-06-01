@@ -13,8 +13,8 @@ const PwaInstallPrompt: React.FC = () => {
 
   const isStandalone = useMemo(
     () =>
-      window.matchMedia?.('(display-mode: standalone)').matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
+      globalThis.matchMedia?.('(display-mode: standalone)').matches ||
+      (globalThis.navigator as Navigator & { standalone?: boolean }).standalone === true,
     [],
   )
 
@@ -28,11 +28,11 @@ const PwaInstallPrompt: React.FC = () => {
       setDismissed(false)
     }
 
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-    window.addEventListener('appinstalled', onBeforeInstallPromptInstalled)
+    globalThis.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
+    globalThis.addEventListener('appinstalled', onBeforeInstallPromptInstalled)
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', onBeforeInstallPromptInstalled)
+      globalThis.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
+      globalThis.removeEventListener('appinstalled', onBeforeInstallPromptInstalled)
     }
   }, [])
 

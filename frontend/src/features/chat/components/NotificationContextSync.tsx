@@ -35,18 +35,18 @@ const NotificationContextSync: React.FC = () => {
 
     socketService.on('connect', onConnect);
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('blur', onBlur);
+    globalThis.addEventListener('focus', onFocus);
+    globalThis.addEventListener('blur', onBlur);
     publish();
 
-    const heartbeat = window.setInterval(() => publish(), 45_000);
+    const heartbeat = globalThis.setInterval(() => publish(), 45_000);
 
     return () => {
       socketService.off('connect', onConnect);
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('blur', onBlur);
-      window.clearInterval(heartbeat);
+      globalThis.removeEventListener('focus', onFocus);
+      globalThis.removeEventListener('blur', onBlur);
+      globalThis.clearInterval(heartbeat);
     };
   }, [isAuthenticated, publish]);
 

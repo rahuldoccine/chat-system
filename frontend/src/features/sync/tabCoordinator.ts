@@ -12,7 +12,20 @@ export type TabSyncMessage =
 
 type LeaderListener = (isLeader: boolean) => void;
 
-let tabId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+function newTabId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    const suffix = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+    return `${Date.now()}-${suffix}`;
+  }
+  return `${Date.now()}-tab`;
+}
+
+let tabId = newTabId();
 let channel: BroadcastChannel | null = null;
 let isLeader = true;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -96,7 +109,7 @@ export function initTabCoordinator(): boolean {
     }
   }, HEARTBEAT_MS);
 
-  window.addEventListener('storage', (e) => {
+  globalThis.addEventListener('storage', (e) => {
     if (e.key === LEADER_KEY) evaluateLeadership();
   });
 

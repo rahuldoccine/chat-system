@@ -46,7 +46,7 @@ const NotFoundPage: React.FC = () => {
           <button
             type="button"
             className={styles.secondaryBtn}
-            onClick={() => window.history.back()}
+            onClick={() => globalThis.history.back()}
           >
             <ArrowLeft size={16} />
             Go back

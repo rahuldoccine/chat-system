@@ -5,7 +5,7 @@ export type ParsedMentions = {
 };
 
 function normalizeHandle(input: string): string {
-  return input.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+  return input.toLowerCase().replaceAll(/[^a-z0-9_.-]/g, '');
 }
 
 /** Parse @username tokens and @all from composer text (plaintext groups). */
@@ -25,7 +25,7 @@ export function parseMentionsFromText(
     const match = members.find((m) => {
       const un = m.username ? normalizeHandle(m.username) : undefined;
       const emailLocal = normalizeHandle(m.email.split('@')[0] ?? '');
-      const dn = normalizeHandle((m.displayName ?? '').replace(/\s+/g, ''));
+      const dn = normalizeHandle((m.displayName ?? '').replaceAll(/\s+/g, ''));
       return un === handle || emailLocal === handle || dn === handle;
     });
     if (match) userIds.add(match.userId);

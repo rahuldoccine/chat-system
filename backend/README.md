@@ -104,7 +104,7 @@ Routers are mounted in `src/routes/index.ts`. Typical patterns:
 
 ## Socket.IO (realtime)
 
-- **URL:** same origin as the API host (browser often uses `window.location.origin`); path **`/socket.io`**.
+- **URL:** same origin as the API host (browser often uses `globalThis.location.origin`); path **`/socket.io`**.
 - **Auth:** `Authorization: Bearer <accessToken>` or `handshake.auth.token`.
 - **Server events** (examples): `session:ready`, `message:new`, `message:updated`, `message:deleted`, `reaction:*`, `receipt:*`, `typing:update`, `presence:changed`, **`call:incoming`**, **`call:ringing`**, **`call:answered`**, **`call:rejected`**, **`call:ended`**, **`call:ice`**, **`groupCall:started`**, **`groupCall:participantUpdate`**, **`groupCall:ended`**, **`groupCall:signal`**.
 - **Client events** (examples): `message:send`, `receipt:delivered`, `receipt:read`, `typing:start` / `typing:stop`, `presence:update`, **`call:offer`**, **`call:answer`**, **`call:reject`**, **`call:end`**, **`call:ice`**, **`groupCall:start`**, **`groupCall:join`**, **`groupCall:leave`**, **`groupCall:signal`** (many use ack callbacks `{ ok, data } | { ok: false, code, message }`).

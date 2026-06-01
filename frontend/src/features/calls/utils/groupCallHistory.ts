@@ -16,7 +16,7 @@ export function groupCallHistoryRows(rows: CallHistoryRow[]): CallHistoryGroup[]
   const groups: CallHistoryGroup[] = [];
 
   for (const row of rows) {
-    const prev = groups[groups.length - 1];
+    const prev = groups.at(-1);
     const sameBurst =
       prev &&
       prev.direction === row.direction &&

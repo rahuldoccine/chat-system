@@ -207,7 +207,7 @@ const prisma = new PrismaClient();
 try {
   const uploadDir = resolveUploadDir();
   console.log(dryRun ? "=== DRY RUN ===" : "=== CLEAR ALL CHAT DATA ===");
-  console.log(`Database: ${process.env.DATABASE_URL?.replace(/:[^:@]+@/, ":***@") ?? "(DATABASE_URL not set)"}`);
+  console.log(`Database: ${process.env.DATABASE_URL?.replaceAll(/:[^:@]+@/g, ":***@") ?? "(DATABASE_URL not set)"}`);
   console.log(`Upload dir: ${uploadDir}`);
   console.log(`Chat media dirs: ${CHAT_UPLOAD_DIRS.map((d) => path.join(uploadDir, d)).join(", ")}`);
   console.log(`Profile logos kept: ${path.join(uploadDir, "logos")}/\n`);

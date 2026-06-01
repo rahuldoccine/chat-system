@@ -316,7 +316,7 @@ const MessageStream: React.FC = () => {
   const [suppressBottomSpacer, setSuppressBottomSpacer] = useState(false);
   const hasPendingUnreads = hasActiveUnreadDivider || suppressBottomSpacer;
   const didResetScrollForUnreadRef = useRef(false);
-  const lastMessageId = messages?.length ? messages[messages.length - 1]?.id : null;
+  const lastMessageId = messages?.length ? messages.at(-1)?.id : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
@@ -517,7 +517,7 @@ const MessageStream: React.FC = () => {
   const scheduleVisibleUnreadFlush = useCallback(
     (chatId: string) => {
       if (markFlushTimerRef.current) clearTimeout(markFlushTimerRef.current);
-      markFlushTimerRef.current = window.setTimeout(() => {
+      markFlushTimerRef.current = globalThis.setTimeout(() => {
         markFlushTimerRef.current = null;
         void flushVisibleUnreadMarks(chatId);
       }, 280);
@@ -559,7 +559,7 @@ const MessageStream: React.FC = () => {
         return;
       }
 
-      const lastId = messages?.length ? messages[messages.length - 1]?.id : null;
+      const lastId = messages?.length ? messages.at(-1)?.id : null;
       if (!shouldMarkChatAsRead(scrollRef.current, lastId)) return;
       if (markedReadAtBottomRef.current === chatId) return;
 
@@ -596,7 +596,7 @@ const MessageStream: React.FC = () => {
       pendingFocusScrollRef.current = false;
       unreadScrollAttemptsRef.current = 0;
       if (messages?.length) {
-        lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
+        lastMessageIdRef.current = messages.at(-1)?.id ?? null;
       }
     },
     [messages, suppressBottomSpacer],
@@ -918,10 +918,10 @@ const MessageStream: React.FC = () => {
       streamItemsLen: streamItems.length,
     });
 
-    const retryTimer = window.setInterval(() => {
+    const retryTimer = globalThis.setInterval(() => {
       unreadScrollAttemptsRef.current += 1;
       if (runScroll() || unreadScrollAttemptsRef.current >= 25) {
-        window.clearInterval(retryTimer);
+        globalThis.clearInterval(retryTimer);
         if (!initialScrollDoneRef.current) {
           scrollDebug('unread scroll retry ended', {
             success: initialScrollDoneRef.current,
@@ -932,7 +932,7 @@ const MessageStream: React.FC = () => {
       }
     }, 80);
 
-    return () => window.clearInterval(retryTimer);
+    return () => globalThis.clearInterval(retryTimer);
   }, [
     activeId,
     messages,
@@ -990,7 +990,7 @@ const MessageStream: React.FC = () => {
     if (!initialScrollDoneRef.current) return;
     if (!allowBottomPinRef.current) return;
 
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages.at(-1);
     const lastId = lastMessage?.id ?? null;
     if (!lastId || lastId === lastMessageIdRef.current) return;
 
@@ -1018,10 +1018,10 @@ const MessageStream: React.FC = () => {
   }, [messages, activeId, isLoading, isFetchingNextPage, user?.id, scrollToBottom, pendingScrollToMessageId]);
 
   const lastMessageBody = messages?.length
-    ? bodyOf(messages[messages.length - 1])
+    ? bodyOf(messages.at(-1)!)
     : '';
   const lastMessageLinkKey = messages?.length
-    ? getMessageLinkPreview(messages[messages.length - 1], decryptedBodies)?.url ?? ''
+    ? getMessageLinkPreview(messages.at(-1)!, decryptedBodies)?.url ?? ''
     : '';
 
   // Re-scroll when the latest bubble grows (decrypt, link preview, line wrap)
@@ -1254,7 +1254,7 @@ const MessageStream: React.FC = () => {
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2500);
+    globalThis.setTimeout(() => setToast(null), 2500);
   }, []);
 
   const scrollToReplyParent = useCallback(
@@ -1327,9 +1327,9 @@ const MessageStream: React.FC = () => {
     const finishScroll = () => {
       if (cancelled) return;
       clearPendingScrollToMessage();
-      window.setTimeout(() => {
+      globalThis.setTimeout(() => {
         flashMessageHighlight(messageId);
-        window.setTimeout(() => {
+        globalThis.setTimeout(() => {
           navigatingToMessageRef.current = false;
         }, 2100);
       }, 400);
@@ -1362,7 +1362,7 @@ const MessageStream: React.FC = () => {
 
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        window.setTimeout(startScroll, 50);
+        globalThis.setTimeout(startScroll, 50);
       });
     });
 

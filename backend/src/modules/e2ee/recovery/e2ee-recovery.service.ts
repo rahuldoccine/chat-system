@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { AppError } from "../../../errors/index.js";
 import type { AppConfig } from "../../../config/index.js";
 import type { Logger } from "../../../lib/logger.js";
@@ -12,8 +13,7 @@ const STEP_UP_TTL_MS = 10 * 60_000;
 const MAX_ATTEMPTS = 8;
 
 function newEmailCode(): string {
-  const n = Math.floor(Math.random() * 1_000_000);
-  return String(n).padStart(6, "0");
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
 export async function upsertKeyBackup(

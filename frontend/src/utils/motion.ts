@@ -1,7 +1,7 @@
 /** Respect OS reduced-motion preference for Framer Motion and CSS. */
 export function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof globalThis.window === 'undefined') return false;
+  return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 export const motionTransition = {

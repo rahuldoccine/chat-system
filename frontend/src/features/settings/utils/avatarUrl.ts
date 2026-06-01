@@ -27,7 +27,7 @@ export function avatarFileNameFromUpload(data: {
 }): string {
   const key = data.key?.trim() || data.filename?.trim();
   if (key) {
-    const normalized = key.replace(/\\/g, '/');
+    const normalized = key.replaceAll('\\', '/');
     const base = normalized.split('/').pop();
     if (base) return base;
   }
@@ -68,7 +68,7 @@ export function resolveAvatarAbsoluteUrl(
     return `${env.apiOrigin}${pathPart}`;
   }
 
-  const fileName = v.replace(/\\/g, '/').split('/').pop() ?? v;
+  const fileName = v.replaceAll('\\', '/').split('/').pop() ?? v;
   return `${env.apiOrigin}/api/v1/files/logos/${encodeURIComponent(fileName)}`;
 }
 

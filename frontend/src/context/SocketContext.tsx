@@ -108,8 +108,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const handleSessionRevoked = () => {
       void logoutRef.current().then(() => {
-        if (!window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
+        if (!globalThis.location.pathname.startsWith('/login')) {
+          globalThis.location.href = '/login';
         }
       });
     };
@@ -185,7 +185,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    window.addEventListener('online', onOnline);
+    globalThis.addEventListener('online', onOnline);
     document.addEventListener('visibilitychange', onVisibility);
 
     connectIfLeader();
@@ -198,15 +198,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     });
 
-    const reconnectPoll = window.setInterval(() => {
+    const reconnectPoll = globalThis.setInterval(() => {
       if (!socketService.isConnected()) {
         nudgeReconnect();
       }
     }, 15_000);
 
     return () => {
-      window.clearInterval(reconnectPoll);
-      window.removeEventListener('online', onOnline);
+      globalThis.clearInterval(reconnectPoll);
+      globalThis.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', onVisibility);
       unsubTabSync();
       unsubLeadership();

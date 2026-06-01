@@ -9,7 +9,7 @@ function withAckTimeout<T>(promise: Promise<SocketAck<T>>, ms = SIGNALING_TIMEOU
   return Promise.race([
     promise,
     new Promise<SocketAck<T>>((resolve) => {
-      window.setTimeout(
+      globalThis.setTimeout(
         () =>
           resolve({
             ok: false,

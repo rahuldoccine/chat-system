@@ -11,7 +11,7 @@ export type UploadCategory = (typeof UPLOAD_CATEGORIES)[number];
 /** Relative path under upload root, e.g. `logos/uuid.jpg` or legacy `uuid.jpg`. */
 export function isSafeStorageKey(storageKey: string): boolean {
   if (!storageKey || storageKey.includes("..")) return false;
-  const normalized = storageKey.replace(/\\/g, "/");
+  const normalized = storageKey.replaceAll("\\", "/");
   if (!normalized.includes("/")) {
     const base = path.basename(normalized);
     return base === normalized && base.length > 0 && !base.startsWith(".");

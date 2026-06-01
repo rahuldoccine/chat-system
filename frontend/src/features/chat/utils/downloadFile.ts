@@ -1,6 +1,6 @@
 /** Safe filename for the download attribute (no path segments). */
 export function safeDownloadFilename(name: string): string {
-  const base = name.replace(/[/\\?%*:|"<>]/g, '_').trim();
+  const base = name.replaceAll(/[/\\?%*:|"<>]/g, '_').trim();
   return base || 'download';
 }
 

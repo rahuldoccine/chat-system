@@ -162,8 +162,8 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
         activateItem(flatItems[activeIndex]!);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    globalThis.addEventListener('keydown', onKey);
+    return () => globalThis.removeEventListener('keydown', onKey);
   }, [open, onClose, flatItems, activeIndex, activateItem]);
 
   if (!open) return null;

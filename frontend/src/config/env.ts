@@ -21,8 +21,8 @@ function readList(value: string | undefined, fallback: string): string[] {
     .filter(Boolean);
 }
 
-const apiUrl = readString(import.meta.env.VITE_API_URL, 'http://localhost:4000/api/v1').replace(
-  /\/$/,
+const apiUrl = readString(import.meta.env.VITE_API_URL, 'http://localhost:4000/api/v1').replaceAll(
+  /\/$/g,
   '',
 );
 
@@ -32,11 +32,11 @@ export const env = {
 
   /** Origin without /api/v1 - used for file URLs and sockets */
   get apiOrigin(): string {
-    return apiUrl.replace(/\/api\/v1$/i, '');
+    return apiUrl.replaceAll(/\/api\/v1$/gi, '');
   },
 
   /** Path prefix for uploaded files (default /api/v1/files) */
-  filesApiPath: readString(import.meta.env.VITE_FILES_API_PATH, '/api/v1/files').replace(/\/$/, ''),
+  filesApiPath: readString(import.meta.env.VITE_FILES_API_PATH, '/api/v1/files').replaceAll(/\/$/g, ''),
 
   /** Socket.IO server URL */
   socketUrl: readString(import.meta.env.VITE_SOCKET_URL, 'http://localhost:4000'),
@@ -44,8 +44,8 @@ export const env = {
   /** Giphy API key - https://developers.giphy.com/dashboard/ */
   giphyApiKey: readString(import.meta.env.VITE_GIPHY_API_KEY, ''),
 
-  giphyApiBase: readString(import.meta.env.VITE_GIPHY_API_BASE, 'https://api.giphy.com/v1/gifs').replace(
-    /\/$/,
+  giphyApiBase: readString(import.meta.env.VITE_GIPHY_API_BASE, 'https://api.giphy.com/v1/gifs').replaceAll(
+    /\/$/g,
     '',
   ),
 

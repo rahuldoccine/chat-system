@@ -113,7 +113,7 @@ function emitMessageSend(
   body: OutboxPayload,
 ): Promise<{ message: Message; idempotent?: boolean }> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       reject(new Error(friendlySocketAckMessage('TIMEOUT', undefined)));
     }, SEND_TIMEOUT_MS);
 
@@ -130,7 +130,7 @@ function emitMessageSend(
         broadcastToChannel: body.broadcastToChannel ?? false,
       },
       (ack: SocketAck) => {
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         if (ack?.ok && ack.data?.message) {
           resolve({ message: ack.data.message, idempotent: ack.data.idempotent });
           return;

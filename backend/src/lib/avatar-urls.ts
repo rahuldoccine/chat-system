@@ -17,17 +17,17 @@ export function normalizeAvatarDbValue(
 
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     const key = storageKeyFromUrl(trimmed);
-    return key ? path.basename(key.replace(/\\/g, "/")) : null;
+    return key ? path.basename(key.replaceAll("\\", "/")) : null;
   }
 
   if (trimmed.includes("/files/")) {
     const key = storageKeyFromUrl(
       trimmed.startsWith("http") ? trimmed : `http://local${trimmed.startsWith("/") ? "" : "/"}${trimmed}`,
     );
-    if (key) return path.basename(key.replace(/\\/g, "/"));
+    if (key) return path.basename(key.replaceAll("\\", "/"));
   }
 
-  const normalized = trimmed.replace(/\\/g, "/");
+  const normalized = trimmed.replaceAll("\\", "/");
   if (normalized.startsWith(`${LOGO_PREFIX}/`)) {
     return path.basename(normalized);
   }
@@ -50,14 +50,14 @@ export function expandAvatarUrl(dbValue: string | null | undefined): string | nu
 
 /** Map upload storage key (e.g. logos/uuid.jpg) to DB file name. */
 export function avatarFileNameFromStorageKey(storageKey: string): string {
-  return path.basename(storageKey.replace(/\\/g, "/"));
+  return path.basename(storageKey.replaceAll("\\", "/"));
 }
 
 /** Resolve DB or URL value to on-disk storage key for cleanup / access checks. */
 export function resolveLogoStorageKey(value: string | null | undefined): string | null {
   if (!value?.trim()) return null;
   const fromUrl = storageKeyFromUrl(value);
-  if (fromUrl) return fromUrl.replace(/\\/g, "/");
+  if (fromUrl) return fromUrl.replaceAll("\\", "/");
   const fileName = normalizeAvatarDbValue(value);
   if (!fileName) return null;
   return `${LOGO_PREFIX}/${fileName}`;

@@ -21,12 +21,12 @@ function emitWithAck<T = unknown>(event: string, payload: unknown, timeoutMs = 8
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       reject(new Error(`Socket ${event} timed out`));
     }, timeoutMs);
 
     socket.emit(event, payload, (response: SocketAck) => {
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
       if (response?.ok) {
         resolve((response.data ?? response) as T);
         return;
@@ -58,7 +58,7 @@ export async function markChatAsReadWithRetry(
       return true;
     } catch {
       if (attempt < maxAttempts - 1) {
-        await new Promise((r) => window.setTimeout(r, 350 * (attempt + 1)));
+        await new Promise((r) => globalThis.setTimeout(r, 350 * (attempt + 1)));
       }
     }
   }

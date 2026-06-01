@@ -34,13 +34,13 @@ export async function probeNetworkReachable(force = false): Promise<boolean> {
   lastProbeAt = Date.now();
   try {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    const timer = globalThis.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
     await fetch(`${env.apiUrl}/config/public`, {
       method: 'GET',
       signal: controller.signal,
       cache: 'no-store',
     });
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
     lastProbeOk = true;
     networkDownFlag = false;
     return true;

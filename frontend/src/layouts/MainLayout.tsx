@@ -113,13 +113,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const onNewDm = () => setShowNewDm(true);
     const onCreateGroup = () => setShowGroupActions(true);
     const onJumpTo = () => openJumpTo();
-    window.addEventListener('chat:open-new-dm', onNewDm);
-    window.addEventListener('chat:open-create-group', onCreateGroup);
-    window.addEventListener('chat:open-jump-to', onJumpTo);
+    globalThis.addEventListener('chat:open-new-dm', onNewDm);
+    globalThis.addEventListener('chat:open-create-group', onCreateGroup);
+    globalThis.addEventListener('chat:open-jump-to', onJumpTo);
     return () => {
-      window.removeEventListener('chat:open-new-dm', onNewDm);
-      window.removeEventListener('chat:open-create-group', onCreateGroup);
-      window.removeEventListener('chat:open-jump-to', onJumpTo);
+      globalThis.removeEventListener('chat:open-new-dm', onNewDm);
+      globalThis.removeEventListener('chat:open-create-group', onCreateGroup);
+      globalThis.removeEventListener('chat:open-jump-to', onJumpTo);
     };
   }, [openJumpTo]);
 
@@ -162,7 +162,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   useEffect(() => {
     if (!pinMenu) return;
     const close = () => setPinMenu(null);
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       document.addEventListener('click', close);
     }, 0);
     return () => {
@@ -174,7 +174,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   useEffect(() => {
     if (!chatMenu) return;
     const close = () => setChatMenu(null);
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       document.addEventListener('click', close);
     }, 0);
     return () => {

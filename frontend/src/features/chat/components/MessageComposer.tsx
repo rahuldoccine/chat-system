@@ -187,7 +187,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
     }> => {
       if (isE2eeDm && user?.id) {
         const { encryptedBlob, attachment } = await encryptFileBlob(await file.arrayBuffer());
-        const encFile = new window.File([encryptedBlob], file.name, {
+        const encFile = new globalThis.File([encryptedBlob], file.name, {
           type: 'application/octet-stream',
         });
         const uploadResult = await uploadFile(encFile, activeId ?? undefined, {
@@ -231,10 +231,10 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
       if (m.userId === user?.id) continue;
       const baseHandle =
         m.username?.trim() ||
-        m.displayName?.toLowerCase().replace(/\s+/g, '') ||
+        m.displayName?.toLowerCase().replaceAll(/\s+/g, '') ||
         m.email.split('@')[0] ||
         'user';
-      const handle = baseHandle.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
+      const handle = baseHandle.replaceAll(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
       const label = m.displayName || m.username || m.email;
       const hay = `${handle} ${label.toLowerCase()} ${m.email.toLowerCase()}`;
       if (!mentionQuery || hay.includes(mentionQuery)) {
@@ -537,8 +537,8 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   const applyMention = (handle: string) => {
-    const next = text.replace(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/, (m) =>
-      m.replace(/@([a-zA-Z0-9_.-]*)$/, `@${handle} `),
+    const next = text.replaceAll(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/g, (m) =>
+      m.replaceAll(/@([a-zA-Z0-9_.-]*)$/g, `@${handle} `),
     );
     setText(next);
     if (activeId && !editingMessage) {
@@ -900,11 +900,11 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const [keyboardInset, setKeyboardInset] = useState(0);
 
   useEffect(() => {
-    const vv = window.visualViewport;
+    const vv = globalThis.visualViewport;
     if (!vv) return;
 
     const update = () => {
-      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const inset = Math.max(0, globalThis.innerHeight - vv.height - vv.offsetTop);
       setKeyboardInset(inset > 50 ? inset : 0);
     };
 

@@ -236,7 +236,7 @@ export async function forgotPassword(
     },
   });
 
-  const resetLink = `${config.frontendUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(raw)}`;
+  const resetLink = `${config.frontendUrl.replaceAll(/\/$/g, "")}/reset-password?token=${encodeURIComponent(raw)}`;
   sendPasswordResetEmailAsync(config, logger, user.email, resetLink);
 }
 

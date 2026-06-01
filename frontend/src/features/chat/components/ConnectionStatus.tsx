@@ -17,11 +17,11 @@ const ConnectionStatus: React.FC = () => {
   useEffect(() => {
     const onOnline = () => setBrowserOffline(false);
     const onOffline = () => setBrowserOffline(true);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
+    globalThis.addEventListener('online', onOnline);
+    globalThis.addEventListener('offline', onOffline);
     return () => {
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
+      globalThis.removeEventListener('online', onOnline);
+      globalThis.removeEventListener('offline', onOffline);
     };
   }, []);
 
@@ -30,8 +30,8 @@ const ConnectionStatus: React.FC = () => {
       setShowOffline(false);
       if (wasConnectedRef.current) {
         setShowConnected(true);
-        const timer = window.setTimeout(() => setShowConnected(false), 2500);
-        return () => window.clearTimeout(timer);
+        const timer = globalThis.setTimeout(() => setShowConnected(false), 2500);
+        return () => globalThis.clearTimeout(timer);
       }
       wasConnectedRef.current = true;
       return;

@@ -124,7 +124,7 @@ export async function getSignedPreKeyPrivate(
 export async function getLatestSignedPreKeyPrivate(
   material: E2eeKeyMaterial,
 ): Promise<{ key: CryptoKey; keyId: string } | null> {
-  const row = material.signedPreKeys[material.signedPreKeys.length - 1];
+  const row = material.signedPreKeys.at(-1);
   if (!row) return null;
   return { key: await importEcdhPrivateKey(row.privateJwk), keyId: row.keyId };
 }

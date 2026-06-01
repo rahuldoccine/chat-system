@@ -38,7 +38,7 @@ async function publishKeys(material: E2eeKeyMaterial, deviceId: string): Promise
   }
   await e2eeApi.putDeviceKey(deviceId, material.devicePublicSpki, BOOTSTRAP_LABEL);
 
-  const latestSpk = material.signedPreKeys[material.signedPreKeys.length - 1]!;
+  const latestSpk = material.signedPreKeys.at(-1)!;
   const signingKey = await getSigningPrivate(material);
   const signature = await signBytes(
     signingKey,

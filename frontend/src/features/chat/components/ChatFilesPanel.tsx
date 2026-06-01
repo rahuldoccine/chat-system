@@ -188,7 +188,7 @@ const FilesPanelDocumentRow: React.FC<FilesPanelDocumentRowProps> = ({
         return;
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      globalThis.open(url, '_blank', 'noopener,noreferrer');
     } finally {
       setOpening(false);
     }

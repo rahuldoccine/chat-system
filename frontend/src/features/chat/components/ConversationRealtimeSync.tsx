@@ -135,10 +135,10 @@ const ConversationRealtimeSync: React.FC = () => {
     socket.on('thread:updated', handleThreadUpdated);
     socket.on('receipt:read', handleReceiptRead);
     socket.on('poll:updated', handlePollUpdated);
-    window.addEventListener('online', handleBrowserOnline);
+    globalThis.addEventListener('online', handleBrowserOnline);
     return () => {
       unsubTab();
-      window.removeEventListener('online', handleBrowserOnline);
+      globalThis.removeEventListener('online', handleBrowserOnline);
       socket.off('connect', handleConnect);
       socket.off('message:new', handleNewMessage);
       socket.off('thread:updated', handleThreadUpdated);

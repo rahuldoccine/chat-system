@@ -29,7 +29,7 @@ function getChatLabel(chat: Chat): string {
 }
 
 function dispatchUiAction(name: 'chat:open-new-dm' | 'chat:open-create-group' | 'chat:open-jump-to') {
-  window.dispatchEvent(new CustomEvent(name));
+  globalThis.dispatchEvent(new CustomEvent(name));
 }
 
 const HomeDashboard: React.FC<HomeDashboardProps> = ({

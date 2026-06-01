@@ -13,7 +13,7 @@ How the **Vite + React 19** SPA (`frontend/`) connects to the **Express + Socket
 **Development options:**
 
 1. **Direct** (default in `.env.example`): `VITE_API_URL=http://localhost:4000/api/v1`, `VITE_SOCKET_URL=http://localhost:4000`. Set backend `CORS_ORIGIN` to include `http://localhost:5173`.
-2. **Vite proxy**: `VITE_API_URL=/api/v1`, leave socket URL unset so the client uses `window.location.origin`. Vite proxies `/api` and `/socket.io` to `VITE_PROXY_TARGET` (see `frontend/vite.config.ts`).
+2. **Vite proxy**: `VITE_API_URL=/api/v1`, leave socket URL unset so the client uses `globalThis.location.origin`. Vite proxies `/api` and `/socket.io` to `VITE_PROXY_TARGET` (see `frontend/vite.config.ts`).
 
 ## 2. Environment variables
 
@@ -22,7 +22,7 @@ How the **Vite + React 19** SPA (`frontend/`) connects to the **Express + Socket
 | Variable | Role |
 |----------|------|
 | `VITE_API_URL` | Axios base URL (default `http://localhost:4000/api/v1`) |
-| `VITE_SOCKET_URL` | Socket.IO origin (defaults to `window.location.origin` if empty) |
+| `VITE_SOCKET_URL` | Socket.IO origin (defaults to `globalThis.location.origin` if empty) |
 | `VITE_FILES_API_PATH` | File download prefix (default `/api/v1/files`) |
 | `VITE_GIPHY_API_KEY` | GIF picker |
 | `VITE_STUN_URL` / `VITE_TURN_*` | WebRTC ICE |

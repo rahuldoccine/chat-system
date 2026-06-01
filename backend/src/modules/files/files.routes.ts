@@ -47,7 +47,7 @@ export function createFilesRouter(config: AppConfig): Router {
     asyncHandler(async (req, res) => {
       // Router is mounted at `/files`, so `req.path` is everything after `/files`
       // e.g. `/groupchats/<uuid>.jpg` (supports nested keys).
-      const rawKey = (req.path ?? "").replace(/^\/+/, "");
+      const rawKey = (req.path ?? "").replaceAll(/^\/+/g, "");
       const key = decodeURIComponent(rawKey);
       if (!key || !isSafeStorageKey(key)) {
         throw new AppError(400, "INVALID_KEY", "Invalid file key");

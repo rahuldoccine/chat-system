@@ -48,7 +48,7 @@ function menuPosition(trigger: HTMLElement, menuHeight: number, menuWidth: numbe
   const top = Math.max(VIEWPORT_PAD, rect.top - menuHeight - 4);
   const left = Math.max(
     VIEWPORT_PAD,
-    Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - VIEWPORT_PAD),
+    Math.min(rect.right - menuWidth, globalThis.innerWidth - menuWidth - VIEWPORT_PAD),
   );
   return { top, left };
 }
@@ -100,12 +100,12 @@ const LinkPreviewBlock: React.FC<LinkPreviewBlockProps> = ({
     const el = menuPanelRef.current;
     const ro = el ? new ResizeObserver(syncMenuPos) : null;
     if (el && ro) ro.observe(el);
-    window.addEventListener('resize', syncMenuPos);
-    window.addEventListener('scroll', syncMenuPos, true);
+    globalThis.addEventListener('resize', syncMenuPos);
+    globalThis.addEventListener('scroll', syncMenuPos, true);
     return () => {
       ro?.disconnect();
-      window.removeEventListener('resize', syncMenuPos);
-      window.removeEventListener('scroll', syncMenuPos, true);
+      globalThis.removeEventListener('resize', syncMenuPos);
+      globalThis.removeEventListener('scroll', syncMenuPos, true);
     };
   }, [menuOpen, syncMenuPos]);
 
@@ -138,7 +138,7 @@ const LinkPreviewBlock: React.FC<LinkPreviewBlockProps> = ({
   };
 
   const openNewTab = () => {
-    window.open(preview.url, '_blank', 'noopener,noreferrer');
+    globalThis.open(preview.url, '_blank', 'noopener,noreferrer');
     closeMenu();
   };
 

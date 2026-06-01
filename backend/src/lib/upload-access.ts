@@ -13,7 +13,7 @@ export async function userCanAccessUploadedFile(userId: string, file: UploadedFi
 
   const prisma = getPrisma();
 
-  const logoFileName = path.basename(file.storageKey.replace(/\\/g, "/"));
+  const logoFileName = path.basename(file.storageKey.replaceAll("\\", "/"));
 
   // Profile photos (uploads without chatId) linked on User.avatarUrl (file name only in DB)
   const profileOwner = await prisma.user.findFirst({

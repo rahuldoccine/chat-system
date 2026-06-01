@@ -521,7 +521,7 @@ export async function listChats(
     }
   }
 
-  const lastRow = page[page.length - 1];
+  const lastRow = page.at(-1);
   const nextCursor =
     rows.length > opts.limit && lastRow
       ? encodeMessageCursor(lastRow.chat.updatedAt, lastRow.chat.id)
@@ -793,7 +793,7 @@ export async function listMessages(
   });
 
   const page = rows.slice(0, opts.limit);
-  const last = page[page.length - 1];
+  const last = page.at(-1);
   const nextCursor =
     rows.length > opts.limit && last ? encodeMessageCursor(last.createdAt, last.id) : null;
 
@@ -816,7 +816,7 @@ export async function listMessages(
 const SEARCH_MESSAGE_KINDS: MessageKind[] = ["TEXT", "IMAGE", "FILE", "POLL", "OTHER"];
 
 function escapeIlikePattern(term: string): string {
-  return term.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+  return term.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 }
 
 function buildSearchSnippet(ciphertext: string, q: string, maxLen = 120): string {
@@ -917,7 +917,7 @@ export async function searchMessagesInChat(
   `;
 
   const page = rows.slice(0, opts.limit);
-  const last = page[page.length - 1];
+  const last = page.at(-1);
   const nextCursor =
     rows.length > opts.limit && last ? encodeMessageCursor(last.createdAt, last.id) : null;
 
@@ -991,7 +991,7 @@ export async function listThreadMessages(
   });
 
   const page = rows.slice(0, opts.limit);
-  const last = page[page.length - 1];
+  const last = page.at(-1);
   const nextCursor =
     rows.length > opts.limit && last ? encodeThreadCursor(last.createdAt, last.id) : null;
 

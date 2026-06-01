@@ -29,9 +29,9 @@ function emitSyncHello(
       resolve([]);
       return;
     }
-    const timer = window.setTimeout(() => resolve([]), 12_000);
+    const timer = globalThis.setTimeout(() => resolve([]), 12_000);
     socketService.emit('sync:hello', { chats }, (ack: SyncHelloAck) => {
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
       if (ack?.ok && ack.data?.chats) resolve(ack.data.chats);
       else resolve([]);
     });
@@ -44,7 +44,7 @@ function getLastMessageIdForChat(queryClient: QueryClient, chatId: string): stri
   if (!flat?.length) return null;
   const serverRows = flat.filter((m) => m.id && m.status !== 'sending' && m.status !== 'error');
   if (!serverRows.length) return null;
-  return serverRows[serverRows.length - 1]?.id ?? null;
+  return serverRows.at(-1)?.id ?? null;
 }
 
 async function fetchLatestMessages(chatId: string, cursor: string | null) {

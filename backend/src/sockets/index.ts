@@ -50,7 +50,7 @@ export async function initSocket(
         const headerAuth = socket.handshake.headers.authorization;
         const token =
           (typeof authToken === "string" ? authToken : undefined) ??
-          (typeof headerAuth === "string" ? headerAuth.replace(/^Bearer\s+/i, "").trim() : "");
+          (typeof headerAuth === "string" ? headerAuth.replaceAll(/^Bearer\s+/gi, "").trim() : "");
 
         if (!token) {
           next(new Error("Unauthorized"));

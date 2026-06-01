@@ -31,7 +31,7 @@ export function faviconUrlForLink(url: string): string {
 
 export function hostnameFromUrl(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, '');
+    return new URL(url).hostname.replaceAll(/^www\./g, '');
   } catch {
     return url;
   }
@@ -52,7 +52,7 @@ export function inlineSiteLabel(preview: LinkPreviewMeta): string {
 }
 
 function normalizeUrlForCompare(u: string): string {
-  return u.trim().replace(/\/$/, '');
+  return u.trim().replaceAll(/\/$/g, '');
 }
 
 /** Hide raw URL in message body when showing inline/preview chip for URL-only messages. */
@@ -68,7 +68,9 @@ export function messageTextWithoutLink(
   if (extracted && normalizeUrlForCompare(extracted) === urlNorm && trimmed === extracted) {
     return '';
   }
-  return trimmed.replace(previewUrl, '').replace(extracted ?? '', '').trim();
+  let result = trimmed.replaceAll(previewUrl, '');
+  if (extracted) result = result.replaceAll(extracted, '');
+  return result.trim();
 }
 
 export function withLinkDisplay(
@@ -114,7 +116,10 @@ export function instantPreviewFromUrl(url: string): LinkPreviewMeta {
     const parts = host.split('.');
     if (parts.length >= 2) {
       siteName = parts.slice(-2).join('.');
-      title = parts[parts.length - 2].charAt(0).toUpperCase() + parts[parts.length - 2].slice(1);
+      const segment = parts.at(-2);
+      if (segment) {
+        title = segment.charAt(0).toUpperCase() + segment.slice(1);
+      }
     }
   }
 

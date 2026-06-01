@@ -19,13 +19,14 @@ import { PrismaClient } from "@prisma/client";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomInt } from "node:crypto";
 import { cleanupOrphanDirectChatsForUser } from "./lib/cleanup-orphan-direct-chats.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = path.join(__dirname, ".seed-test-manifest.json");
 
 const SEED_EMAIL_DOMAIN = "seed-test.local";
-const DEFAULT_PASSWORD = process.env.SEED_TEST_PASSWORD ?? "SeedTest123!";
+const DEFAULT_PASSWORD = process.env.SEED_TEST_PASSWORD ?? "SeedTest123!"; // NOSONAR
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
 /** Always added as MEMBER to every seeded group. Override with SEED_JOIN_EMAIL. */
 const DEFAULT_JOIN_EMAIL = (
@@ -69,15 +70,16 @@ function parseArgs() {
   return { dryRun, users, publicGroups, privateGroups };
 }
 
+/** Non-security random picks for dev-only fixture data (names, member counts, shuffle). */
 function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[randomInt(arr.length)];
 }
 
 function pickMany(arr, count) {
   const copy = [...arr];
   const out = [];
   while (out.length < count && copy.length > 0) {
-    const i = Math.floor(Math.random() * copy.length);
+    const i = randomInt(copy.length);
     out.push(copy.splice(i, 1)[0]);
   }
   return out;
@@ -86,7 +88,7 @@ function pickMany(arr, count) {
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -236,7 +238,7 @@ async function main() {
       }
       usedSet.add(title);
       const ownerId = pick(seedUserIds);
-      const memberCount = 2 + Math.floor(Math.random() * 4);
+      const memberCount = 2 + randomInt(4);
       const members = pickMany(seedUserIds, Math.min(memberCount, seedUserIds.length));
       if (!members.includes(ownerId)) members.unshift(ownerId);
       if (defaultJoinUserId && !members.includes(defaultJoinUserId)) {

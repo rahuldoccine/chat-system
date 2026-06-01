@@ -5,8 +5,8 @@ export function useCallTimer(active: boolean, startedAt: number | null): string 
 
   useEffect(() => {
     if (!active || !startedAt) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    const id = globalThis.setInterval(() => setNow(Date.now()), 1000);
+    return () => globalThis.clearInterval(id);
   }, [active, startedAt]);
 
   if (!active || !startedAt) return '00:00';

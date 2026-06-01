@@ -56,8 +56,8 @@ api.interceptors.response.use(
       return api(original);
     } catch {
       clearAccessToken();
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
+      if (!globalThis.location.pathname.startsWith('/login')) {
+        globalThis.location.href = '/login';
       }
       return Promise.reject(error);
     }

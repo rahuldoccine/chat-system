@@ -10,7 +10,7 @@ export type AlertModalProps = {
   onClose: () => void;
 };
 
-/** Single-action dialog for errors and informational messages (replaces window.alert). */
+/** Single-action dialog for errors and informational messages (replaces browser `alert()`). */
 const AlertModal: React.FC<AlertModalProps> = ({
   open,
   title,

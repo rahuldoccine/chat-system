@@ -85,10 +85,10 @@ export function useE2eeChatMessageSearch(
 
   useEffect(() => {
     if (!active || !hasNextPage || isFetchingNextPage) return;
-    const t = window.setTimeout(() => {
+    const t = globalThis.setTimeout(() => {
       void fetchNextPage();
     }, 250);
-    return () => window.clearTimeout(t);
+    return () => globalThis.clearTimeout(t);
   }, [active, hasNextPage, isFetchingNextPage, fetchNextPage, messages?.length]);
 
   const data = useMemo((): SearchMessagesResponse => {

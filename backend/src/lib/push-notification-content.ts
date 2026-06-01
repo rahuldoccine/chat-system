@@ -30,8 +30,8 @@ function truncate(text: string, max: number): string {
 function stripMentionTags(text: string): string {
   // Remove tokens like @all and @username from push preview copy.
   return text
-    .replace(/(^|\s)@[a-z0-9._-]+/gi, "$1")
-    .replace(/\s{2,}/g, " ")
+    .replaceAll(/(^|\s)@[a-z0-9._-]+/gi, "$1")
+    .replaceAll(/\s{2,}/g, " ")
     .trim();
 }
 
