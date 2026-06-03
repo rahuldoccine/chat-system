@@ -52,14 +52,24 @@ import {
   getMessageLinkPreview,
 } from '../../e2ee/useMessageBodies';
 import TypingIndicator from './TypingIndicator';
-import { useChatTyping } from '../hooks/useChatTyping';
+import { useMessageStreamTyping } from '../hooks/useMessageStreamTyping';
 import { useMessageStreamScroll } from '../hooks/useMessageStreamScroll';
 import MessageStreamRow, {
   MessageStreamDateDivider,
   MessageStreamUnreadDivider,
   type MessageStreamRowProps,
 } from './MessageStreamRow';
-const MessageStream: React.FC = () => {
+type MessageStreamProps = {
+  isPeerTyping: boolean;
+  peerTypingCount: number;
+  peerTypingIds: string[];
+};
+
+const MessageStream: React.FC<MessageStreamProps> = ({
+  isPeerTyping,
+  peerTypingCount,
+  peerTypingIds,
+}) => {
   const {
     activeId,
     activeSection,
@@ -171,52 +181,14 @@ const MessageStream: React.FC = () => {
   }, [groupDetails?.members]);
 
   const { startCall, phase: callPhase } = useCall();
-  const { isPeerTyping, peerTypingCount, peerTypingIds } = useChatTyping(activeId, user?.id);
 
-  const getChatName = useCallback(() => {
-    if (!activeChat) return 'this chat';
-    if (activeChat.type === 'GROUP') return activeChat.title || 'this group';
-    return activeChat.dmPeer?.displayName || activeChat.dmPeer?.email || 'this person';
-  }, [activeChat]);
-
-  const typingLabel = useMemo(() => {
-    if (!isPeerTyping) return '';
-    if (activeChat?.type === 'DIRECT') {
-      return `${getChatName()} is typing`;
-    }
-    if (peerTypingCount === 1) {
-      const uid = peerTypingIds[0];
-      const member = uid ? groupMemberById.get(uid) : undefined;
-      const name =
-        member?.displayName || member?.username || member?.email || 'Someone';
-      return `${name} is typing`;
-    }
-    return `${peerTypingCount} people are typing`;
-  }, [
+  const { typingLabel, typingPeer, getChatName } = useMessageStreamTyping(
     isPeerTyping,
-    activeChat?.type,
-    getChatName,
     peerTypingCount,
     peerTypingIds,
+    activeChat,
     groupMemberById,
-  ]);
-
-  const typingPeer = useMemo(() => {
-    if (!isPeerTyping) return undefined;
-    if (activeChat?.type === 'DIRECT') return activeChat.dmPeer;
-    const uid = peerTypingIds[0];
-    if (!uid) return undefined;
-    const member = groupMemberById.get(uid);
-    if (member) {
-      return {
-        id: member.userId,
-        displayName: member.displayName,
-        email: member.email,
-        avatarUrl: member.avatarUrl,
-      };
-    }
-    return { id: uid };
-  }, [isPeerTyping, activeChat, peerTypingIds, groupMemberById]);
+  );
 
   const chatName = getChatName();
   const chatInitial = chatName.charAt(0).toUpperCase();

@@ -14,8 +14,8 @@ import { createCallSystemMessage } from "./call-system-message.js";
 import {
   enqueueIncomingCallPush,
   enqueueMissedCallPush,
-  resolveUserDisplayName,
 } from "./call-push.js";
+import { resolveUserDisplayName } from "../user-display-name.js";
 
 async function broadcastPresence(
   io: Server,

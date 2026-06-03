@@ -208,33 +208,3 @@ export async function decryptMessageFile(
 
   return new Blob([plain], { type: file.mimetype || 'application/octet-stream' });
 }
-
-/** @deprecated Use decryptMessageFile — kept for voice note call sites during migration */
-export async function decryptAttachmentFromMessage(
-  userId: string,
-  msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
-  viewerId: string,
-  token: string | null = null,
-  transportMeta?: ContentMeta,
-): Promise<ArrayBuffer | null> {
-  const files = transportMeta ? filesFromMeta(transportMeta) : [];
-  const legacyMeta = isPlainObject(msg.contentMeta) ? msg.contentMeta : null;
-  const primary = files[0] ?? {
-    url: typeof legacyMeta?.url === 'string' ? legacyMeta.url : undefined,
-    filename: typeof legacyMeta?.filename === 'string' ? legacyMeta.filename : undefined,
-    mimetype: typeof legacyMeta?.mimetype === 'string' ? legacyMeta.mimetype : undefined,
-  };
-  const blob = await decryptMessageFile(userId, msg, primary, viewerId, token, transportMeta);
-  if (!blob) return null;
-  return blob.arrayBuffer();
-}
-
-/** @deprecated Use encryptFileBlob */
-export async function encryptAttachment(
-  _userId: string,
-  _peerUserId: string,
-  blob: ArrayBuffer,
-): Promise<{ encryptedBlob: Blob; encryptResult: null; attachment: E2eeFileAttachmentKeys }> {
-  const { encryptedBlob, attachment } = await encryptFileBlob(blob);
-  return { encryptedBlob, encryptResult: null, attachment };
-}

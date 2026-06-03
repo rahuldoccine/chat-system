@@ -34,7 +34,6 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--foreground, #0f172a);
 }
 
 .hint {

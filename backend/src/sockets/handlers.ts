@@ -1,6 +1,5 @@
 import type { MessageKind } from "@prisma/client";
 import type { Server, Socket } from "socket.io";
-import { ZodError } from "zod";
 
 import type { AppConfig } from "../config/index.js";
 import { AppError } from "../errors/index.js";
@@ -65,23 +64,10 @@ import {
   putGroupCall,
   type ActiveGroupCall,
 } from "./group-call-state.js";
+import { randomUUID } from "node:crypto";
 import { publishGroupActivityMessage } from "../lib/groups/group-system-message.js";
-import { v4 as uuidv4 } from "uuid";
 import { redactLogPayload } from "../lib/log-redaction.js";
-
-function ackFn(cb: unknown): ((payload: unknown) => void) | undefined {
-  return typeof cb === "function" ? (cb as (payload: unknown) => void) : undefined;
-}
-
-function ackError(err: unknown): { ok: false; code: string; message: string; details?: unknown } {
-  if (err instanceof ZodError) {
-    return { ok: false, code: "VALIDATION_ERROR", message: "Invalid payload", details: err.flatten() };
-  }
-  if (err instanceof AppError) {
-    return { ok: false, code: err.code, message: err.message, details: err.details };
-  }
-  return { ok: false, code: "INTERNAL_ERROR", message: "Internal error" };
-}
+import { ackFn, ackError, flushReconnectDeliveriesOnConnect } from "./handlers-shared.js";
 
 function onCallOfferMissedTimeout(
   io: Server,
@@ -107,50 +93,6 @@ function scheduleCallOfferMissedTimeout(
   return setTimeout(onCallOfferMissedTimeout, 30_000, io, logger, config, callId);
 }
 
-const reconnectDeliveryFlushInFlight = new Set<string>();
-
-async function emitReconnectDeliveryBatches(
-  io: Server,
-  userId: string,
-  batches: Array<{ chatId: string; messageIds: string[]; deliveredAt: Date }>,
-): Promise<void> {
-  for (const b of batches) {
-    if (b.messageIds.length === 0) continue;
-    await emitToChatMembers(io, b.chatId, "receipt:delivered", {
-      v: SOCKET_PROTOCOL_VERSION,
-      chatId: b.chatId,
-      userId,
-      messageIds: b.messageIds,
-      deliveredAt: b.deliveredAt.toISOString(),
-    });
-  }
-}
-
-async function continueReconnectDeliveryFlush(
-  io: Server,
-  userId: string,
-  config: AppConfig,
-  logger: Logger,
-): Promise<void> {
-  if (reconnectDeliveryFlushInFlight.has(userId)) return;
-  reconnectDeliveryFlushInFlight.add(userId);
-  try {
-    for (let pass = 0; pass < config.chatReconnectDeliveryMaxAsyncPasses; pass += 1) {
-      const out = await chatsService.flushUndeliveredReceiptsOnReconnect(userId, {
-        pageSize: config.chatReconnectDeliveryPageSize,
-        budgetMs: config.chatReconnectDeliverySyncBudgetMs,
-      });
-      await emitReconnectDeliveryBatches(io, userId, out.batches);
-      if (!out.hasMore) break;
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    }
-  } catch (err) {
-    logger.warn({ err, userId }, "continueReconnectDeliveryFlush failed");
-  } finally {
-    reconnectDeliveryFlushInFlight.delete(userId);
-  }
-}
-
 export function registerSocketHandlers(io: Server, config: AppConfig, logger: Logger): void {
   io.on("connection", (socket: Socket) => {
     const userId = socket.data.user.sub;
@@ -171,14 +113,7 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
         });
       }
       try {
-        const initialFlush = await chatsService.flushUndeliveredReceiptsOnReconnect(userId, {
-          pageSize: config.chatReconnectDeliveryPageSize,
-          budgetMs: config.chatReconnectDeliverySyncBudgetMs,
-        });
-        await emitReconnectDeliveryBatches(io, userId, initialFlush.batches);
-        if (initialFlush.hasMore) {
-          void continueReconnectDeliveryFlush(io, userId, config, logger);
-        }
+        await flushReconnectDeliveriesOnConnect(io, userId, config, logger);
       } catch (flushErr) {
         logger.warn({ err: flushErr, userId }, "flushUndeliveredReceiptsOnReconnect failed");
       }
@@ -294,7 +229,7 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
           throw new AppError(409, "CALL_BUSY", "User is busy");
         }
 
-        const callId = p.callId ?? uuidv4();
+        const callId = p.callId ?? randomUUID();
         const existing = getActiveCall(callId);
         if (existing) {
           throw new AppError(409, "CALL_EXISTS", "Call already exists");
@@ -684,7 +619,7 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
           });
           return;
         }
-        const sessionId = uuidv4();
+        const sessionId = randomUUID();
         const call: ActiveGroupCall = {
           sessionId,
           chatId: p.chatId,

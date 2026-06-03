@@ -107,8 +107,3 @@ export function getAvatarImageSrc(
     return absolute;
   }
 }
-
-/** @deprecated Use avatarFileNameFromUpload — kept for any remaining imports */
-export function toStoredAvatarUrl(url: string): string {
-  return avatarFileNameFromUpload({ url });
-}

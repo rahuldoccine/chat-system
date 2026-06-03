@@ -28,10 +28,8 @@ import { isUserMentioned, validateAndMergeMentions } from "../../lib/groups/ment
 import { emitToChatMembers } from "../../sockets/chat-broadcast.js";
 import { SOCKET_PROTOCOL_VERSION } from "../../sockets/constants.js";
 import { getSocketIo } from "../../sockets/socket-holder.js";
-import {
-  publishGroupActivityMessage,
-  resolveDisplayName,
-} from "../../lib/groups/group-system-message.js";
+import { resolveUserDisplayName } from "../../lib/user-display-name.js";
+import { publishGroupActivityMessage } from "../../lib/groups/group-system-message.js";
 import {
   assertE2eeMessageInput,
   assertE2eePatchPayload,
@@ -802,7 +800,7 @@ async function createGroupChat(
       include: chatWithActiveMembersUserInclude,
     });
   });
-  const actorName = await resolveDisplayName(userId);
+  const actorName = await resolveUserDisplayName(userId);
   void publishGroupActivityMessage({
     chatId: chat.id,
     senderId: userId,
@@ -810,7 +808,7 @@ async function createGroupChat(
   }).catch(() => {});
   for (const uid of memberIds) {
     if (uid === userId) continue;
-    const targetName = await resolveDisplayName(uid);
+    const targetName = await resolveUserDisplayName(uid);
     void publishGroupActivityMessage({
       chatId: chat.id,
       senderId: userId,
@@ -1512,7 +1510,7 @@ export async function patchGroupChat(
     data: patchData,
     include: chatWithActiveMembersUserInclude,
   });
-  const actorName = await resolveDisplayName(userId);
+  const actorName = await resolveUserDisplayName(userId);
   if (data.title !== undefined && data.title !== chat.title) {
     void publishGroupActivityMessage({
       chatId,
@@ -1569,7 +1567,7 @@ export async function joinPublicGroup(userId: string, chatId: string) {
     where: { id: chatId },
     include: chatWithActiveMembersUserInclude,
   });
-  const actorName = await resolveDisplayName(userId);
+  const actorName = await resolveUserDisplayName(userId);
   void publishGroupActivityMessage({
     chatId,
     senderId: userId,
@@ -1624,8 +1622,8 @@ export async function addGroupMember(userId: string, chatId: string, newUserId: 
     where: { id: chatId },
     include: chatWithActiveMembersUserInclude,
   });
-  const actorName = await resolveDisplayName(userId);
-  const targetName = await resolveDisplayName(newUserId);
+  const actorName = await resolveUserDisplayName(userId);
+  const targetName = await resolveUserDisplayName(newUserId);
   void publishGroupActivityMessage({
     chatId,
     senderId: userId,
@@ -1668,8 +1666,8 @@ export async function removeGroupMember(actorId: string, chatId: string, targetU
     where: { id: target.id },
     data: { leftAt: new Date() },
   });
-  const actorName = await resolveDisplayName(actorId);
-  const targetName = await resolveDisplayName(targetUserId);
+  const actorName = await resolveUserDisplayName(actorId);
+  const targetName = await resolveUserDisplayName(targetUserId);
   const isSelf = actorId === targetUserId;
   void publishGroupActivityMessage({
     chatId,
@@ -1714,8 +1712,8 @@ export async function patchGroupMemberRole(
     where: { id: target.id },
     data: { role: newRole },
   });
-  const actorName = await resolveDisplayName(actorId);
-  const targetName = await resolveDisplayName(targetUserId);
+  const actorName = await resolveUserDisplayName(actorId);
+  const targetName = await resolveUserDisplayName(targetUserId);
   void publishGroupActivityMessage({
     chatId,
     senderId: actorId,

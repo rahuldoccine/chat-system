@@ -1,6 +1,6 @@
 import { useCallback, type RefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import { debounce } from 'lodash-es';
+import { debounce } from '../../../utils/debounce';
 import { env } from '../../../config/env';
 import {
   applyMentionToText,

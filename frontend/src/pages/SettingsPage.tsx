@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ArrowLeft, ShieldAlert, User, Shield, Palette } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../features/chat/components/ConfirmModal';
 import {
@@ -262,7 +262,6 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Toaster position="top-center" richColors />
 
       <aside className={styles.sidebar}>
         <ChatSystemLogo

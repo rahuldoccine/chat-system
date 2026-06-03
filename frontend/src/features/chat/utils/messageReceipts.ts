@@ -1,40 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query';
 import api from '../../../api/axios';
 import type { Message } from '../types';
-import { socketService } from '../../../services/socket';
+import { emitWithAck } from '../../../services/socketAck';
 import type { ChatUnreadBoundary } from '../hooks/useChatData';
 import { patchConversationUnreadCount } from './conversationCache';
 import { buildUnreadState } from './incrementalRead';
 import { broadcastReadState } from '../../sync/tabCoordinator';
 
 const RECEIPT_BATCH_SIZE = 200;
-
-type SocketAck =
-  | { ok: true; data?: unknown }
-  | { ok: false; code?: string; message?: string };
-
-function emitWithAck<T = unknown>(event: string, payload: unknown, timeoutMs = 8000): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const socket = socketService.getSocket();
-    if (!socket?.connected) {
-      reject(new Error('Socket not connected'));
-      return;
-    }
-
-    const timer = globalThis.setTimeout(() => {
-      reject(new Error(`Socket ${event} timed out`));
-    }, timeoutMs);
-
-    socket.emit(event, payload, (response: SocketAck) => {
-      globalThis.clearTimeout(timer);
-      if (response?.ok) {
-        resolve((response.data ?? response) as T);
-        return;
-      }
-      reject(new Error(response?.message ?? `Socket ${event} failed`));
-    });
-  });
-}
 
 /** Mark every unread receipt in this chat (HTTP first - reliable; socket as fallback). */
 export async function markChatAsRead(chatId: string): Promise<void> {

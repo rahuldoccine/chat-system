@@ -86,7 +86,7 @@ const HomePage: React.FC = () => {
     },
     enabled: Boolean(activeId && activeChat?.type === 'GROUP'),
   });
-  const { peerTypingCount: typingCount } = useChatTyping(activeId, user?.id);
+  const typingState = useChatTyping(activeId, user?.id);
 
   React.useEffect(() => {
     void refreshProfile();
@@ -284,7 +284,9 @@ const HomePage: React.FC = () => {
                 chatName={chatName}
                 isMobile={isMobile}
                 blockStatus={blockStatus}
-                typingCount={typingCount}
+                typingCount={typingState.peerTypingCount}
+                isPeerTyping={typingState.isPeerTyping}
+                peerTypingIds={typingState.peerTypingIds}
                 isPeerOnline={isPeerOnline}
                 groupDetailsMemberCount={groupDetails?.memberCount}
                 callDisabledReason={callDisabledReason}

@@ -1,26 +1,13 @@
 import { socketService } from '../../services/socket';
-import { friendlySocketAckMessage } from '../../utils/userFriendlyErrors';
+import {
+  defaultSocketAckFailure,
+  defaultSocketAckTimeout,
+  withAckTimeout,
+} from '../../services/socketAck';
 import { getOrCreateDeviceId } from './deviceId';
 import type { CallIcePayload, CallMedia, SocketAck } from './types';
 
 const SIGNALING_TIMEOUT_MS = 15_000;
-
-function withAckTimeout<T>(promise: Promise<SocketAck<T>>, ms = SIGNALING_TIMEOUT_MS): Promise<SocketAck<T>> {
-  return Promise.race([
-    promise,
-    new Promise<SocketAck<T>>((resolve) => {
-      globalThis.setTimeout(
-        () =>
-          resolve({
-            ok: false,
-            code: 'TIMEOUT',
-            message: friendlySocketAckMessage('TIMEOUT', undefined, "The call didn't connect in time. Please try again."),
-          }),
-        ms,
-      );
-    }),
-  ]);
-}
 
 export function emitCallOffer(payload: {
   chatId: string;
@@ -31,23 +18,19 @@ export function emitCallOffer(payload: {
   videoFallback?: boolean;
   callId?: string;
 }): Promise<SocketAck<{ callId: string }>> {
-  return withAckTimeout(
-    new Promise((resolve) => {
+  return withAckTimeout<SocketAck<{ callId: string }>>(
+    new Promise<SocketAck<{ callId: string }>>((resolve) => {
       socketService.emit(
         'call:offer',
         {
           ...payload,
           deviceId: getOrCreateDeviceId(),
         },
-        (ack: SocketAck<{ callId: string }>) =>
-          resolve(
-            ack ?? {
-              ok: false,
-              message: friendlySocketAckMessage(undefined, undefined, 'No response from the server. Try again.'),
-            },
-          ),
+        (ack: SocketAck<{ callId: string }>) => resolve(ack ?? defaultSocketAckFailure()),
       );
     }),
+    SIGNALING_TIMEOUT_MS,
+    defaultSocketAckTimeout(),
   );
 }
 
@@ -60,27 +43,18 @@ export function emitCallAnswer(payload: {
       socketService.emit(
         'call:answer',
         { ...payload, deviceId: getOrCreateDeviceId() },
-        (ack: SocketAck) =>
-          resolve(
-            ack ?? {
-              ok: false,
-              message: friendlySocketAckMessage(undefined, undefined, 'No response from the server. Try again.'),
-            },
-          ),
+        (ack: SocketAck) => resolve(ack ?? defaultSocketAckFailure()),
       );
     }),
+    SIGNALING_TIMEOUT_MS,
+    defaultSocketAckTimeout(),
   );
 }
 
 export function emitCallReject(callId: string, reason = 'rejected'): Promise<SocketAck> {
   return new Promise((resolve) => {
     socketService.emit('call:reject', { callId, reason }, (ack: SocketAck) =>
-      resolve(
-        ack ?? {
-          ok: false,
-          message: friendlySocketAckMessage(undefined, undefined, 'No response from the server. Try again.'),
-        },
-      ),
+      resolve(ack ?? defaultSocketAckFailure()),
     );
   });
 }
@@ -88,12 +62,7 @@ export function emitCallReject(callId: string, reason = 'rejected'): Promise<Soc
 export function emitCallEnd(callId: string, reason = 'ended'): Promise<SocketAck> {
   return new Promise((resolve) => {
     socketService.emit('call:end', { callId, reason }, (ack: SocketAck) =>
-      resolve(
-        ack ?? {
-          ok: false,
-          message: friendlySocketAckMessage(undefined, undefined, 'No response from the server. Try again.'),
-        },
-      ),
+      resolve(ack ?? defaultSocketAckFailure()),
     );
   });
 }

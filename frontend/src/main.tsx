@@ -11,12 +11,7 @@ import { CallProvider } from './features/calls/CallProvider';
 import { GroupCallProvider } from './features/calls/GroupCallProvider';
 import { ChatProvider } from './context/ChatContext';
 import { ThemeProvider } from './context/ThemeContext';
-import ProfileSyncListener from './features/settings/components/ProfileSyncListener';
-import PushSubscriptionSync from './features/settings/components/PushSubscriptionSync';
-import NotificationContextSync from './features/chat/components/NotificationContextSync';
-import ReceiptStatusSync from './features/chat/components/ReceiptStatusSync';
-import AuthChatCacheSync from './features/chat/components/AuthChatCacheSync';
-import ConversationRealtimeSync from './features/chat/components/ConversationRealtimeSync';
+import AppSyncEffects from './components/AppSyncEffects';
 import PwaInstallPrompt from './features/pwa/PwaInstallPrompt';
 import App from './App';
 import { applyThemeFromStorage } from './themeBootstrap';
@@ -60,12 +55,7 @@ ReactDOM.createRoot(rootEl).render(
             <CallProvider>
             <GroupCallProvider>
             <ChatProvider>
-              <ProfileSyncListener />
-              <PushSubscriptionSync />
-              <NotificationContextSync />
-              <ReceiptStatusSync />
-              <AuthChatCacheSync />
-              <ConversationRealtimeSync />
+              <AppSyncEffects />
               <PwaInstallPrompt />
               <Toaster position="top-center" richColors />
               <App />

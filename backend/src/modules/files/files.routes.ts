@@ -10,36 +10,11 @@ import { shouldForceAttachmentDisposition } from "../../lib/upload-allowlist.js"
 import { userCanAccessUploadedFile } from "../../lib/upload-access.js";
 import { isSafeStorageKey, resolveStorageAbsolutePath } from "../../lib/upload-storage.js";
 import { asyncHandler } from "../../middleware/async-handler.js";
-
-import { verifyAccessTokenActive } from "../../lib/validate-access-token.js";
+import { createRequireAuthOrQueryToken } from "../../middleware/auth.js";
 
 export function createFilesRouter(config: AppConfig): Router {
   const router = Router();
-
-  const requireAuthOrQueryToken = (req: any, _res: any, next: any) => {
-    void (async () => {
-      try {
-        let token: string | undefined;
-        const h = req.headers.authorization;
-        if (h && typeof h === "string") {
-          const [type, t] = h.split(" ");
-          if (type?.toLowerCase() === "bearer" && t) {
-            token = t.trim();
-          }
-        }
-        if (!token && req.query.token && typeof req.query.token === "string") {
-          token = req.query.token;
-        }
-        if (!token) {
-          throw new AppError(401, "UNAUTHORIZED", "Missing access token");
-        }
-        req.user = await verifyAccessTokenActive(token, config);
-        next();
-      } catch {
-        next(new AppError(401, "UNAUTHORIZED", "Invalid token"));
-      }
-    })();
-  };
+  const requireAuthOrQueryToken = createRequireAuthOrQueryToken(config);
 
   router.get(
     "/*",

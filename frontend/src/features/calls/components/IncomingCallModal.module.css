@@ -31,7 +31,6 @@
 .title {
   font-size: 1.125rem;
   font-weight: 800;
-  color: var(--foreground, #0f172a);
   margin: 0 0 0.35rem;
 }
 
@@ -66,7 +65,7 @@
 
 .declineBtn {
   background: var(--surface-muted, #f1f5f9);
-  color: var(--foreground, #0f172a);
+  
 }
 
 .declineBtn:hover {

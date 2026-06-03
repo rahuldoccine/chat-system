@@ -30,6 +30,8 @@ type ActiveChatViewProps = {
   isMobile: boolean;
   blockStatus: BlockStatus | undefined;
   typingCount: number;
+  isPeerTyping: boolean;
+  peerTypingIds: string[];
   isPeerOnline: boolean;
   groupDetailsMemberCount: number | undefined;
   callDisabledReason: string | undefined;
@@ -102,6 +104,8 @@ const ActiveChatView: React.FC<ActiveChatViewProps> = ({
   isMobile,
   blockStatus,
   typingCount,
+  isPeerTyping,
+  peerTypingIds,
   isPeerOnline,
   groupDetailsMemberCount,
   callDisabledReason,
@@ -294,7 +298,11 @@ const ActiveChatView: React.FC<ActiveChatViewProps> = ({
               <p>Join this public group to view messages.</p>
             </div>
           ) : (
-            <MessageStream />
+            <MessageStream
+              isPeerTyping={isPeerTyping}
+              peerTypingCount={typingCount}
+              peerTypingIds={peerTypingIds}
+            />
           )}
           {renderMessagesFooter(canJoinPublicGroup, isMessagingRestricted, blockStatus, chatName)}
         </div>

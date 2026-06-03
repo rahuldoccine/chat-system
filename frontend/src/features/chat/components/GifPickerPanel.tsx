@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import styles from './GifPickerPanel.module.css';
 import { Loader2, Search, X } from 'lucide-react';
-import { debounce } from 'lodash-es';
+import { debounce } from '../../../utils/debounce';
 import { giphyMissingKeyMessage } from '../../../config/env';
 import {
   fetchTrendingGifs,

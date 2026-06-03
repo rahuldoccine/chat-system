@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { getPrisma } from "../prisma.js";
 import { publicMessage } from "../../modules/chats/chats.service.js";
 import { createSystemMessageWithReceipts } from "../system-message-persist.js";
 import { notifyNewMessage } from "../notification-router.js";
@@ -91,14 +90,4 @@ export async function publishGroupActivityMessage(input: {
     () => {},
   );
   return published;
-}
-
-export async function resolveDisplayName(userId: string): Promise<string> {
-  const prisma = getPrisma();
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { displayName: true, email: true, username: true },
-  });
-  if (!u) return "Someone";
-  return u.displayName || u.username || u.email.split("@")[0] || "Someone";
 }
