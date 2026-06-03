@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 
 import { Prisma, type MessageKind } from "@prisma/client";
 
+import { isPlainObject } from "./plain-object.js";
 import { getPrisma } from "./prisma.js";
 import { resolveLogoStorageKey } from "./avatar-urls.js";
 import {
@@ -17,8 +17,7 @@ export type UploadFileRefs = {
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  return isPlainObject(value) ? value : null;
 }
 
 export { storageKeyFromUrl } from "./upload-storage.js";
@@ -172,7 +171,7 @@ async function resolveStorageKeysFromUploadIds(uploadIds: string[]): Promise<str
 }
 
 async function collectStorageKeysForMessage(
-  uploadDir: string,
+  _uploadDir: string,
   contentMeta: unknown,
   messageId: string,
 ): Promise<Set<string>> {

@@ -148,11 +148,9 @@ export function ensureSentPlaintextHydrated(userId: string): Promise<void> {
     idbHydratedUserId = null;
   }
   if (idbHydratedUserId === userId) return Promise.resolve();
-  if (!idbHydratePromise) {
-    idbHydratePromise = hydrateFromIndexedDb(userId).finally(() => {
-      idbHydratePromise = null;
-    });
-  }
+  idbHydratePromise ??= hydrateFromIndexedDb(userId).finally(() => {
+    idbHydratePromise = null;
+  });
   return idbHydratePromise;
 }
 
@@ -295,7 +293,6 @@ export async function importSentPlaintextEntries(
     const parts = key.split(':');
     if (parts.length >= 3) {
       const kind = parts[1];
-      const id = parts.slice(2).join(':');
       if (kind === 'c') {
         savePersisted({ ...loadPersisted(), [key]: entry.text });
         if (entry.meta) {

@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { handler } from '../../../utils/asyncHandler';
 import { createPortal } from 'react-dom';
 import styles from './ImageViewerModal.module.css';
 import { X, Download, Loader2 } from 'lucide-react';
+import { ModalDialog } from '../../../components/ModalDialog';
 import { downloadFileFromUrl } from '../utils/downloadFile';
+import { useViewerModalLock } from '../hooks/useViewerModalLock';
 
 export type ImageViewerModalProps = {
   open: boolean;
@@ -12,28 +15,9 @@ export type ImageViewerModalProps = {
 };
 
 const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ open, src, alt = 'Image', onClose }) => {
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-
-    document.addEventListener('keydown', handleKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.body.classList.add('image-viewer-open');
-
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = prevOverflow;
-      document.body.classList.remove('image-viewer-open');
-    };
-  }, [open]);
+  useViewerModalLock(open, onClose, { bodyClass: 'image-viewer-open' });
 
   const handleDownload = useCallback(async () => {
     if (downloading) return;
@@ -47,40 +31,28 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ open, src, alt = 'I
 
   if (!open) return null;
 
-  const handleBackdropMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onCloseRef.current();
-    }
-  };
-
   return createPortal(
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-modal="true"
-      aria-label={alt}
-      onMouseDown={handleBackdropMouseDown}
-    >
-      <div className={styles.panel} onMouseDown={(e) => e.stopPropagation()}>
+    <ModalDialog className={styles.overlay} aria-label={alt} onClose={onClose}>
+      <div className={styles.panel}>
         <div className={styles.stage}>
           <div className={styles.toolbar}>
             <button
               type="button"
               className={styles.iconBtn}
-              onClick={() => void handleDownload()}
+              onClick={handler(handleDownload)}
               disabled={downloading}
               aria-label="Download"
             >
               {downloading ? <Loader2 size={20} className={styles.iconSpinner} /> : <Download size={20} />}
             </button>
-            <button type="button" className={styles.iconBtn} onClick={() => onCloseRef.current()} aria-label="Close">
+            <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Close">
               <X size={22} />
             </button>
           </div>
           <img src={src} alt={alt} className={styles.image} draggable={false} />
         </div>
       </div>
-    </div>,
+    </ModalDialog>,
     document.body,
   );
 };

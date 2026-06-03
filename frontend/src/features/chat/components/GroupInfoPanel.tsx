@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { handler, handlerArg, handlerEvent } from '../../../utils/asyncHandler';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Loader2, LogOut, Trash2, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useChat } from '../../../context/ChatContext';
-import type { Chat } from '../types';
+import type { Chat, GroupVisibility } from '../types';
 import {
   addGroupMember,
   fetchGroup,
@@ -17,7 +18,6 @@ import {
 } from '../api/groupsApi';
 import { useSearchUsers, type DiscoverableUser } from '../hooks/useChatData';
 import GroupVisibilitySection from './GroupVisibilitySection';
-import type { GroupVisibility } from '../types';
 import {
   canManageGroupMeta,
   canModerateMessages,
@@ -28,6 +28,7 @@ import { useMuteChat, getApiErrorMessage } from '../../settings/hooks/useUserSet
 import UserAvatar from './UserAvatar';
 import ChatAvatar from './ChatAvatar';
 import ConfirmModal from './ConfirmModal';
+import a11yStyles from '../../../styles/a11y.module.css';
 import styles from './GroupInfoPanel.module.css';
 
 type GroupInfoPanelProps = {
@@ -106,9 +107,9 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
   };
 
   const handleRole = async (userId: string, role: GroupMemberRole) => {
-    if (role === 'OWNER') return;
+    if (role !== 'ADMIN' && role !== 'MOD' && role !== 'MEMBER') return;
     try {
-      await patchGroupMemberRole(chat.id, userId, role as 'ADMIN' | 'MOD' | 'MEMBER');
+      await patchGroupMemberRole(chat.id, userId, role);
       await refetch();
     } catch {
       toast.error('Could not change role');
@@ -211,7 +212,7 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
                   key={u.id}
                   type="button"
                   className={styles.candidateItem}
-                  onClick={() => void handleAddMember(u)}
+                  onClick={handler(() => handleAddMember(u))}
                 >
                   <UserAvatar
                     userId={u.id}
@@ -247,9 +248,9 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
                     {myRole === 'OWNER' && (
                       <select
                         value={m.role}
-                        onChange={(e) =>
-                          void handleRole(m.userId, e.target.value as GroupMemberRole)
-                        }
+                        onChange={handlerEvent((e) =>
+                          handleRole(m.userId, e.target.value as GroupMemberRole),
+                        )}
                       >
                         <option value="MEMBER">Member</option>
                         <option value="MOD">Moderator</option>
@@ -262,7 +263,7 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
                         className={styles.removeBtn}
                         aria-label={`Remove ${getUserLabel(m)}`}
                         title={`Remove ${getUserLabel(m)}`}
-                        onClick={() => void handleRemove(m.userId)}
+                        onClick={handler(() => handleRemove(m.userId))}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -286,13 +287,13 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
                 value={editTitle}
                 disabled={!canEditInfoAndVisibility}
                 onChange={(e) => setEditTitle(e.target.value)}
-                onBlur={() => void handleSaveTitle()}
+                onBlur={handler(handleSaveTitle)}
               />
-              {!canEditInfoAndVisibility ? (
+              {canEditInfoAndVisibility ? null : (
                 <div className={styles.readOnlyHint}>
                   Only Owner and Admin can edit basic group information.
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
 
@@ -300,14 +301,14 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
             <h4 className={styles.blockTitle}>Visibility</h4>
             <GroupVisibilitySection
               value={visibility}
-              onChange={(v) => void handleVisibilityChange(v)}
+              onChange={handlerArg(handleVisibilityChange)}
               disabled={!canEditInfoAndVisibility}
             />
-            {!canEditInfoAndVisibility ? (
+            {canEditInfoAndVisibility ? null : (
               <div className={styles.readOnlyHint}>
                 Only Owner and Admin can change group visibility.
               </div>
-            ) : null}
+            )}
           </div>
 
           <div className={styles.settingsBlock}>
@@ -318,11 +319,13 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
                 <div className={styles.muteHint}>Turn off alerts for this group</div>
               </div>
               <label className={styles.toggle}>
+                <span className={a11yStyles.srOnly}>Mute notifications</span>
                 <input
                   type="checkbox"
                   checked={muted}
                   disabled={muting}
-                  onChange={() => void handleMuteToggle()}
+                  onChange={handler(handleMuteToggle)}
+                  aria-label="Mute notifications"
                 />
                 <span className={styles.toggleSlider} />
               </label>
@@ -354,7 +357,7 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
         cancelLabel="Cancel"
         variant="danger"
         isLoading={leavePending}
-        onConfirm={() => void handleLeave()}
+        onConfirm={handler(handleLeave)}
         onCancel={() => setLeaveConfirmOpen(false)}
       />
     </div>

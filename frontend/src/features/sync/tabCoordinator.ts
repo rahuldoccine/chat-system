@@ -109,7 +109,7 @@ export function initTabCoordinator(): boolean {
     }
   }, HEARTBEAT_MS);
 
-  globalThis.addEventListener('storage', (e) => {
+  globalThis.addEventListener('storage', (e: StorageEvent) => {
     if (e.key === LEADER_KEY) evaluateLeadership();
   });
 

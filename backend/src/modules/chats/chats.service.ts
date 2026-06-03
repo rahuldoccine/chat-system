@@ -5,16 +5,16 @@ import { requireActiveMember, requireActiveMemberMinRole } from "../../lib/chat-
 import { expandAvatarUrl, normalizeAvatarDbValue } from "../../lib/avatar-urls.js";
 import {
   canInviteGroupMembers,
-  canModerateMessages,
   canManageGroupMeta,
   roleAtLeast,
   roleRank,
 } from "../../lib/chat-roles.js";
-import { decodeMessageCursor, encodeMessageCursor } from "../../lib/cursor-pagination.js";
+import { encodeMessageCursor } from "../../lib/cursor-pagination.js";
 import { assertNotBlockedPair } from "../../lib/moderation-guard.js";
 import { notifyNewMessage } from "../../lib/notification-router.js";
 import { getPollForUser } from "../polls/polls.service.js";
 import { loadConfig } from "../../config/index.js";
+import { isPlainObject } from "../../lib/plain-object.js";
 import { getPrisma } from "../../lib/prisma.js";
 import { pairKeyForUserIds } from "../../lib/pair-key.js";
 import {
@@ -22,20 +22,39 @@ import {
   deleteReplacedAvatarUpload,
   purgeUploadsForMessage,
 } from "../../lib/upload-cleanup.js";
-import {
-  extractFirstHttpUrl,
-  fetchLinkPreviewForText,
-  getCachedLinkPreview,
-  type LinkPreview,
-} from "../../lib/link-preview.js";
-import { isUserMentioned } from "../../lib/groups/mentions.js";
+import { messageWithSenderInclude, senderSelect } from "../../lib/message-includes.js";
+import { fetchLinkPreviewForText } from "../../lib/link-preview.js";
+import { isUserMentioned, validateAndMergeMentions } from "../../lib/groups/mentions.js";
 import { emitToChatMembers } from "../../sockets/chat-broadcast.js";
+import { SOCKET_PROTOCOL_VERSION } from "../../sockets/constants.js";
 import { getSocketIo } from "../../sockets/socket-holder.js";
 import {
   publishGroupActivityMessage,
   resolveDisplayName,
 } from "../../lib/groups/group-system-message.js";
-import { validateAndMergeMentions } from "../../lib/groups/mentions.js";
+import {
+  assertE2eeMessageInput,
+  assertE2eePatchPayload,
+  buildAscThreadCursorWhere,
+  buildChatListCursorWhere,
+  buildDescMessageCursorWhere,
+  buildE2eePollContentMeta,
+  buildGroupChatPatchData,
+  buildMessagePatchUpdateData,
+  buildSearchMessageCursorFilter,
+  chatWithActiveMembersUserInclude,
+  contentMetaToPrismaInput,
+  enrichTextMessageContentMeta,
+  escapeIlikePattern,
+  isE2eeContentMeta,
+  mergeLinkPreviewIntoMeta,
+  requireExistingMessageInChat,
+  requireMessageInChat,
+  requireMessageModifyAccess,
+  requirePinMessageAccess,
+  resolveChatE2eeFlags,
+  touchChatAfterOutboundMessage,
+} from "./chats.helpers.js";
 
 async function isBlockedPair(a: string, b: string): Promise<boolean> {
   try {
@@ -49,29 +68,15 @@ async function isBlockedPair(a: string, b: string): Promise<boolean> {
 
 export type MessageReactionSummary = { emoji: string; count: number; byMe: boolean };
 export type { MessageReceiptStatus } from "../../lib/receipt-status.js";
-import { deriveMessageReceiptStatus, type MessageReceiptStatus } from "../../lib/receipt-status.js";
-
-const senderSelect = {
-  id: true,
-  email: true,
-  displayName: true,
-  username: true,
-  avatarUrl: true,
-} as const;
+import {
+  deriveMessageReceiptStatus,
+  type MessageReceiptStatus,
+} from "../../lib/receipt-status.js";
 
 /** Matches main chat timeline (excludes thread-only replies). */
 const MAIN_FEED_MESSAGE_WHERE = {
   OR: [{ threadRootId: null }, { broadcastToChannel: true }],
 } satisfies Prisma.MessageWhereInput;
-
-const messageWithSenderInclude = {
-  sender: { select: senderSelect },
-  replyTo: {
-    include: {
-      sender: { select: senderSelect },
-    },
-  },
-} as const;
 
 export type PublicReplyPreview = {
   id: string;
@@ -267,7 +272,8 @@ async function receiptStatusForMessages(
     { deliveryTotal: number; delivered: number; readableTotal: number; read: number }
   >();
   for (const r of receipts) {
-    const cur = agg.get(r.messageId) ?? {
+    let cur = agg.get(r.messageId);
+    cur ??= {
       deliveryTotal: 0,
       delivered: 0,
       readableTotal: 0,
@@ -315,7 +321,8 @@ async function reactionsSummariesForMessages(
   const mineSet = new Set(mine.map((r) => `${r.messageId}\0${r.emoji}`));
 
   for (const g of grouped) {
-    const list = out.get(g.messageId) ?? [];
+    let list = out.get(g.messageId);
+    list ??= [];
     list.push({
       emoji: g.emoji,
       count: g._count._all,
@@ -329,24 +336,187 @@ async function reactionsSummariesForMessages(
   return out;
 }
 
+type ChatMemberListRow = {
+  chatId: string;
+  pinnedAt: Date | null;
+  favoritedAt: Date | null;
+  closedAt: Date | null;
+  mutedUntil: Date | null;
+  chat: {
+    id: string;
+    type: ChatType;
+    title: string | null;
+    avatarUrl: string | null;
+    e2eeMode: ChatE2eeMode;
+    groupVisibility: string | null;
+    updatedAt: Date;
+    lastMessageAt: Date | null;
+    members: Array<{
+      userId: string;
+      user: {
+        id: string;
+        email: string;
+        displayName: string | null;
+        username: string | null;
+        avatarUrl: string | null;
+        publicKey: string | null;
+        keyVersion: number | null;
+        isOnline: boolean;
+        lastSeenAt: Date | null;
+      };
+    }>;
+  };
+};
+
+function sortChatListPage(page: ChatMemberListRow[]): void {
+  page.sort((a, b) => {
+    const aPin = a.pinnedAt ? a.pinnedAt.getTime() : 0;
+    const bPin = b.pinnedAt ? b.pinnedAt.getTime() : 0;
+    if (aPin !== bPin) return bPin - aPin;
+    const aUpd = a.chat.updatedAt.getTime();
+    const bUpd = b.chat.updatedAt.getTime();
+    if (aUpd !== bUpd) return bUpd - aUpd;
+    return b.chat.id.localeCompare(a.chat.id);
+  });
+}
+
+async function loadUnreadCountsForChats(
+  prisma: ReturnType<typeof getPrisma>,
+  userId: string,
+  chatIds: string[],
+): Promise<{ unreadByChat: Map<string, number>; unreadMentionByChat: Map<string, number> }> {
+  const unreadByChat = new Map<string, number>();
+  const unreadMentionByChat = new Map<string, number>();
+  for (const chatId of chatIds) {
+    const n = await prisma.receipt.count({
+      where: {
+        userId,
+        readAt: null,
+        message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
+      },
+    });
+    unreadByChat.set(chatId, n);
+
+    const unreadReceipts = await prisma.receipt.findMany({
+      where: {
+        userId,
+        readAt: null,
+        message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
+      },
+      select: { message: { select: { contentMeta: true } } },
+      take: 200,
+    });
+    const mentionCount = unreadReceipts.filter((r) =>
+      isUserMentioned(userId, r.message.contentMeta),
+    ).length;
+    unreadMentionByChat.set(chatId, mentionCount);
+  }
+  return { unreadByChat, unreadMentionByChat };
+}
+
+function mapMemberChatListRow(
+  m: ChatMemberListRow,
+  userId: string,
+  lastByChat: Map<string, Awaited<ReturnType<ReturnType<typeof getPrisma>["message"]["findFirst"]>>>,
+  lastSummaries: Map<string, MessageReactionSummary[]>,
+  unreadByChat: Map<string, number>,
+  unreadMentionByChat: Map<string, number>,
+): unknown {
+  const chat = m.chat;
+  const last = lastByChat.get(chat.id);
+  let dmPeer: unknown = undefined;
+  if (chat.type === "DIRECT") {
+    const other = chat.members.find((x) => x.userId !== userId)?.user;
+    dmPeer = other
+      ? { ...other, avatarUrl: expandAvatarUrl(other.avatarUrl) }
+      : null;
+  }
+  return {
+    id: chat.id,
+    type: chat.type,
+    title: chat.title,
+    avatarUrl: expandAvatarUrl(chat.avatarUrl),
+    e2eeMode: chat.e2eeMode,
+    groupVisibility: chat.type === "GROUP" ? chat.groupVisibility : undefined,
+    isMember: true,
+    canJoin: false,
+    dmPeer,
+    lastMessage: last ? publicMessage(last, lastSummaries.get(last.id) ?? []) : null,
+    unreadCount: unreadByChat.get(chat.id) ?? 0,
+    unreadMentionCount: unreadMentionByChat.get(chat.id) ?? 0,
+    pinnedAt: m.pinnedAt ? m.pinnedAt.toISOString() : null,
+    favoritedAt: m.favoritedAt ? m.favoritedAt.toISOString() : null,
+    closedAt: m.closedAt ? m.closedAt.toISOString() : null,
+    updatedAt: chat.updatedAt,
+    lastMessageAt: chat.lastMessageAt,
+    mutedUntil: m.mutedUntil ? m.mutedUntil.toISOString() : null,
+  };
+}
+
+async function appendDiscoverablePublicGroups(
+  prisma: ReturnType<typeof getPrisma>,
+  data: unknown[],
+  memberChatIds: Set<string>,
+): Promise<void> {
+  const discoverable = await prisma.chat.findMany({
+    where: {
+      type: "GROUP",
+      groupVisibility: "PUBLIC",
+      ...(memberChatIds.size > 0 ? { id: { notIn: [...memberChatIds] } } : {}),
+    },
+    take: 30,
+    orderBy: { updatedAt: "desc" },
+    include: {
+      members: {
+        where: { leftAt: null },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              username: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  for (const chat of discoverable) {
+    const last = await prisma.message.findFirst({
+      where: { chatId: chat.id, deletedAt: null },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    data.push({
+      id: chat.id,
+      type: chat.type,
+      title: chat.title,
+      avatarUrl: expandAvatarUrl(chat.avatarUrl),
+      e2eeMode: chat.e2eeMode,
+      groupVisibility: chat.groupVisibility,
+      isMember: false,
+      canJoin: true,
+      dmPeer: undefined,
+      lastMessage: last ? publicMessage(last, []) : null,
+      unreadCount: 0,
+      unreadMentionCount: 0,
+      updatedAt: chat.updatedAt,
+      lastMessageAt: chat.lastMessageAt,
+      pinnedAt: null,
+      favoritedAt: null,
+      closedAt: null,
+      mutedUntil: null,
+    });
+  }
+}
+
 export async function listChats(
   userId: string,
   opts: { limit: number; cursor?: string; type?: ChatType },
 ): Promise<{ data: unknown[]; nextCursor: string | null }> {
   const prisma = getPrisma();
-  const cursorWhere =
-    opts.cursor !== undefined && opts.cursor.length > 0
-      ? (() => {
-          const { c, i } = decodeMessageCursor(opts.cursor);
-          const t = new Date(c);
-          return {
-            OR: [
-              { chat: { updatedAt: { lt: t } } },
-              { AND: [{ chat: { updatedAt: t } }, { chat: { id: { lt: i } } }] },
-            ],
-          };
-        })()
-      : {};
+  const cursorWhere = buildChatListCursorWhere(opts.cursor);
 
   const rows = await prisma.chatMember.findMany({
     where: {
@@ -385,16 +555,8 @@ export async function listChats(
     },
   });
 
-  const page = rows.slice(0, opts.limit);
-  page.sort((a, b) => {
-    const aPin = a.pinnedAt ? a.pinnedAt.getTime() : 0;
-    const bPin = b.pinnedAt ? b.pinnedAt.getTime() : 0;
-    if (aPin !== bPin) return bPin - aPin;
-    const aUpd = a.chat.updatedAt.getTime();
-    const bUpd = b.chat.updatedAt.getTime();
-    if (aUpd !== bUpd) return bUpd - aUpd;
-    return b.chat.id.localeCompare(a.chat.id);
-  });
+  const page = rows.slice(0, opts.limit) as ChatMemberListRow[];
+  sortChatListPage(page);
   const chatIds = page.map((r) => r.chatId);
 
   const lastByChat = new Map<string, Awaited<ReturnType<typeof prisma.message.findFirst>>>();
@@ -406,119 +568,23 @@ export async function listChats(
     if (last) lastByChat.set(chatId, last);
   }
 
-  const unreadByChat = new Map<string, number>();
-  const unreadMentionByChat = new Map<string, number>();
-  for (const chatId of chatIds) {
-    const n = await prisma.receipt.count({
-      where: {
-        userId,
-        readAt: null,
-        message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
-      },
-    });
-    unreadByChat.set(chatId, n);
-
-    const unreadReceipts = await prisma.receipt.findMany({
-      where: {
-        userId,
-        readAt: null,
-        message: { chatId, deletedAt: null, ...MAIN_FEED_MESSAGE_WHERE },
-      },
-      select: { message: { select: { contentMeta: true } } },
-      take: 200,
-    });
-    const mentionCount = unreadReceipts.filter((r) =>
-      isUserMentioned(userId, r.message.contentMeta),
-    ).length;
-    unreadMentionByChat.set(chatId, mentionCount);
-  }
+  const { unreadByChat, unreadMentionByChat } = await loadUnreadCountsForChats(prisma, userId, chatIds);
 
   const lastMessageIds = [...lastByChat.values()].map((lm) => lm?.id).filter((id): id is string => Boolean(id));
   const lastSummaries = await reactionsSummariesForMessages(prisma, lastMessageIds, userId);
 
   const data = page
-    .map((m) => {
-    const chat = m.chat;
-    const last = lastByChat.get(chat.id);
-    let dmPeer: unknown = undefined;
-    if (chat.type === "DIRECT") {
-      const other = chat.members.find((x) => x.userId !== userId)?.user;
-      dmPeer = other
-        ? { ...other, avatarUrl: expandAvatarUrl(other.avatarUrl) }
-        : null;
-    }
-    return {
-      id: chat.id,
-      type: chat.type,
-      title: chat.title,
-      avatarUrl: expandAvatarUrl(chat.avatarUrl),
-      e2eeMode: chat.e2eeMode,
-      groupVisibility: chat.type === "GROUP" ? chat.groupVisibility : undefined,
-      isMember: true,
-      canJoin: false,
-      dmPeer,
-      lastMessage: last ? publicMessage(last, lastSummaries.get(last.id) ?? []) : null,
-      unreadCount: unreadByChat.get(chat.id) ?? 0,
-      unreadMentionCount: unreadMentionByChat.get(chat.id) ?? 0,
-      pinnedAt: m.pinnedAt ? m.pinnedAt.toISOString() : null,
-      favoritedAt: m.favoritedAt ? m.favoritedAt.toISOString() : null,
-      closedAt: m.closedAt ? m.closedAt.toISOString() : null,
-      updatedAt: chat.updatedAt,
-      lastMessageAt: chat.lastMessageAt,
-      mutedUntil: m.mutedUntil ? m.mutedUntil.toISOString() : null,
-    };
-  })
-    .filter((row) => row.type !== "DIRECT" || row.dmPeer != null);
+    .map((m) =>
+      mapMemberChatListRow(m, userId, lastByChat, lastSummaries, unreadByChat, unreadMentionByChat),
+    )
+    .filter((row) => {
+      const r = row as { type: string; dmPeer: unknown };
+      return r.type !== "DIRECT" || r.dmPeer != null;
+    });
 
   const memberChatIds = new Set(page.map((r) => r.chatId));
   if ((!opts.type || opts.type === "GROUP") && (!opts.cursor || opts.cursor.length === 0)) {
-    const discoverable = await prisma.chat.findMany({
-      where: {
-        type: "GROUP",
-        groupVisibility: "PUBLIC",
-        ...(memberChatIds.size > 0 ? { id: { notIn: [...memberChatIds] } } : {}),
-      },
-      take: 30,
-      orderBy: { updatedAt: "desc" },
-      include: {
-        members: {
-          where: { leftAt: null },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                displayName: true,
-                username: true,
-                avatarUrl: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    for (const chat of discoverable) {
-      const last = await prisma.message.findFirst({
-        where: { chatId: chat.id, deletedAt: null },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      });
-      data.push({
-        id: chat.id,
-        type: chat.type,
-        title: chat.title,
-        avatarUrl: expandAvatarUrl(chat.avatarUrl),
-        e2eeMode: chat.e2eeMode,
-        groupVisibility: chat.groupVisibility,
-        isMember: false,
-        canJoin: true,
-        dmPeer: undefined,
-        lastMessage: last ? publicMessage(last, []) : null,
-        unreadCount: 0,
-        updatedAt: chat.updatedAt,
-        lastMessageAt: chat.lastMessageAt,
-        mutedUntil: null,
-      });
-    }
+    await appendDiscoverablePublicGroups(prisma, data, memberChatIds);
   }
 
   const lastRow = page.at(-1);
@@ -552,7 +618,7 @@ export async function patchChatFavorite(userId: string, chatId: string, favorite
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
-  if (!chat || (chat.type !== "DIRECT" && chat.type !== "GROUP")) {
+  if (chat?.type !== "DIRECT" && chat?.type !== "GROUP") {
     throw new AppError(400, "INVALID_CHAT", "Only chats can be favorited");
   }
   await prisma.chatMember.updateMany({
@@ -565,7 +631,7 @@ export async function patchChatClose(userId: string, chatId: string, closed: boo
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
-  if (!chat || chat.type !== "DIRECT") {
+  if (chat?.type !== "DIRECT") {
     throw new AppError(400, "INVALID_CHAT", "Only direct messages can be closed");
   }
   await prisma.chatMember.updateMany({
@@ -631,73 +697,74 @@ export async function getChat(userId: string, chatId: string) {
   return chat;
 }
 
-export async function createChat(
+async function createDirectChat(
+  prisma: ReturnType<typeof getPrisma>,
   userId: string,
-  body:
-    | { type: "DIRECT"; otherUserId: string }
-    | {
-        type: "GROUP";
-        title: string;
-        memberIds?: string[];
-        e2eeMode?: "NONE" | "GROUP_V1";
-        groupVisibility?: "PRIVATE" | "PUBLIC";
-      },
+  otherUserId: string,
 ) {
-  const prisma = getPrisma();
-  if (body.type === "DIRECT") {
-    if (body.otherUserId === userId) {
-      throw new AppError(400, "INVALID_DM", "Cannot create a DM with yourself");
-    }
-    if (await isBlockedPair(userId, body.otherUserId)) {
-      throw new AppError(403, "BLOCKED", "Cannot message this user");
-    }
-    const other = await prisma.user.findUnique({ where: { id: body.otherUserId } });
-    if (!other || other.deletedAt) {
-      throw new AppError(404, "NOT_FOUND", "User not found");
-    }
-    const dmKey = pairKeyForUserIds(userId, body.otherUserId);
-    const existing = await prisma.chat.findUnique({
-      where: { dmKey },
-      include: { members: { where: { leftAt: null } } },
-    });
-    if (existing && existing.type === "DIRECT") {
-      await prisma.chatMember.updateMany({
-        where: { chatId: existing.id, userId, leftAt: null },
-        data: { closedAt: null },
-      });
-      if (existing.e2eeMode === "NONE") {
-        const upgraded = await prisma.chat.update({
-          where: { id: existing.id },
-          data: { e2eeMode: "DM_V1" },
-          include: { members: { where: { leftAt: null }, include: { user: true } } },
-        });
-        return { chat: upgraded, created: false };
-      }
-      return { chat: existing, created: false };
-    }
-    const chat = await prisma.$transaction(async (tx) => {
-      const c = await tx.chat.create({
-        data: {
-          type: "DIRECT",
-          dmKey,
-          createdById: userId,
-          e2eeMode: "DM_V1",
-        },
-      });
-      await tx.chatMember.createMany({
-        data: [
-          { chatId: c.id, userId, role: "OWNER" },
-          { chatId: c.id, userId: body.otherUserId, role: "MEMBER" },
-        ],
-      });
-      return tx.chat.findUniqueOrThrow({
-        where: { id: c.id },
-        include: { members: { where: { leftAt: null }, include: { user: true } } },
-      });
-    });
-    return { chat, created: true };
+  if (otherUserId === userId) {
+    throw new AppError(400, "INVALID_DM", "Cannot create a DM with yourself");
   }
+  if (await isBlockedPair(userId, otherUserId)) {
+    throw new AppError(403, "BLOCKED", "Cannot message this user");
+  }
+  const other = await prisma.user.findUnique({ where: { id: otherUserId } });
+  if (!other?.id || other.deletedAt) {
+    throw new AppError(404, "NOT_FOUND", "User not found");
+  }
+  const dmKey = pairKeyForUserIds(userId, otherUserId);
+  const existing = await prisma.chat.findUnique({
+    where: { dmKey },
+    include: { members: { where: { leftAt: null } } },
+  });
+  if (existing?.type === "DIRECT") {
+    await prisma.chatMember.updateMany({
+      where: { chatId: existing.id, userId, leftAt: null },
+      data: { closedAt: null },
+    });
+    if (existing.e2eeMode === "NONE") {
+      const upgraded = await prisma.chat.update({
+        where: { id: existing.id },
+        data: { e2eeMode: "DM_V1" },
+        include: chatWithActiveMembersUserInclude,
+      });
+      return { chat: upgraded, created: false };
+    }
+    return { chat: existing, created: false };
+  }
+  const chat = await prisma.$transaction(async (tx) => {
+    const c = await tx.chat.create({
+      data: {
+        type: "DIRECT",
+        dmKey,
+        createdById: userId,
+        e2eeMode: "DM_V1",
+      },
+    });
+    await tx.chatMember.createMany({
+      data: [
+        { chatId: c.id, userId, role: "OWNER" },
+        { chatId: c.id, userId: otherUserId, role: "MEMBER" },
+      ],
+    });
+    return tx.chat.findUniqueOrThrow({
+      where: { id: c.id },
+      include: chatWithActiveMembersUserInclude,
+    });
+  });
+  return { chat, created: true };
+}
 
+async function createGroupChat(
+  prisma: ReturnType<typeof getPrisma>,
+  userId: string,
+  body: {
+    title: string;
+    memberIds?: string[];
+    e2eeMode?: "NONE" | "GROUP_V1";
+    groupVisibility?: "PRIVATE" | "PUBLIC";
+  },
+) {
   const memberSet = new Set<string>([userId, ...(body.memberIds ?? [])]);
   const memberIds = [...memberSet];
   for (const uid of memberIds) {
@@ -705,7 +772,7 @@ export async function createChat(
       throw new AppError(403, "BLOCKED", "Cannot add a blocked user to the group");
     }
     const u = await prisma.user.findUnique({ where: { id: uid } });
-    if (!u || u.deletedAt) {
+    if (!u?.id || u.deletedAt) {
       throw new AppError(404, "NOT_FOUND", "User not found");
     }
   }
@@ -732,7 +799,7 @@ export async function createChat(
     });
     return tx.chat.findUniqueOrThrow({
       where: { id: c.id },
-      include: { members: { where: { leftAt: null }, include: { user: true } } },
+      include: chatWithActiveMembersUserInclude,
     });
   });
   const actorName = await resolveDisplayName(userId);
@@ -759,6 +826,25 @@ export async function createChat(
   return { chat, created: true };
 }
 
+export async function createChat(
+  userId: string,
+  body:
+    | { type: "DIRECT"; otherUserId: string }
+    | {
+        type: "GROUP";
+        title: string;
+        memberIds?: string[];
+        e2eeMode?: "NONE" | "GROUP_V1";
+        groupVisibility?: "PRIVATE" | "PUBLIC";
+      },
+) {
+  const prisma = getPrisma();
+  if (body.type === "DIRECT") {
+    return createDirectChat(prisma, userId, body.otherUserId);
+  }
+  return createGroupChat(prisma, userId, body);
+}
+
 export async function listMessages(
   userId: string,
   chatId: string,
@@ -766,19 +852,7 @@ export async function listMessages(
 ): Promise<{ data: ReturnType<typeof publicMessage>[]; nextCursor: string | null }> {
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
-  const cursorWhere =
-    opts.cursor !== undefined && opts.cursor.length > 0
-      ? (() => {
-          const { c, i } = decodeMessageCursor(opts.cursor);
-          const t = new Date(c);
-          return {
-            OR: [
-              { createdAt: { lt: t } },
-              { AND: [{ createdAt: t }, { id: { lt: i } }] },
-            ],
-          };
-        })()
-      : {};
+  const cursorWhere = buildDescMessageCursorWhere(opts.cursor);
 
   const rows = await prisma.message.findMany({
     where: {
@@ -814,10 +888,6 @@ export async function listMessages(
 }
 
 const SEARCH_MESSAGE_KINDS: MessageKind[] = ["TEXT", "IMAGE", "FILE", "POLL", "OTHER"];
-
-function escapeIlikePattern(term: string): string {
-  return term.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
-}
 
 function buildSearchSnippet(ciphertext: string, q: string, maxLen = 120): string {
   const lower = ciphertext.toLowerCase();
@@ -863,25 +933,13 @@ export async function searchMessagesInChat(
     where: { id: chatId },
     select: { type: true, e2eeMode: true },
   });
-  const isE2ee =
-    (chat?.type === "DIRECT" && chat?.e2eeMode === "DM_V1") ||
-    (chat?.type === "GROUP" && chat?.e2eeMode === "GROUP_V1");
+  const isE2ee = chat ? resolveChatE2eeFlags(chat).isE2ee : false;
   if (isE2ee) {
     return { data: [], nextCursor: null, searchUnavailable: true };
   }
 
   const pattern = `%${escapeIlikePattern(q)}%`;
-  const cursorFilter =
-    opts.cursor !== undefined && opts.cursor.length > 0
-      ? (() => {
-          const { c, i } = decodeMessageCursor(opts.cursor);
-          const t = new Date(c);
-          return Prisma.sql`AND (
-            m."createdAt" < ${t}
-            OR (m."createdAt" = ${t} AND m.id < ${i})
-          )`;
-        })()
-      : Prisma.empty;
+  const cursorFilter = buildSearchMessageCursorFilter(opts.cursor);
 
   type SearchRow = {
     id: string;
@@ -938,15 +996,6 @@ export async function searchMessagesInChat(
   };
 }
 
-function encodeThreadCursor(createdAt: Date, id: string): string {
-  return encodeMessageCursor(createdAt, id);
-}
-
-function decodeThreadCursor(cursor: string): { createdAt: Date; id: string } {
-  const { c, i } = decodeMessageCursor(cursor);
-  return { createdAt: new Date(c), id: i };
-}
-
 export async function listThreadMessages(
   userId: string,
   chatId: string,
@@ -964,19 +1013,7 @@ export async function listThreadMessages(
     throw new AppError(404, "NOT_FOUND", "Thread root not found");
   }
 
-  const cursorWhere =
-    opts.cursor !== undefined && opts.cursor.length > 0
-      ? (() => {
-          const { createdAt, id } = decodeThreadCursor(opts.cursor);
-          const t = createdAt;
-          return {
-            OR: [
-              { createdAt: { gt: t } },
-              { AND: [{ createdAt: t }, { id: { gt: id } }] },
-            ],
-          };
-        })()
-      : {};
+  const cursorWhere = buildAscThreadCursorWhere(opts.cursor);
 
   const rows = await prisma.message.findMany({
     where: {
@@ -993,7 +1030,7 @@ export async function listThreadMessages(
   const page = rows.slice(0, opts.limit);
   const last = page.at(-1);
   const nextCursor =
-    rows.length > opts.limit && last ? encodeThreadCursor(last.createdAt, last.id) : null;
+    rows.length > opts.limit && last ? encodeMessageCursor(last.createdAt, last.id) : null;
 
   const pageIds = page.map((r) => r.id);
   const summaries = await reactionsSummariesForMessages(prisma, pageIds, userId);
@@ -1021,6 +1058,46 @@ export async function listThreadMessages(
   };
 }
 
+async function loadIdempotentCreateMessageResult(
+  prisma: ReturnType<typeof getPrisma>,
+  userId: string,
+  chatId: string,
+  clientMessageId: string,
+) {
+  const existing = await prisma.message.findUnique({
+    where: { chatId_clientMessageId: { chatId, clientMessageId } },
+    include: messageWithSenderInclude,
+  });
+  if (!existing) return null;
+  const sumMap = await reactionsSummariesForMessages(prisma, [existing.id], userId);
+  const receiptMap = await receiptStatusForMessages(prisma, [existing.id], userId);
+  return {
+    message: publicMessage(
+      existing,
+      sumMap.get(existing.id) ?? [],
+      receiptMap.get(existing.id),
+      replyPreviewFromRow(existing),
+    ),
+    idempotent: true as const,
+  };
+}
+
+async function resolveCreateMessageThread(
+  chatId: string,
+  input: { threadRootId?: string | null; broadcastToChannel?: boolean },
+) {
+  if (input.threadRootId) {
+    return {
+      canonicalThreadRootId: await resolveCanonicalThreadRoot(chatId, input.threadRootId),
+      broadcastToChannel: Boolean(input.broadcastToChannel),
+    };
+  }
+  if (input.broadcastToChannel) {
+    throw new AppError(400, "INVALID_THREAD", "broadcastToChannel requires threadRootId");
+  }
+  return { canonicalThreadRootId: null, broadcastToChannel: false };
+}
+
 export async function createMessage(
   userId: string,
   chatId: string,
@@ -1045,51 +1122,21 @@ export async function createMessage(
   if (!chat) {
     throw new AppError(404, "NOT_FOUND", "Chat not found");
   }
-  const isE2eeDm = chat.type === "DIRECT" && chat.e2eeMode === "DM_V1";
-  const isE2eeGroup = chat.type === "GROUP" && chat.e2eeMode === "GROUP_V1";
-  const isE2ee = isE2eeDm || isE2eeGroup;
-  if (isE2ee) {
-    const ct = input.ciphertext ?? null;
-    if (!ct || ct.length < 1) {
-      throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only messages");
-    }
-    const meta = input.contentMeta ?? null;
-    if (!meta || typeof meta !== "object") {
-      throw new AppError(400, "E2EE_META_REQUIRED", "This chat requires E2EE contentMeta");
-    }
-    const v = (meta as Record<string, unknown>).e2eeVersion;
-    if (typeof v !== "string" || v.length < 1) {
-      throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE chats");
-    }
-  }
+  const { isE2ee } = resolveChatE2eeFlags(chat);
+  assertE2eeMessageInput(isE2ee, input.ciphertext, input.contentMeta);
 
-  const existing = await prisma.message.findUnique({
-    where: { chatId_clientMessageId: { chatId, clientMessageId: input.clientMessageId } },
-    include: messageWithSenderInclude,
-  });
-  if (existing) {
-    const sumMap = await reactionsSummariesForMessages(prisma, [existing.id], userId);
-    const receiptMap = await receiptStatusForMessages(prisma, [existing.id], userId);
-    return {
-      message: publicMessage(
-        existing,
-        sumMap.get(existing.id) ?? [],
-        receiptMap.get(existing.id),
-        replyPreviewFromRow(existing),
-      ),
-      idempotent: true,
-    };
-  }
+  const idempotentHit = await loadIdempotentCreateMessageResult(
+    prisma,
+    userId,
+    chatId,
+    input.clientMessageId,
+  );
+  if (idempotentHit) return idempotentHit;
 
-  let canonicalThreadRootId: string | null = null;
-  let broadcastToChannel = false;
-
-  if (input.threadRootId) {
-    canonicalThreadRootId = await resolveCanonicalThreadRoot(chatId, input.threadRootId);
-    broadcastToChannel = Boolean(input.broadcastToChannel);
-  } else if (input.broadcastToChannel) {
-    throw new AppError(400, "INVALID_THREAD", "broadcastToChannel requires threadRootId");
-  }
+  const { canonicalThreadRootId, broadcastToChannel } = await resolveCreateMessageThread(
+    chatId,
+    input,
+  );
 
   if (input.replyToId) {
     const parent = await prisma.message.findFirst({
@@ -1100,47 +1147,26 @@ export async function createMessage(
     }
   }
 
-  const members = await prisma.chatMember.findMany({
-    where: { chatId, leftAt: null },
-  });
-
   let contentMetaForInsert = input.contentMeta;
-  if (contentMetaForInsert && typeof contentMetaForInsert === "object" && chat.type === "GROUP") {
-    contentMetaForInsert = (await validateAndMergeMentions(
+  if (isPlainObject(contentMetaForInsert) && chat.type === "GROUP") {
+    contentMetaForInsert = await validateAndMergeMentions(
       userId,
       chatId,
       me.role,
-      contentMetaForInsert as Record<string, unknown>,
-    )) as typeof contentMetaForInsert;
+      contentMetaForInsert,
+    );
   }
   const cfg = loadConfig();
   const textBody = input.ciphertext ?? "";
-  const clientHasPreview =
-    contentMetaForInsert &&
-    typeof contentMetaForInsert === "object" &&
-    (contentMetaForInsert as Record<string, unknown>).preview != null;
-  let schedulePreviewEnrichment = false;
-
-  if (
-    input.kind === "TEXT" &&
-    !isE2ee &&
-    cfg.linkPreviewEnabled &&
-    textBody.length > 0 &&
-    !clientHasPreview
-  ) {
-    const url = extractFirstHttpUrl(textBody);
-    if (url) {
-      const cached = getCachedLinkPreview(url);
-      if (cached) {
-        contentMetaForInsert = mergeLinkPreviewIntoMeta(
-          contentMetaForInsert as Record<string, unknown> | null | undefined,
-          cached,
-        );
-      } else {
-        schedulePreviewEnrichment = true;
-      }
-    }
-  }
+  const enriched = enrichTextMessageContentMeta({
+    kind: input.kind,
+    isE2ee,
+    linkPreviewEnabled: cfg.linkPreviewEnabled,
+    textBody,
+    contentMeta: contentMetaForInsert,
+  });
+  contentMetaForInsert = enriched.contentMeta;
+  const schedulePreviewEnrichment = enriched.schedulePreviewEnrichment;
 
   const message = await prisma.$transaction(async (tx) => {
     const msg = await tx.message.create({
@@ -1150,24 +1176,14 @@ export async function createMessage(
         clientMessageId: input.clientMessageId,
         kind: input.kind,
         ciphertext: input.ciphertext ?? null,
-        contentMeta:
-          contentMetaForInsert === undefined
-            ? undefined
-            : contentMetaForInsert === null
-              ? Prisma.JsonNull
-              : (contentMetaForInsert as Prisma.InputJsonValue),
+        contentMeta: contentMetaToPrismaInput(contentMetaForInsert),
         replyToId: input.replyToId ?? null,
         threadRootId: canonicalThreadRootId,
         broadcastToChannel,
       },
       include: messageWithSenderInclude,
     });
-    const receipts = members
-      .filter((m) => m.userId !== userId)
-      .map((m) => ({ messageId: msg.id, userId: m.userId }));
-    if (receipts.length) {
-      await tx.receipt.createMany({ data: receipts });
-    }
+    await touchChatAfterOutboundMessage(tx, chatId, userId, msg.id, msg.createdAt);
     let threadUpdated: { rootMessageId: string; replyCount: number; lastReplyAt: Date } | undefined;
     if (canonicalThreadRootId) {
       const root = await tx.message.update({
@@ -1184,10 +1200,6 @@ export async function createMessage(
         lastReplyAt: root.threadLastReplyAt ?? msg.createdAt,
       };
     }
-    await tx.chat.update({
-      where: { id: chatId },
-      data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
-    });
     await tx.chatMember.updateMany({
       where: { chatId, leftAt: null, closedAt: { not: null } },
       data: { closedAt: null },
@@ -1211,22 +1223,6 @@ export async function createMessage(
   };
 }
 
-function mergeLinkPreviewIntoMeta(
-  contentMeta: Record<string, unknown> | null | undefined,
-  preview: LinkPreview,
-): Record<string, unknown> {
-  const existingPreview =
-    contentMeta?.preview && typeof contentMeta.preview === "object"
-      ? (contentMeta.preview as Record<string, unknown>)
-      : null;
-  const displayAs =
-    typeof existingPreview?.displayAs === "string" ? existingPreview.displayAs : "inline";
-  return {
-    ...(contentMeta ?? {}),
-    preview: { ...preview, displayAs },
-  };
-}
-
 /** Fetch OG metadata after send so message:send / REST are not blocked on network I/O. */
 function scheduleMessageLinkPreviewEnrichment(
   messageId: string,
@@ -1246,14 +1242,11 @@ function scheduleMessageLinkPreviewEnrichment(
       if (!msg || msg.deletedAt) return;
 
       const meta = msg.contentMeta;
-      if (meta && typeof meta === "object" && (meta as Record<string, unknown>).preview != null) {
+      if (isPlainObject(meta) && meta.preview != null) {
         return;
       }
 
-      const nextMeta = mergeLinkPreviewIntoMeta(
-        meta && typeof meta === "object" ? (meta as Record<string, unknown>) : {},
-        preview,
-      );
+      const nextMeta = mergeLinkPreviewIntoMeta(isPlainObject(meta) ? meta : {}, preview);
 
       const updated = await prisma.message.update({
         where: { id: messageId },
@@ -1281,67 +1274,29 @@ export async function patchMessage(
   messageId: string,
   data: { ciphertext?: string | null; contentMeta?: Record<string, unknown> | null },
 ) {
-  const prisma = getPrisma();
-  const msg = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!msg || msg.deletedAt) {
-    throw new AppError(404, "NOT_FOUND", "Message not found");
-  }
-  const member = await requireActiveMember(userId, msg.chatId);
-  const isSender = msg.senderId === userId;
-  if (!isSender && !canModerateMessages(member.role)) {
-    throw new AppError(403, "FORBIDDEN", "Cannot edit this message");
-  }
+  const { prisma, msg } = await requireMessageModifyAccess(
+    userId,
+    messageId,
+    "Cannot edit this message",
+  );
   const chat = await prisma.chat.findUnique({ where: { id: msg.chatId }, select: { type: true, e2eeMode: true } });
-  const isE2eeDm = chat?.type === "DIRECT" && chat.e2eeMode === "DM_V1";
-  if (isE2eeDm) {
-    if (data.ciphertext !== undefined) {
-      const ct = data.ciphertext ?? null;
-      if (!ct || ct.length < 1) {
-        throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only messages");
-      }
-    }
-    if (data.contentMeta !== undefined) {
-      const meta = data.contentMeta ?? null;
-      if (!meta || typeof meta !== "object") {
-        throw new AppError(400, "E2EE_META_REQUIRED", "This chat requires E2EE contentMeta");
-      }
-      const v = (meta as Record<string, unknown>).e2eeVersion;
-      if (typeof v !== "string" || v.length < 1) {
-        throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE DMs");
-      }
-    }
+  if (chat && resolveChatE2eeFlags(chat).isE2eeDm) {
+    assertE2eePatchPayload(data);
   }
-  const updateData: Prisma.MessageUpdateInput = {
-    editedAt: new Date(),
-    ...(data.ciphertext !== undefined ? { ciphertext: data.ciphertext } : {}),
-    ...(data.contentMeta !== undefined
-      ? {
-          contentMeta:
-            data.contentMeta === null
-              ? Prisma.JsonNull
-              : (data.contentMeta as Prisma.InputJsonValue),
-        }
-      : {}),
-  };
   const updated = await prisma.message.update({
     where: { id: messageId },
-    data: updateData,
+    data: buildMessagePatchUpdateData(data),
   });
   const sumMap = await reactionsSummariesForMessages(prisma, [updated.id], userId);
   return publicMessage(updated, sumMap.get(updated.id) ?? []);
 }
 
 export async function deleteMessage(userId: string, messageId: string) {
-  const prisma = getPrisma();
-  const msg = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!msg || msg.deletedAt) {
-    throw new AppError(404, "NOT_FOUND", "Message not found");
-  }
-  const member = await requireActiveMember(userId, msg.chatId);
-  const isSender = msg.senderId === userId;
-  if (!isSender && !canModerateMessages(member.role)) {
-    throw new AppError(403, "FORBIDDEN", "Cannot delete this message");
-  }
+  const { prisma, msg } = await requireMessageModifyAccess(
+    userId,
+    messageId,
+    "Cannot delete this message",
+  );
 
   await prisma.pinnedMessage.deleteMany({ where: { messageId } });
 
@@ -1363,12 +1318,7 @@ export async function deleteMessage(userId: string, messageId: string) {
 }
 
 export async function addReaction(userId: string, messageId: string, emoji: string) {
-  const prisma = getPrisma();
-  const msg = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!msg || msg.deletedAt) {
-    throw new AppError(404, "NOT_FOUND", "Message not found");
-  }
-  await requireActiveMember(userId, msg.chatId);
+  const { prisma, msg } = await requireMessageInChat(userId, messageId);
   await prisma.reaction.upsert({
     where: {
       messageId_userId_emoji: { messageId, userId, emoji },
@@ -1380,12 +1330,7 @@ export async function addReaction(userId: string, messageId: string, emoji: stri
 }
 
 export async function removeReaction(userId: string, messageId: string, emoji: string) {
-  const prisma = getPrisma();
-  const msg = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!msg) {
-    throw new AppError(404, "NOT_FOUND", "Message not found");
-  }
-  await requireActiveMember(userId, msg.chatId);
+  const { prisma, msg } = await requireExistingMessageInChat(userId, messageId);
   try {
     await prisma.reaction.delete({
       where: { messageId_userId_emoji: { messageId, userId, emoji } },
@@ -1435,18 +1380,7 @@ export async function listPins(userId: string, chatId: string) {
 }
 
 export async function pinMessage(userId: string, messageId: string) {
-  const prisma = getPrisma();
-  const msg = await prisma.message.findUnique({
-    where: { id: messageId },
-    include: { chat: { select: { type: true } } },
-  });
-  if (!msg || msg.deletedAt) {
-    throw new AppError(404, "NOT_FOUND", "Message not found");
-  }
-  const member = await requireActiveMember(userId, msg.chatId);
-  if (msg.chat.type === "GROUP" && !canModerateMessages(member.role)) {
-    throw new AppError(403, "FORBIDDEN", "Only moderators can pin messages in groups");
-  }
+  const { prisma, msg } = await requirePinMessageAccess(userId, messageId, { rejectDeleted: true });
   await prisma.pinnedMessage.upsert({
     where: { chatId_messageId: { chatId: msg.chatId, messageId } },
     create: { chatId: msg.chatId, messageId, pinnedById: userId },
@@ -1456,26 +1390,9 @@ export async function pinMessage(userId: string, messageId: string) {
 }
 
 export async function unpinMessage(userId: string, messageId: string) {
-  const prisma = getPrisma();
-  const msg = await prisma.message.findUnique({
-    where: { id: messageId },
-    include: { chat: { select: { type: true } } },
-  });
-  if (!msg) {
-    throw new AppError(404, "NOT_FOUND", "Message not found");
-  }
-  const member = await requireActiveMember(userId, msg.chatId);
-  if (msg.chat.type === "GROUP" && !canModerateMessages(member.role)) {
-    throw new AppError(403, "FORBIDDEN", "Only moderators can unpin messages in groups");
-  }
+  const { prisma, msg } = await requirePinMessageAccess(userId, messageId, { rejectDeleted: false });
   await prisma.pinnedMessage.deleteMany({ where: { chatId: msg.chatId, messageId } });
   return { chatId: msg.chatId, messageId };
-}
-
-function isE2eeContentMeta(meta: unknown): boolean {
-  if (!meta || typeof meta !== "object") return false;
-  const v = (meta as Record<string, unknown>).e2eeVersion;
-  return typeof v === "string" && v.length > 0;
 }
 
 export async function createPollOnChat(
@@ -1502,7 +1419,7 @@ export async function createPollOnChat(
   if (!chat) {
     throw new AppError(404, "NOT_FOUND", "Chat not found");
   }
-  const isE2eeDm = chat.type === "DIRECT" && chat.e2eeMode === "DM_V1";
+  const { isE2eeDm } = resolveChatE2eeFlags(chat);
   if (isE2eeDm) {
     if (!input.ciphertext?.length) {
       throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only poll messages");
@@ -1537,15 +1454,8 @@ export async function createPollOnChat(
       orderBy: { sortOrder: "asc" },
       select: { id: true, sortOrder: true },
     });
-    const members = await tx.chatMember.findMany({ where: { chatId, leftAt: null } });
     const contentMetaForInsert = isE2eeDm
-      ? ({
-          ...(input.contentMeta as Record<string, unknown>),
-          pollId: p.id,
-          pollRefs: {
-            options: optionRows.map((o) => ({ id: o.id, sortOrder: o.sortOrder })),
-          },
-        } as Prisma.InputJsonValue)
+      ? buildE2eePollContentMeta(input.contentMeta, p.id, optionRows)
       : ({ pollId: p.id } as Prisma.InputJsonValue);
     const msg = await tx.message.create({
       data: {
@@ -1559,14 +1469,7 @@ export async function createPollOnChat(
       },
     });
     await tx.poll.update({ where: { id: p.id }, data: { messageId: msg.id } });
-    const receipts = members.filter((m) => m.userId !== userId).map((m) => ({ messageId: msg.id, userId: m.userId }));
-    if (receipts.length) {
-      await tx.receipt.createMany({ data: receipts });
-    }
-    await tx.chat.update({
-      where: { id: chatId },
-      data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
-    });
+    await touchChatAfterOutboundMessage(tx, chatId, userId, msg.id, msg.createdAt);
     const fullPoll = await tx.poll.findUniqueOrThrow({
       where: { id: p.id },
       include: { options: { orderBy: { sortOrder: "asc" } } },
@@ -1594,22 +1497,20 @@ export async function patchGroupChat(
   const member = await requireActiveMemberMinRole(userId, chatId, "ADMIN");
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
-  if (!chat || chat.type !== "GROUP") {
+  if (chat?.type !== "GROUP") {
     throw new AppError(404, "NOT_FOUND", "Group not found");
   }
   if (!canManageGroupMeta(member.role)) {
     throw new AppError(403, "FORBIDDEN", "Insufficient permissions");
   }
+  const patchData = buildGroupChatPatchData(data);
+  if (data.avatarUrl !== undefined) {
+    patchData.avatarUrl = normalizeAvatarDbValue(data.avatarUrl);
+  }
   const updated = await prisma.chat.update({
     where: { id: chatId },
-    data: {
-      ...(data.title !== undefined ? { title: data.title } : {}),
-      ...(data.avatarUrl !== undefined
-        ? { avatarUrl: normalizeAvatarDbValue(data.avatarUrl) }
-        : {}),
-      ...(data.groupVisibility !== undefined ? { groupVisibility: data.groupVisibility } : {}),
-    },
-    include: { members: { where: { leftAt: null }, include: { user: true } } },
+    data: patchData,
+    include: chatWithActiveMembersUserInclude,
   });
   const actorName = await resolveDisplayName(userId);
   if (data.title !== undefined && data.title !== chat.title) {
@@ -1635,7 +1536,7 @@ export async function patchGroupChat(
 export async function joinPublicGroup(userId: string, chatId: string) {
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
-  if (!chat || chat.type !== "GROUP") {
+  if (chat?.type !== "GROUP") {
     throw new AppError(404, "NOT_FOUND", "Group not found");
   }
   if (chat.groupVisibility !== "PUBLIC") {
@@ -1651,7 +1552,7 @@ export async function joinPublicGroup(userId: string, chatId: string) {
   if (existing?.leftAt === null) {
     return prisma.chat.findUniqueOrThrow({
       where: { id: chatId },
-      include: { members: { where: { leftAt: null }, include: { user: true } } },
+      include: chatWithActiveMembersUserInclude,
     });
   }
   if (existing) {
@@ -1666,7 +1567,7 @@ export async function joinPublicGroup(userId: string, chatId: string) {
   }
   const chatOut = await prisma.chat.findUniqueOrThrow({
     where: { id: chatId },
-    include: { members: { where: { leftAt: null }, include: { user: true } } },
+    include: chatWithActiveMembersUserInclude,
   });
   const actorName = await resolveDisplayName(userId);
   void publishGroupActivityMessage({
@@ -1696,11 +1597,11 @@ export async function addGroupMember(userId: string, chatId: string, newUserId: 
   }
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
-  if (!chat || chat.type !== "GROUP") {
+  if (chat?.type !== "GROUP") {
     throw new AppError(404, "NOT_FOUND", "Group not found");
   }
   const target = await prisma.user.findUnique({ where: { id: newUserId } });
-  if (!target || target.deletedAt) {
+  if (!target?.id || target.deletedAt) {
     throw new AppError(404, "NOT_FOUND", "User not found");
   }
   const existing = await prisma.chatMember.findFirst({
@@ -1721,7 +1622,7 @@ export async function addGroupMember(userId: string, chatId: string, newUserId: 
   }
   const chatOut = await prisma.chat.findUniqueOrThrow({
     where: { id: chatId },
-    include: { members: { where: { leftAt: null }, include: { user: true } } },
+    include: chatWithActiveMembersUserInclude,
   });
   const actorName = await resolveDisplayName(userId);
   const targetName = await resolveDisplayName(newUserId);
@@ -1742,7 +1643,7 @@ export async function addGroupMember(userId: string, chatId: string, newUserId: 
 export async function removeGroupMember(actorId: string, chatId: string, targetUserId: string) {
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
-  if (!chat || chat.type !== "GROUP") {
+  if (chat?.type !== "GROUP") {
     throw new AppError(404, "NOT_FOUND", "Group not found");
   }
   const actor = await requireActiveMember(actorId, chatId);
@@ -1793,7 +1694,7 @@ export async function patchGroupMemberRole(
 ) {
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
-  if (!chat || chat.type !== "GROUP") {
+  if (chat?.type !== "GROUP") {
     throw new AppError(404, "NOT_FOUND", "Group not found");
   }
   await requireActiveMemberMinRole(actorId, chatId, "OWNER");
@@ -1906,7 +1807,6 @@ export async function flushUndeliveredReceiptsOnReconnect(
     });
 
     if (pending.length === 0) {
-      hasMore = false;
       break;
     }
 
@@ -1935,7 +1835,6 @@ export async function flushUndeliveredReceiptsOnReconnect(
     }
 
     if (pending.length < pageSize) {
-      hasMore = false;
       break;
     }
     if (Date.now() - startedAt >= budgetMs) {
@@ -2002,7 +1901,7 @@ export async function getChatUnreadBoundary(userId: string, chatId: string) {
     };
   }
   const messageIds = rows.map((r) => r.messageId);
-  return { count: messageIds.length, firstMessageId: messageIds[0] ?? null, messageIds };
+  return { count: messageIds.length, firstMessageId: messageIds.at(0) ?? null, messageIds };
 }
 
 /** Mark unread thread-only replies for a thread (opening thread panel). */

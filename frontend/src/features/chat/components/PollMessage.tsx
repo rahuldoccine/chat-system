@@ -1,25 +1,25 @@
 import React, { useMemo, useState } from 'react';
+import { handler } from '../../../utils/asyncHandler';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2 } from 'lucide-react';
 import api from '../../../api/axios';
-import type { Message, PollDetail, PollVoter } from '../types';
+import type { PollDetail, PollVoter } from '../types';
 import { getApiErrorMessage } from '../../settings/hooks/useUserSettings';
 import { toast } from 'sonner';
 import UserAvatar from './UserAvatar';
 import PollVotesModal from './PollVotesModal';
-import { mergePollWithDecrypted } from '../../e2ee/pollMeta';
-import type { E2eePollPayload } from '../../e2ee/pollMeta';
+import { mergePollWithDecrypted, type E2eePollPayload } from '../../e2ee/pollMeta';
 import styles from './PollMessage.module.css';
 
-type PollMessageProps = {
+type PollMessageProps = Readonly<{
   pollId: string;
   isMe: boolean;
   decryptedPoll?: E2eePollPayload | null;
-};
+}>;
 
 const AVATAR_PREVIEW_LIMIT = 2;
 
-function VoterAvatarStack({ voters }: { voters: PollVoter[] }) {
+function VoterAvatarStack({ voters }: Readonly<{ voters: PollVoter[] }>) {
   const preview = voters.slice(0, AVATAR_PREVIEW_LIMIT);
   if (preview.length === 0) return null;
 
@@ -122,7 +122,7 @@ const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe, decryptedPoll }
     return (
       <div className={styles.error}>
         <span>This poll couldn't be loaded.</span>
-        <button type="button" className={styles.retry} onClick={() => void refetch()}>
+        <button type="button" className={styles.retry} onClick={handler(() => { void refetch(); })}>
           Retry
         </button>
       </div>

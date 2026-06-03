@@ -14,7 +14,7 @@ import { getApiErrorMessage } from '../utils/userFriendlyErrors';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z.string().min(12, 'Password must be at least 12 characters'),
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
@@ -88,10 +88,11 @@ const RegisterPage: React.FC = () => {
           transition={{ delay: 0.4 }}
           className={styles.inputGroup}
         >
-          <label>Full Name</label>
+          <label htmlFor="register-name">Full Name</label>
           <div className={styles.inputWrapper}>
             <User size={18} strokeWidth={2.5} className={styles.icon} />
             <input
+              id="register-name"
               {...register('name')}
               type="text"
               placeholder="John Doe"
@@ -107,10 +108,11 @@ const RegisterPage: React.FC = () => {
           transition={{ delay: 0.5 }}
           className={styles.inputGroup}
         >
-          <label>Email Address</label>
+          <label htmlFor="register-email">Email Address</label>
           <div className={styles.inputWrapper}>
             <Mail size={18} strokeWidth={2.5} className={styles.icon} />
             <input
+              id="register-email"
               {...register('email')}
               type="email"
               placeholder="name@example.com"
@@ -126,10 +128,11 @@ const RegisterPage: React.FC = () => {
           transition={{ delay: 0.6 }}
           className={styles.inputGroup}
         >
-          <label>Password</label>
+          <label htmlFor="register-password">Password</label>
           <div className={styles.inputWrapper}>
             <Lock size={18} strokeWidth={2.5} className={styles.icon} />
             <input
+              id="register-password"
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
@@ -153,10 +156,11 @@ const RegisterPage: React.FC = () => {
           transition={{ delay: 0.7 }}
           className={styles.inputGroup}
         >
-          <label>Confirm Password</label>
+          <label htmlFor="register-confirm-password">Confirm Password</label>
           <div className={styles.inputWrapper}>
             <ShieldCheck size={18} strokeWidth={2.5} className={styles.icon} />
             <input
+              id="register-confirm-password"
               {...register('confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               placeholder="••••••••"

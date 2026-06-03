@@ -40,7 +40,7 @@
   background: transparent;
   padding: 4px;
   cursor: pointer;
-  color: #64748b;
+  color: #5c6b7a;
   display: inline-flex;
 }
 
@@ -74,7 +74,7 @@
 .unavailable {
   padding: 1.5rem 1rem;
   text-align: center;
-  color: #64748b;
+  color: #5c6b7a;
   font-size: 0.875rem;
 }
 
@@ -110,7 +110,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.75rem;
-  color: #64748b;
+  color: #5c6b7a;
 }
 
 .sender {
@@ -131,7 +131,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1.5rem;
-  color: #64748b;
+  color: #5c6b7a;
   font-size: 0.875rem;
 }
 

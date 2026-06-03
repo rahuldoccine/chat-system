@@ -107,7 +107,7 @@ export async function requireStepUpToken(userId: string, rawToken: string, confi
   const tokenHash = hashOpaqueToken(rawToken, config.jwtAccessSecret);
   const now = new Date();
   const row = await prisma.stepUpToken.findUnique({ where: { tokenHash } });
-  if (!row || row.userId !== userId) {
+  if (row?.userId !== userId) {
     throw new AppError(403, "STEP_UP_REQUIRED", "Step-up verification required");
   }
   if (row.consumedAt) {

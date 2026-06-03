@@ -55,7 +55,7 @@
   padding: 6px;
   border-radius: 8px;
   cursor: pointer;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   display: inline-flex;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -85,7 +85,7 @@
 }
 
 .input::placeholder {
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   opacity: 0.9;
 }
 
@@ -104,7 +104,7 @@
   padding: 0.15rem 0.45rem;
   border-radius: 6px;
   background: var(--surface-muted, #f1f5f9);
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   border: 1px solid var(--border, #e2e8f0);
   font-family: inherit;
 }
@@ -127,7 +127,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
 }
 
 .list {
@@ -190,7 +190,7 @@
   align-items: center;
   gap: 0.25rem;
   font-size: 0.7rem;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   flex-shrink: 0;
 }
 
@@ -198,7 +198,7 @@
 .hintSmall {
   padding: 1.5rem 1rem;
   text-align: center;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   font-size: 0.875rem;
 }
 
@@ -212,7 +212,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1rem;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   font-size: 0.875rem;
 }
 

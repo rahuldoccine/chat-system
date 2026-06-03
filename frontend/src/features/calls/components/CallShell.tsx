@@ -1,21 +1,14 @@
 import React from 'react';
 import { useCall } from '../CallProvider';
-import type { CallMeta, OutgoingPreview } from '../types';
 import IncomingCallModal from './IncomingCallModal';
 import OutgoingCallModal from './OutgoingCallModal';
 import CallOverlay from './CallOverlay';
 import CallErrorBanner from './CallErrorBanner';
-
-function overlayMetaFromPreview(preview: OutgoingPreview): CallMeta {
-  return {
-    callId: '',
-    chatId: preview.chatId,
-    peerUserId: preview.peerUserId,
-    peerDisplayName: preview.peerDisplayName,
-    isVideo: preview.isVideo,
-    isInitiator: true,
-  };
-}
+import { handler } from '../../../utils/asyncHandler';
+import {
+  callOutgoingStatusLabel,
+  resolveCallOverlayMeta,
+} from './callShell.helpers';
 
 const CallShell: React.FC = () => {
   const {
@@ -49,18 +42,14 @@ const CallShell: React.FC = () => {
           peerUserId={pendingIncoming.fromUserId}
           peerAvatarUrl={pendingIncoming.peerAvatarUrl}
           isVideo={Boolean(pendingIncoming.media?.video)}
-          onAccept={() => void acceptIncoming()}
-          onDecline={() => void rejectIncoming()}
+          onAccept={handler(acceptIncoming)}
+          onDecline={handler(rejectIncoming)}
         />
       </>
     );
   }
 
-  const overlayMeta: CallMeta | null =
-    meta ??
-    (outgoingPreview && (isStarting || phase === 'ringing_out' || phase === 'connecting')
-      ? overlayMetaFromPreview(outgoingPreview)
-      : null);
+  const overlayMeta = resolveCallOverlayMeta(meta, outgoingPreview, isStarting, phase);
 
   const showOutgoingCard =
     Boolean(overlayMeta) &&
@@ -72,18 +61,12 @@ const CallShell: React.FC = () => {
     return error ? <CallErrorBanner message={error} onDismiss={clearError} /> : null;
   }
 
-  const statusLabel =
-    isStarting
-      ? 'Calling…'
-      : phase === 'ringing_out'
-        ? peerRinging
-          ? 'Ringing…'
-          : 'Calling…'
-        : phase === 'connecting'
-          ? 'Connecting…'
-          : 'Ongoing';
+  const statusLabel = callOutgoingStatusLabel(isStarting, phase, peerRinging);
 
-  const activeMeta = meta ?? overlayMeta!;
+  const activeMeta = meta ?? overlayMeta;
+  if (!activeMeta) {
+    return error ? <CallErrorBanner message={error} onDismiss={clearError} /> : null;
+  }
 
   return (
     <>
@@ -94,7 +77,7 @@ const CallShell: React.FC = () => {
           peerUserId={overlayMeta.peerUserId}
           peerAvatarUrl={overlayMeta.peerAvatarUrl}
           statusLabel={statusLabel}
-          onCancel={() => void hangUp()}
+          onCancel={handler(hangUp)}
         />
       )}
       {showActiveOverlay && (
@@ -111,7 +94,7 @@ const CallShell: React.FC = () => {
           remotePeerMuted={remotePeerMuted}
           localStream={localStream}
           remoteStream={remoteStream}
-          onHangUp={() => void hangUp()}
+          onHangUp={handler(hangUp)}
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
           onSwitchCamera={switchCamera}

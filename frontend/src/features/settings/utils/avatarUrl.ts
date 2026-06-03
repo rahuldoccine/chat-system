@@ -31,7 +31,8 @@ export function avatarFileNameFromUpload(data: {
     const base = normalized.split('/').pop();
     if (base) return base;
   }
-  const match = data.url.match(/\/files\/([^?#]+)/);
+  const filePathRe = /\/files\/([^?#]+)/;
+  const match = filePathRe.exec(data.url);
   if (match?.[1]) {
     try {
       const decoded = decodeURIComponent(match[1]);
@@ -60,7 +61,8 @@ export function resolveAvatarAbsoluteUrl(
   }
 
   if (v.startsWith('/api/') || v.startsWith('/files/')) {
-    return `${env.apiOrigin}${v.startsWith('/') ? v : `/${v}`}`;
+    const path = v.startsWith('/') ? v : `/${v}`;
+    return `${env.apiOrigin}${path}`;
   }
 
   if (v.includes('/files/')) {
@@ -70,6 +72,19 @@ export function resolveAvatarAbsoluteUrl(
 
   const fileName = v.replaceAll('\\', '/').split('/').pop() ?? v;
   return `${env.apiOrigin}/api/v1/files/logos/${encodeURIComponent(fileName)}`;
+}
+
+/** Prefer signed-in user's live avatar when viewing their own profile. */
+export function resolveLiveAvatarUrl(
+  userId: string | undefined,
+  signedInUserId: string | undefined,
+  signedInAvatar: string | null | undefined,
+  avatarUrl: string | null | undefined,
+): string | null | undefined {
+  if (userId && signedInUserId === userId) {
+    return signedInAvatar ?? avatarUrl;
+  }
+  return avatarUrl;
 }
 
 /** Build a URL suitable for <img src> (adds access token for protected /files routes). */

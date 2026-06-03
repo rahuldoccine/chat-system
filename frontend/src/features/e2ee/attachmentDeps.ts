@@ -1,5 +1,6 @@
 import type { FileAttachmentMeta } from '../chat/utils/fileMeta';
-import type { Message } from '../chat/types';
+import type { ContentMeta, Message } from '../chat/types';
+import { isPlainObject, unknownToDisplayString } from '../../utils/plainObject';
 
 export function fileAttachmentIdentityKey(file: FileAttachmentMeta | undefined): string {
   if (!file) return '';
@@ -17,25 +18,23 @@ export function fileHasDecryptKeys(file: FileAttachmentMeta | undefined): boolea
   return Boolean(att?.fileKey && att?.iv);
 }
 
-export function transportMetaDepKey(meta: Record<string, unknown> | undefined): string {
+export function transportMetaDepKey(meta: ContentMeta | undefined): string {
   if (!meta) return '';
   const parts: string[] = [];
 
   const pushFiles = (list: unknown) => {
     if (!Array.isArray(list)) return;
     for (const entry of list) {
-      if (!entry || typeof entry !== 'object') continue;
-      const r = entry as Record<string, unknown>;
-      const att = r.attachment as { fileKey?: string; iv?: string } | undefined;
+      if (!isPlainObject(entry)) continue;
+      const att = entry.attachment as { fileKey?: string; iv?: string } | undefined;
       parts.push(
-        `${r.uploadId ?? ''}:${r.filename ?? ''}:${att?.fileKey ?? ''}:${att?.iv ?? ''}`,
+        `${unknownToDisplayString(entry.uploadId)}:${unknownToDisplayString(entry.filename)}:${att?.fileKey ?? ''}:${att?.iv ?? ''}`,
       );
     }
   };
 
   pushFiles(meta.files);
-  const refs = meta.attachmentRefs as { files?: unknown } | undefined;
-  pushFiles(refs?.files);
+  pushFiles(meta.attachmentRefs?.files);
 
   if (meta.voiceNote) parts.push('voice');
   const dur = meta.durationMs;

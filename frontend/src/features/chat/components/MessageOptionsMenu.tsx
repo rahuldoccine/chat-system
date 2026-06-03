@@ -52,10 +52,10 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
     };
   }, [onClose]);
 
-  const copyText = copyTextProp ?? getMessageCopyText(message);
+  const copyText = copyTextProp ?? getMessageCopyText(message, decryptedBodies, userId);
   const showCopy =
     canCopyMessage(message, decryptedBodies, userId) &&
-    (copyTextProp ?? getMessageCopyText(message, decryptedBodies, userId)).length > 0;
+    copyText.length > 0;
   const showEdit = canEditMessage(message, userId, decryptedBodies);
   const showDelete = isMe || canModerateDelete;
 
@@ -65,7 +65,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   };
 
   return (
-    <div className={`${styles.menu} ${isMe ? styles.menuMe : ''}`} ref={ref} role="menu">
+    <div className={`${styles.menu} ${isMe ? styles.menuMe : ''}`} ref={ref} role="menu" tabIndex={-1}>
       {showCopy && (
         <button type="button" className={styles.item} role="menuitem" onClick={() => run('copy')}>
           <Copy size={16} />

@@ -1,4 +1,4 @@
-import type { Friend, FriendStatus } from "@prisma/client";
+import type { Friend, FriendStatus, Prisma } from "@prisma/client";
 
 import { AppError } from "../../errors/index.js";
 import { assertNotBlockedPair } from "../../lib/moderation-guard.js";
@@ -18,20 +18,28 @@ function otherUserId(row: Friend, viewerId: string): string {
   return row.requesterId === viewerId ? row.addresseeId : row.requesterId;
 }
 
+function friendListWhere(
+  viewerId: string,
+  status: "accepted" | "incoming" | "outgoing",
+): Prisma.FriendWhereInput {
+  if (status === "accepted") {
+    return {
+      status: "ACCEPTED",
+      OR: [{ requesterId: viewerId }, { addresseeId: viewerId }],
+    };
+  }
+  if (status === "incoming") {
+    return { status: "PENDING", addresseeId: viewerId };
+  }
+  return { status: "PENDING", requesterId: viewerId };
+}
+
 export async function listFriends(
   viewerId: string,
   status: "accepted" | "incoming" | "outgoing",
 ): Promise<FriendListItemDto[]> {
   const prisma = getPrisma();
-  const where =
-    status === "accepted"
-      ? {
-          status: "ACCEPTED" as const,
-          OR: [{ requesterId: viewerId }, { addresseeId: viewerId }],
-        }
-      : status === "incoming"
-        ? { status: "PENDING" as const, addresseeId: viewerId }
-        : { status: "PENDING" as const, requesterId: viewerId };
+  const where = friendListWhere(viewerId, status);
 
   const rows = await prisma.friend.findMany({
     where,
@@ -68,7 +76,7 @@ export async function listFriends(
 export async function cancelFriendRequest(userId: string, friendId: string): Promise<void> {
   const prisma = getPrisma();
   const row = await prisma.friend.findUnique({ where: { id: friendId } });
-  if (!row || row.status !== "PENDING" || row.requesterId !== userId) {
+  if (row?.status !== "PENDING" || row?.requesterId !== userId) {
     throw new AppError(404, "NOT_FOUND", "Friend request not found");
   }
   await prisma.friend.delete({ where: { id: friendId } });
@@ -136,7 +144,7 @@ export async function requestFriend(
 export async function acceptFriend(userId: string, friendId: string) {
   const prisma = getPrisma();
   const row = await prisma.friend.findUnique({ where: { id: friendId } });
-  if (!row || row.status !== "PENDING" || row.addresseeId !== userId) {
+  if (row?.status !== "PENDING" || row?.addresseeId !== userId) {
     throw new AppError(404, "NOT_FOUND", "Friend request not found");
   }
   return prisma.friend.update({
@@ -148,7 +156,7 @@ export async function acceptFriend(userId: string, friendId: string) {
 export async function rejectFriend(userId: string, friendId: string) {
   const prisma = getPrisma();
   const row = await prisma.friend.findUnique({ where: { id: friendId } });
-  if (!row || row.status !== "PENDING" || row.addresseeId !== userId) {
+  if (row?.status !== "PENDING" || row?.addresseeId !== userId) {
     throw new AppError(404, "NOT_FOUND", "Friend request not found");
   }
   return prisma.friend.update({
@@ -161,7 +169,7 @@ export async function removeFriend(userId: string, otherUserId: string) {
   const prisma = getPrisma();
   const pairKey = pairKeyForUserIds(userId, otherUserId);
   const row = await prisma.friend.findUnique({ where: { pairKey } });
-  if (!row || row.status !== "ACCEPTED") {
+  if (row?.status !== "ACCEPTED") {
     throw new AppError(404, "NOT_FOUND", "Friendship not found");
   }
   if (row.requesterId !== userId && row.addresseeId !== userId) {

@@ -34,7 +34,7 @@
   margin: 0 0 16px;
   font-size: 0.875rem;
   line-height: 1.5;
-  color: var(--text-secondary, #64748b);
+  color: var(--text-secondary, #5c6b7a);
 }
 
 .form {

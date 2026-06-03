@@ -19,7 +19,10 @@ import AuthChatCacheSync from './features/chat/components/AuthChatCacheSync';
 import ConversationRealtimeSync from './features/chat/components/ConversationRealtimeSync';
 import PwaInstallPrompt from './features/pwa/PwaInstallPrompt';
 import App from './App';
+import { applyThemeFromStorage } from './themeBootstrap';
 import './index.css';
+
+applyThemeFromStorage();
 
 const updateSW = registerSW({
   immediate: true,
@@ -45,7 +48,9 @@ const updateSW = registerSW({
   },
 });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const rootEl = document.getElementById('root');
+if (!rootEl) throw new Error('Root element #root not found');
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

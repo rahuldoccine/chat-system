@@ -1,4 +1,5 @@
 import React from 'react';
+import { handler } from '../../utils/asyncHandler';
 import { ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -23,7 +24,7 @@ const E2eeUnlockBanner: React.FC = () => {
         Use the unlock dialog to enter your password, or sign in again. Settings → Privacy has
         account recovery if you reset your password by email.
       </p>
-      <button type="button" className={styles.action} onClick={() => void handleSignInAgain()}>
+      <button type="button" className={styles.action} onClick={handler(handleSignInAgain)}>
         Sign in again
       </button>
     </div>

@@ -6,7 +6,9 @@ import {
   type ReportStatus,
 } from '../hooks/useAdminReports';
 import { getApiErrorMessage } from '../hooks/useUserSettings';
+import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './EditReportModal.module.css';
+import { handlerSubmit } from '../../../utils/asyncHandler';
 
 const STATUS_OPTIONS: { value: ReportStatus; label: string; hint: string }[] = [
   { value: 'OPEN', label: 'Open', hint: 'Awaiting review' },
@@ -55,8 +57,7 @@ const EditReportModal: React.FC<EditReportModalProps> = ({
     return () => document.removeEventListener('keydown', handleKey);
   }, [isPending, onClose]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError(null);
     if (status === report.status) {
       onClose();
@@ -73,18 +74,14 @@ const EditReportModal: React.FC<EditReportModalProps> = ({
   };
 
   return (
-    <div
+    <ModalDialog
       className={styles.overlay}
-      role="presentation"
-      onClick={isPending ? undefined : onClose}
+      aria-labelledby="edit-report-title"
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
     >
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-report-title"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className={styles.modal}>
         <div className={styles.header}>
           <h3 id="edit-report-title">Edit report</h3>
           <button
@@ -98,7 +95,7 @@ const EditReportModal: React.FC<EditReportModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={(e) => void handleSubmit(e)}>
+        <form onSubmit={handlerSubmit(handleSubmit)}>
           <div className={styles.body}>
             <div className={styles.readOnlyBlock}>
               <div className={styles.readOnlyRow}>
@@ -170,7 +167,7 @@ const EditReportModal: React.FC<EditReportModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

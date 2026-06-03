@@ -41,7 +41,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   padding: 4px;
   border-radius: 6px;
 }
@@ -78,7 +78,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
 }
 
 .readOnlyValue {
@@ -127,7 +127,7 @@
 .fieldHint {
   margin: 0.4rem 0 0;
   font-size: 0.8rem;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
 }
 
 .error {
@@ -163,7 +163,7 @@
 
 .submitBtn {
   background: var(--primary, #6366f1);
-  color: white;
+  color: var(--primary-foreground);
 }
 
 .submitBtn:disabled,

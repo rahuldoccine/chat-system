@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { applyBlockStatusFromSocket } from '../features/chat/hooks/useBlockStatus';
@@ -14,6 +14,7 @@ import {
   subscribeTabSync,
 } from '../features/sync/tabCoordinator';
 import { probeNetworkReachable, setNetworkDown } from '../features/sync/connectivity';
+import { applyPresenceToConversationCache } from './socketPresence';
 
 interface SocketContextType {
   socket: typeof socketService;
@@ -82,28 +83,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return next;
       });
 
-      queryClientRef.current.setQueryData<{ data: any[]; nextCursor: string | null }>(
-        ['conversations'],
-        (old) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((chat) => {
-              if (chat.dmPeer && chat.dmPeer.id === data.userId) {
-                return {
-                  ...chat,
-                  dmPeer: {
-                    ...chat.dmPeer,
-                    isOnline: data.status === 'online',
-                    lastSeenAt: data.lastSeenAt || chat.dmPeer.lastSeenAt,
-                  },
-                };
-              }
-              return chat;
-            }),
-          };
-        },
-      );
+      applyPresenceToConversationCache(queryClientRef.current, data);
     };
 
     const handleSessionRevoked = () => {
@@ -222,15 +202,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [isAuthenticated, token]);
 
+  const value = useMemo(
+    () => ({
+      socket: socketService,
+      onlineUsers,
+      isConnected,
+      lastConnectedAt,
+    }),
+    [onlineUsers, isConnected, lastConnectedAt],
+  );
+
   return (
-    <SocketContext.Provider
-      value={{
-        socket: socketService,
-        onlineUsers,
-        isConnected,
-        lastConnectedAt,
-      }}
-    >
+    <SocketContext.Provider value={value}>
       {children}
     </SocketContext.Provider>
   );

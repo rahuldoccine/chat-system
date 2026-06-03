@@ -37,7 +37,7 @@
 
 .hint {
   font-size: 0.75rem;
-  color: #949ba4;
+  color: var(--sidebar-muted);
   line-height: 1.3;
 }
 

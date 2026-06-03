@@ -24,38 +24,82 @@ type GroupCallContextValue = {
   toggleCamera: () => boolean;
 };
 
+type StartAck = {
+  ok?: boolean;
+  data?: { sessionId: string; existing?: boolean; startedAt?: number };
+};
+
 const GroupCallContext = createContext<GroupCallContextValue | null>(null);
 
-export function GroupCallProvider({ children }: { children: React.ReactNode }) {
-  const { socket } = useSocket();
-  const { user } = useAuth();
-  const [state, setState] = useState<GroupCallState>({
+const INITIAL_STATE: GroupCallState = {
+  sessionId: null,
+  chatId: null,
+  kind: 'AUDIO',
+  participants: [],
+  localStream: null,
+  startedAtMs: null,
+};
+
+function stopLocalStream(stream: MediaStream | null): void {
+  stream?.getTracks().forEach((t) => t.stop());
+}
+
+function resolveStartedAtMs(
+  startedAt: number | undefined,
+  fallback: number | null,
+): number | null {
+  return typeof startedAt === 'number' ? startedAt : fallback;
+}
+
+function endGroupCallSession(state: GroupCallState, endedSessionId: string): GroupCallState {
+  if (state.sessionId !== endedSessionId) return state;
+  stopLocalStream(state.localStream);
+  return {
+    ...state,
     sessionId: null,
-    chatId: null,
-    kind: 'AUDIO',
     participants: [],
     localStream: null,
     startedAtMs: null,
-  });
+  };
+}
+
+function applyStartAck(
+  ack: StartAck | undefined,
+  userId: string,
+  emitJoin: (sessionId: string) => void,
+): (state: GroupCallState) => GroupCallState {
+  return (s) => {
+    if (!ack?.ok || !ack.data?.sessionId) return s;
+    const sessionId = ack.data.sessionId;
+    if (ack.data.existing) {
+      emitJoin(sessionId);
+    }
+    return {
+      ...s,
+      sessionId,
+      participants: [userId],
+      startedAtMs: resolveStartedAtMs(ack.data.startedAt, s.startedAtMs),
+    };
+  };
+}
+
+export function GroupCallProvider({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { socket } = useSocket();
+  const { user } = useAuth();
+  const [state, setState] = useState<GroupCallState>(INITIAL_STATE);
   const [dismissedIncomingSessionId, setDismissedIncomingSessionId] = useState<string | null>(null);
 
   const leaveGroupCall = useCallback(() => {
     if (socket && state.sessionId) {
       socket.emit('groupCall:leave', { sessionId: state.sessionId });
     }
-    state.localStream?.getTracks().forEach((t) => t.stop());
-    setState({
-      sessionId: null,
-      chatId: null,
-      kind: 'AUDIO',
-      participants: [],
-      localStream: null,
-      startedAtMs: null,
-    });
+    stopLocalStream(state.localStream);
+    setState(INITIAL_STATE);
   }, [socket, state.sessionId, state.localStream]);
 
   useEffect(() => {
     if (!socket) return;
+
     const onStarted = (p: {
       sessionId: string;
       chatId: string;
@@ -67,23 +111,22 @@ export function GroupCallProvider({ children }: { children: React.ReactNode }) {
         sessionId: p.sessionId,
         chatId: p.chatId,
         kind: p.kind,
-        startedAtMs: typeof p.startedAt === 'number' ? p.startedAt : s.startedAtMs,
+        startedAtMs: resolveStartedAtMs(p.startedAt, s.startedAtMs),
       }));
       setDismissedIncomingSessionId((prev) => (prev === p.sessionId ? null : prev));
     };
+
     const onUpdate = (p: { sessionId: string; participants: string[] }) => {
       setState((s) =>
         s.sessionId === p.sessionId ? { ...s, participants: p.participants } : s,
       );
     };
+
     const onEnded = (p: { sessionId: string }) => {
-      setState((s) => {
-        if (s.sessionId !== p.sessionId) return s;
-        s.localStream?.getTracks().forEach((t) => t.stop());
-        return { ...s, sessionId: null, participants: [], localStream: null, startedAtMs: null };
-      });
+      setState((s) => endGroupCallSession(s, p.sessionId));
       setDismissedIncomingSessionId((prev) => (prev === p.sessionId ? null : prev));
     };
+
     socket.on('groupCall:started', onStarted);
     socket.on('groupCall:participantUpdate', onUpdate);
     socket.on('groupCall:ended', onEnded);
@@ -104,26 +147,11 @@ export function GroupCallProvider({ children }: { children: React.ReactNode }) {
         }
         const kind: 'AUDIO' | 'VIDEO' = video ? 'VIDEO' : 'AUDIO';
         setState((s) => ({ ...s, chatId, kind, localStream: stream }));
-      socket.emit(
-        'groupCall:start',
-        { chatId, kind },
-        (ack: { ok?: boolean; data?: { sessionId: string; existing?: boolean; startedAt?: number } }) => {
-          if (ack?.ok && ack.data?.sessionId) {
-            const sessionId = ack.data.sessionId;
-            setState((s) => ({
-              ...s,
-              sessionId,
-              participants: [user.id],
-              startedAtMs:
-                typeof ack.data?.startedAt === 'number' ? ack.data.startedAt : s.startedAtMs,
-            }));
-            // A call already existed for this group: join that same session.
-            if (ack.data.existing) {
-              socket.emit('groupCall:join', { sessionId });
-            }
-          }
-        },
-      );
+        socket.emit('groupCall:start', { chatId, kind }, (ack: StartAck) => {
+          setState(applyStartAck(ack, user.id, (sessionId) => {
+            socket.emit('groupCall:join', { sessionId });
+          }));
+        });
       } catch (err) {
         toast.error(formatMediaError(err, video));
       }
@@ -176,6 +204,14 @@ export function GroupCallProvider({ children }: { children: React.ReactNode }) {
     [state, startGroupCall, joinGroupCall, leaveGroupCall, toggleMute, toggleCamera],
   );
 
+  const incomingSessionId = state.sessionId;
+  const incomingChatId = state.chatId;
+  const showIncoming =
+    incomingSessionId &&
+    incomingChatId &&
+    !state.localStream &&
+    dismissedIncomingSessionId !== incomingSessionId;
+
   return (
     <GroupCallContext.Provider value={value}>
       {children}
@@ -192,18 +228,21 @@ export function GroupCallProvider({ children }: { children: React.ReactNode }) {
           onToggleCamera={toggleCamera}
         />
       )}
-      {state.sessionId &&
-        state.chatId &&
-        !state.localStream &&
-        dismissedIncomingSessionId !== state.sessionId && (
-          <GroupCallIncomingPrompt
-            kind={state.kind}
-            participants={state.participants}
-            onJoinVoice={() => void joinGroupCall(state.sessionId!, state.chatId!, false)}
-            onJoinVideo={() => void joinGroupCall(state.sessionId!, state.chatId!, true)}
-            onDismiss={() => setDismissedIncomingSessionId(state.sessionId)}
-          />
-        )}
+      {showIncoming && (
+        <GroupCallIncomingPrompt
+          kind={state.kind}
+          participants={state.participants}
+          onJoinVoice={() => {
+            if (!incomingSessionId || !incomingChatId) return;
+            void joinGroupCall(incomingSessionId, incomingChatId, false);
+          }}
+          onJoinVideo={() => {
+            if (!incomingSessionId || !incomingChatId) return;
+            void joinGroupCall(incomingSessionId, incomingChatId, true);
+          }}
+          onDismiss={() => setDismissedIncomingSessionId(incomingSessionId)}
+        />
+      )}
     </GroupCallContext.Provider>
   );
 }

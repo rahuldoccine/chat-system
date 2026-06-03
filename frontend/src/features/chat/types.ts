@@ -116,11 +116,29 @@ export type Message = {
     e2eeVersion?: string;
     mentions?: { userIds?: string[]; all?: boolean };
     groupActivity?: Record<string, unknown>;
+    /** E2EE transport attachment manifest (no encryption keys). */
+    attachmentRefs?: {
+      files?: Array<{
+        uploadId?: string;
+        filename?: string;
+        originalName?: string;
+        url?: string;
+        mimetype?: string;
+        width?: number;
+        height?: number;
+      }>;
+    };
+    pollRefs?: { options?: Array<{ id: string; sortOrder: number }> };
+    pushPreview?: string;
+    epoch?: number;
+    mediaBlob?: unknown;
     senderFingerprint?: string;
     peerDeviceId?: string;
     senderDeviceId?: string;
   };
 };
+
+export type ContentMeta = NonNullable<Message['contentMeta']>;
 
 export type LinkDisplayMode = 'inline' | 'preview' | 'url';
 

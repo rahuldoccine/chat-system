@@ -3,6 +3,7 @@ import { Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import styles from './E2eeUnlockModal.module.css';
+import { handlerSubmit } from '../../utils/asyncHandler';
 
 const E2eeUnlockModal: React.FC = () => {
   const { e2eeKeysLocked, unlockE2eeWithPassword } = useAuth();
@@ -11,8 +12,7 @@ const E2eeUnlockModal: React.FC = () => {
 
   if (!e2eeKeysLocked) return null;
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async () => {
     if (!password.trim()) return;
     setBusy(true);
     try {
@@ -27,7 +27,7 @@ const E2eeUnlockModal: React.FC = () => {
   };
 
   return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="e2ee-unlock-title">
+    <dialog className={styles.overlay} open aria-labelledby="e2ee-unlock-title">
       <div className={styles.modal}>
         <div className={styles.header}>
           <ShieldAlert size={22} aria-hidden />
@@ -37,25 +37,26 @@ const E2eeUnlockModal: React.FC = () => {
           Your encryption keys are stored on this account but are not loaded on this device.
           Enter your sign-in password to restore them without signing out.
         </p>
-        <form className={styles.form} onSubmit={(e) => void handleSubmit(e)}>
-          <label className={styles.label}>
+        <form className={styles.form} onSubmit={handlerSubmit(handleSubmit)}>
+          <label className={styles.label} htmlFor="e2ee-unlock-password">
             Account password
-            <input
-              type="password"
-              className={styles.input}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              autoFocus
-            />
           </label>
+          <input
+            id="e2ee-unlock-password"
+            type="password"
+            className={styles.input}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            autoFocus
+          />
           <button type="submit" className={styles.primaryBtn} disabled={busy || !password}>
             {busy ? <Loader2 size={16} className={styles.spin} aria-hidden /> : null}
             Unlock keys
           </button>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 };
 

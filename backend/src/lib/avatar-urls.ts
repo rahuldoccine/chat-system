@@ -21,9 +21,9 @@ export function normalizeAvatarDbValue(
   }
 
   if (trimmed.includes("/files/")) {
-    const key = storageKeyFromUrl(
-      trimmed.startsWith("http") ? trimmed : `http://local${trimmed.startsWith("/") ? "" : "/"}${trimmed}`,
-    );
+    const pathPrefix = trimmed.startsWith("/") ? "" : "/";
+    const urlForKey = trimmed.startsWith("http") ? trimmed : `http://local${pathPrefix}${trimmed}`;
+    const key = storageKeyFromUrl(urlForKey);
     if (key) return path.basename(key.replaceAll("\\", "/"));
   }
 

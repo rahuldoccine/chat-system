@@ -50,26 +50,26 @@ export async function patchMe(userId: string, data: {
 }): Promise<PublicUser> {
   const prisma = getPrisma();
   const previousAvatarUrl =
-    data.avatarUrl !== undefined
-      ? (
+    data.avatarUrl === undefined
+      ? undefined
+      : (
           await prisma.user.findUnique({
             where: { id: userId },
             select: { avatarUrl: true },
           })
-        )?.avatarUrl ?? null
-      : undefined;
+        )?.avatarUrl ?? null;
 
   try {
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
-        ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
-        ...(data.username !== undefined ? { username: data.username } : {}),
-        ...(data.avatarUrl !== undefined
-          ? { avatarUrl: normalizeAvatarDbValue(data.avatarUrl) }
-          : {}),
-        ...(data.publicKey !== undefined ? { publicKey: data.publicKey } : {}),
-        ...(data.keyVersion !== undefined ? { keyVersion: data.keyVersion } : {}),
+        ...(data.displayName === undefined ? {} : { displayName: data.displayName }),
+        ...(data.username === undefined ? {} : { username: data.username }),
+        ...(data.avatarUrl === undefined
+          ? {}
+          : { avatarUrl: normalizeAvatarDbValue(data.avatarUrl) }),
+        ...(data.publicKey === undefined ? {} : { publicKey: data.publicKey }),
+        ...(data.keyVersion === undefined ? {} : { keyVersion: data.keyVersion }),
       },
     });
 

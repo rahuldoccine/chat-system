@@ -1,20 +1,7 @@
 import type { LinkDisplayMode, LinkPreviewMeta } from '../types';
+import { extractFirstHttpUrl } from '../../../utils/httpUrl';
 
-const URL_RE = /https?:\/\/[^\s<>"')\]]+/i;
-
-export function extractFirstHttpUrl(text: string): string | null {
-  const m = text.match(URL_RE);
-  if (!m) return null;
-  let raw = m[0];
-  while (/[.,;:!?)]$/.test(raw)) raw = raw.slice(0, -1);
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-    return u.href;
-  } catch {
-    return null;
-  }
-}
+export { extractFirstHttpUrl } from '../../../utils/httpUrl';
 
 export function linkDisplayMode(preview: LinkPreviewMeta): LinkDisplayMode {
   return preview.displayAs ?? 'inline';
@@ -78,6 +65,17 @@ export function withLinkDisplay(
   displayAs: LinkDisplayMode,
 ): LinkPreviewMeta {
   return { ...preview, displayAs };
+}
+
+export function resolveComposerLinkPreview(
+  previewDismissed: boolean,
+  fetchedPreview: LinkPreviewMeta | null | undefined,
+  urlInText: string | null,
+): LinkPreviewMeta | null {
+  if (previewDismissed) return null;
+  if (fetchedPreview) return fetchedPreview;
+  if (urlInText) return instantPreviewFromUrl(urlInText);
+  return null;
 }
 
 /** Synchronous preview from URL only — no network; shown immediately on paste/type. */

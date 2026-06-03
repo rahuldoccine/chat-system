@@ -3,7 +3,6 @@ import { socketService } from '../../services/socket';
 import { friendlySocketAckMessage } from '../../utils/userFriendlyErrors';
 import type { Chat, Message } from '../chat/types';
 import { prepareOutboundMessage } from '../e2ee/prepareOutbound';
-import { E2eePeerNotReadyError } from '../e2ee/directChat';
 import { canAttemptDelivery, shouldQueueLocallyAsync } from './connectivity';
 import {
   enqueueOutbox,
@@ -42,8 +41,6 @@ export type SendMessageInput = {
   /** Skip encryption when ciphertext was prepared externally (e.g. encrypted attachments). */
   preEncrypted?: { ciphertext: string; contentMeta: unknown };
 };
-
-export { E2eePeerNotReadyError };
 
 export type SendMessageResult = {
   message: Message;
@@ -114,7 +111,7 @@ function emitMessageSend(
 ): Promise<{ message: Message; idempotent?: boolean }> {
   return new Promise((resolve, reject) => {
     const timer = globalThis.setTimeout(() => {
-      reject(new Error(friendlySocketAckMessage('TIMEOUT', undefined)));
+      reject(new Error(friendlySocketAckMessage('TIMEOUT')));
     }, SEND_TIMEOUT_MS);
 
     socketService.emit(
@@ -201,7 +198,7 @@ export async function deliverOutboxEntry(entry: OutboxEntry): Promise<SendMessag
 let flushInFlight: Promise<void> | null = null;
 
 export async function flushOutbox(): Promise<void> {
-  if (flushInFlight) return flushInFlight;
+  if (flushInFlight !== null) return flushInFlight;
   flushInFlight = (async () => {
     const pending = await listPendingOutbox();
     if (!pending.length) return;

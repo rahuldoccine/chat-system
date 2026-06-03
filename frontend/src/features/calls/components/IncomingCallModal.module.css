@@ -37,7 +37,7 @@
 
 .sub {
   font-size: 0.875rem;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground);
   margin: 0 0 1.5rem;
 }
 
@@ -74,8 +74,8 @@
 }
 
 .acceptBtn {
-  background: #16a34a;
-  color: white;
+  background: #15803d;
+  color: var(--primary-foreground);
 }
 
 .acceptBtn:hover {

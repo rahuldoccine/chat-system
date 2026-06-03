@@ -10,38 +10,57 @@ import api from '../../../api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import type { Chat, Message, PollDetail } from '../types';
 import { patchReactionOnMessage } from '../utils/messageReactions';
-import { patchMessageInCache, removeMessageFromCache } from '../utils/messageCache';
 import {
   flattenMessagePages,
   mergeMessageIntoInfiniteCache,
-  mergeMessageIntoThreadCache,
-  patchMessageInThreadCache,
-  removeMessageFromThreadCache,
   threadMessagesQueryKey,
   type MessagePage,
-  type ThreadMessagesCache,
 } from '../utils/messageQueryCache';
 import { flushOutbox, sendMessageUnified } from '../../sync/sendMessage';
 import { canAttemptDelivery as canAttemptDeliveryAsync } from '../../sync/connectivity';
 import { buildOptimisticMessage } from '../../sync/optimisticMessage';
-import { linkSentMessageId, rememberSentPlaintext, rememberSentPayloadMeta } from '../../e2ee/sentPlaintextCache';
+import { linkSentMessageId } from '../../e2ee/sentPlaintextCache';
 import { isDmE2eeChat, isE2eeChat } from '../../e2ee/chatE2ee';
 import { prepareOutboundMessage, prepareOutboundPoll } from '../../e2ee/prepareOutbound';
-import { latestPeerSenderDeviceId } from '../../e2ee/peerDevice';
+import {
+  applyFinalizedMessageToCaches,
+  applyOptimisticMessageToCaches,
+  cacheOptimisticE2eeDraft,
+  markSendingMessagesAsError,
+  normalizeEditedAt,
+  patchEditedMessageInCaches,
+  rememberEditedE2eeContent,
+  rememberOutboundE2eePlaintext,
+  removeMessageFromAllCaches,
+  resolvePreferPeerDeviceId,
+} from './useChatData.helpers';
+
+function useAuthApiGet<T>(
+  queryKey: unknown[],
+  path: string,
+  enabled: boolean,
+  options?: { params?: Record<string, string | number>; refetchOnMount?: 'always' },
+) {
+  return useQuery<T>({
+    queryKey,
+    queryFn: async () => {
+      const response = await api.get(path, options?.params ? { params: options.params } : undefined);
+      return response.data as T;
+    },
+    enabled,
+    staleTime: 0,
+    ...(options?.refetchOnMount ? { refetchOnMount: options.refetchOnMount } : {}),
+  });
+}
 
 export const useConversations = () => {
   const { isAuthenticated } = useAuth();
-
-  return useQuery<{ data: Chat[], nextCursor: string | null }>({
-    queryKey: ['conversations'],
-    queryFn: async () => {
-      const response = await api.get('/chats');
-      return response.data;
-    },
-    enabled: isAuthenticated,
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
+  return useAuthApiGet<{ data: Chat[]; nextCursor: string | null }>(
+    ['conversations'],
+    '/chats',
+    isAuthenticated,
+    { refetchOnMount: 'always' },
+  );
 };
 
 export type DiscoverableUser = {
@@ -53,19 +72,12 @@ export type DiscoverableUser = {
 };
 
 export const useSearchUsers = (query: string, enabled = true) => {
-  return useQuery<{ data: DiscoverableUser[] }>({
-    queryKey: ['users', 'search', query],
-    queryFn: async () => {
-      const response = await api.get('/users/search', {
-        params: { q: query, limit: 30 },
-      });
-      return response.data;
-    },
+  return useAuthApiGet<{ data: DiscoverableUser[] }>(
+    ['users', 'search', query],
+    '/users/search',
     enabled,
-    // User directory changes after dev seed/remove; avoid stale IDs (404 on create DM).
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
+    { params: { q: query, limit: 30 }, refetchOnMount: 'always' },
+  );
 };
 
 export const useCreateDirectChat = () => {
@@ -140,7 +152,12 @@ export const useThreadMessages = (chatId: string | null, rootMessageId: string |
   });
 };
 
-export { mergeMessageIntoInfiniteCache, flattenMessagePages, type MessagePage, type ThreadMessagesCache };
+export {
+  mergeMessageIntoInfiniteCache,
+  flattenMessagePages,
+  type MessagePage,
+  type ThreadMessagesCache,
+} from '../utils/messageQueryCache';
 
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
@@ -173,25 +190,10 @@ export const useSendMessage = () => {
       preEncrypted?: { ciphertext: string; contentMeta: unknown };
     }) => {
       const clientMessageId = crypto.randomUUID();
-
-      let preferPeerDeviceId: string | null = null;
-      if (peerUserId) {
-        const cached = queryClient.getQueryData<{ pages: MessagePage[] }>(['messages', chatId]);
-        preferPeerDeviceId = latestPeerSenderDeviceId(
-          flattenMessagePages(cached?.pages),
-          peerUserId,
-        );
-      }
+      const preferPeerDeviceId = resolvePreferPeerDeviceId(queryClient, chatId, peerUserId);
 
       if (user?.id && chat && isE2eeChat(chat)) {
-        const plainMeta =
-          contentMeta && typeof contentMeta === 'object'
-            ? (contentMeta as Record<string, unknown>)
-            : undefined;
-        rememberSentPlaintext(user.id, clientMessageId, text ?? '');
-        if (plainMeta && Object.keys(plainMeta).length > 0) {
-          rememberSentPayloadMeta(user.id, clientMessageId, plainMeta);
-        }
+        cacheOptimisticE2eeDraft(user.id, chat, clientMessageId, text, contentMeta);
       }
 
       if (user) {
@@ -208,27 +210,12 @@ export const useSendMessage = () => {
             contentMeta: contentMeta as Message['contentMeta'],
           },
         );
-        if (threadRootId) {
-          queryClient.setQueryData<ThreadMessagesCache>(
-            threadMessagesQueryKey(chatId, threadRootId),
-            (old) => (old ? mergeMessageIntoThreadCache(old, optimistic) : old),
-          );
-          if (broadcastToChannel) {
-            queryClient.setQueryData(['messages', chatId], (old) =>
-              mergeMessageIntoInfiniteCache(
-                old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-                optimistic,
-              ) ?? old,
-            );
-          }
-        } else {
-          queryClient.setQueryData(['messages', chatId], (old) =>
-            mergeMessageIntoInfiniteCache(
-              old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-              optimistic,
-            ) ?? old,
-          );
-        }
+        applyOptimisticMessageToCaches(queryClient, {
+          chatId,
+          threadRootId,
+          broadcastToChannel,
+          optimistic,
+        });
       }
 
       const result = await sendMessageUnified({
@@ -251,98 +238,45 @@ export const useSendMessage = () => {
       if (user?.id && !result.queued) {
         linkSentMessageId(user.id, clientMessageId, result.message.id);
         if (chat && isE2eeChat(chat)) {
-          rememberSentPlaintext(user.id, clientMessageId, text ?? '', result.message.id);
-          const plainMeta =
-            contentMeta && typeof contentMeta === 'object'
-              ? (contentMeta as Record<string, unknown>)
-              : undefined;
-          if (plainMeta && Object.keys(plainMeta).length > 0) {
-            rememberSentPayloadMeta(user.id, clientMessageId, plainMeta, result.message.id);
-          }
+          rememberOutboundE2eePlaintext(
+            user.id,
+            clientMessageId,
+            text,
+            contentMeta,
+            result.message.id,
+          );
         }
       }
 
       return { ...result, chatId, clientMessageId };
     },
     onSuccess: (data, variables) => {
-      const finalized = {
-        ...data.message,
-        clientMessageId: data.clientMessageId,
-        receiptStatus: 'sent' as const,
-        status: data.queued ? ('sending' as const) : undefined,
-      };
       const threadRootId = variables.threadRootId ?? data.message.threadRootId;
 
+      applyFinalizedMessageToCaches(queryClient, {
+        chatId: data.chatId,
+        threadRootId,
+        broadcastToChannel: variables.broadcastToChannel ?? data.message.broadcastToChannel,
+        message: data.message,
+        clientMessageId: data.clientMessageId,
+        queued: data.queued,
+      });
+
       if (data.queued) {
-        if (threadRootId) {
-          queryClient.setQueryData<ThreadMessagesCache>(
-            threadMessagesQueryKey(data.chatId, threadRootId),
-            (old) => (old ? mergeMessageIntoThreadCache(old, finalized) : old),
-          );
-          if (variables.broadcastToChannel) {
-            queryClient.setQueryData(['messages', data.chatId], (old) =>
-              mergeMessageIntoInfiniteCache(
-                old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-                finalized,
-              ) ?? old,
-            );
-          }
-        } else {
-          queryClient.setQueryData(['messages', data.chatId], (old) =>
-            mergeMessageIntoInfiniteCache(
-              old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-              finalized,
-            ) ?? old,
-          );
-        }
         void canAttemptDeliveryAsync().then((ok) => {
           if (ok) void flushOutbox();
         });
         return;
       }
+
       if (user?.id) {
         linkSentMessageId(user.id, data.clientMessageId, data.message.id);
-      }
-      if (threadRootId) {
-        queryClient.setQueryData<ThreadMessagesCache>(
-          threadMessagesQueryKey(data.message.chatId, threadRootId),
-          (old) => (old ? mergeMessageIntoThreadCache(old, finalized) : old),
-        );
-        if (data.message.broadcastToChannel) {
-          queryClient.setQueryData(['messages', data.message.chatId], (old) =>
-            mergeMessageIntoInfiniteCache(
-              old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-              finalized,
-            ) ?? old,
-          );
-        }
-      } else {
-        queryClient.setQueryData(['messages', data.message.chatId], (old) =>
-          mergeMessageIntoInfiniteCache(
-            old as Parameters<typeof mergeMessageIntoInfiniteCache>[0],
-            finalized,
-          ) ?? old,
-        );
       }
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (_err, variables) => {
       if (!user?.id) return;
-      queryClient.setQueryData(['messages', variables.chatId], (old) => {
-        const pages = old as { pages: MessagePage[] } | undefined;
-        if (!pages?.pages?.length) return old;
-        return {
-          ...pages,
-          pages: pages.pages.map((page: MessagePage) => ({
-            ...page,
-            data: page.data.map((m: Message) =>
-              m.status === 'sending' && m.senderId === user.id
-                ? { ...m, status: 'error' as const }
-                : m,
-            ),
-          })),
-        };
-      });
+      markSendingMessagesAsError(queryClient, variables.chatId, user.id);
     },
   });
 };
@@ -363,13 +297,11 @@ export const useCreatePoll = () => {
     }) => {
       if (isDmE2eeChat(input.chat ?? null) && input.userId) {
         const clientMessageId = input.clientMessageId ?? crypto.randomUUID();
-        const cached = queryClient.getQueryData<{ pages: MessagePage[] }>([
-          'messages',
+        const preferPeerDeviceId = resolvePreferPeerDeviceId(
+          queryClient,
           input.chatId,
-        ]);
-        const preferPeerDeviceId = input.peerUserId
-          ? latestPeerSenderDeviceId(flattenMessagePages(cached?.pages), input.peerUserId)
-          : null;
+          input.peerUserId,
+        );
         const prepared = await prepareOutboundPoll(input.userId, {
           chat: input.chat,
           peerUserId: input.peerUserId,
@@ -457,44 +389,24 @@ export const useEditMessage = () => {
     onSuccess: (data, { chatId, messageId, text, chat }) => {
       const updated = data?.message;
       if (!updated) return;
-      const editedAt =
-        updated.editedAt != null
-          ? typeof updated.editedAt === 'string'
-            ? updated.editedAt
-            : new Date(updated.editedAt as string | number | Date).toISOString()
-          : new Date().toISOString();
+      const editedAt = normalizeEditedAt(updated.editedAt);
 
       if (user?.id && isE2eeChat(chat ?? null)) {
         const cacheKey = updated.clientMessageId ?? messageId;
-        rememberSentPlaintext(user.id, cacheKey, text, updated.id);
-        if (updated.contentMeta && typeof updated.contentMeta === 'object') {
-          const inner = { ...(updated.contentMeta as Record<string, unknown>) };
-          delete inner.e2eeVersion;
-          delete inner.preview;
-          if (Object.keys(inner).length) {
-            rememberSentPayloadMeta(user.id, cacheKey, inner, updated.id);
-          }
-        }
+        rememberEditedE2eeContent(user.id, cacheKey, text, updated);
       }
 
-      queryClient.setQueryData(['messages', chatId], (old: unknown) =>
-        patchMessageInCache(old as Parameters<typeof patchMessageInCache>[0], messageId, {
+      patchEditedMessageInCaches(
+        queryClient,
+        chatId,
+        messageId,
+        {
           ciphertext: updated.ciphertext ?? '',
           editedAt,
           contentMeta: updated.contentMeta,
-        }),
+        },
+        updated.threadRootId,
       );
-      if (updated.threadRootId) {
-        queryClient.setQueryData<ThreadMessagesCache>(
-          threadMessagesQueryKey(chatId, updated.threadRootId),
-          (old) =>
-            patchMessageInThreadCache(old, messageId, {
-              ciphertext: updated.ciphertext ?? '',
-              editedAt,
-              contentMeta: updated.contentMeta,
-            }),
-        );
-      }
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
@@ -508,13 +420,7 @@ export const useDeleteMessage = () => {
       return { messageId };
     },
     onSuccess: (_data, { chatId, messageId }) => {
-      queryClient.setQueryData(['messages', chatId], (old: unknown) =>
-        removeMessageFromCache(old as Parameters<typeof removeMessageFromCache>[0], messageId),
-      );
-      queryClient.setQueriesData<ThreadMessagesCache>(
-        { queryKey: ['threadMessages', chatId] },
-        (old) => removeMessageFromThreadCache(old, messageId),
-      );
+      removeMessageFromAllCaches(queryClient, chatId, messageId);
       queryClient.invalidateQueries({ queryKey: ['pins', chatId] });
     },
   });
@@ -540,85 +446,69 @@ export type ChatUnreadBoundary = {
   messageIds?: string[];
 };
 
-export const useChatUnreadBoundary = (chatId: string | null) => {
-  return useQuery<ChatUnreadBoundary>({
-    queryKey: ['chatUnread', chatId],
+function useChatScopedGetQuery<T>(
+  chatId: string | null,
+  queryKey: string,
+  pathSuffix: string,
+  options?: { refetchOnMount?: 'always' },
+) {
+  return useQuery<T>({
+    queryKey: [queryKey, chatId],
     queryFn: async () => {
-      const response = await api.get(`/chats/${chatId}/unread`);
-      return response.data as ChatUnreadBoundary;
+      const response = await api.get(`/chats/${chatId}${pathSuffix}`);
+      return response.data as T;
     },
     enabled: !!chatId,
     staleTime: 0,
+    ...(options?.refetchOnMount ? { refetchOnMount: options.refetchOnMount } : {}),
+  });
+}
+
+export const useChatUnreadBoundary = (chatId: string | null) =>
+  useChatScopedGetQuery<ChatUnreadBoundary>(chatId, 'chatUnread', '/unread', {
     refetchOnMount: 'always',
   });
-};
 
-export const usePinnedMessages = (chatId: string | null) => {
-  return useQuery<{ data: PinnedMessageEntry[] }>({
-    queryKey: ['pins', chatId],
-    queryFn: async () => {
-      const response = await api.get(`/chats/${chatId}/pins`);
-      return response.data;
-    },
-    enabled: !!chatId,
-  });
-};
+export const usePinnedMessages = (chatId: string | null) =>
+  useChatScopedGetQuery<{ data: PinnedMessageEntry[] }>(chatId, 'pins', '/pins');
 
-export const usePinMessage = () => {
+function useInvalidatePinsOnSuccess() {
   const queryClient = useQueryClient();
+  return (chatId: string) => {
+    queryClient.invalidateQueries({ queryKey: ['pins', chatId] });
+  };
+}
+
+function usePinMutation(method: 'post' | 'delete') {
+  const invalidatePins = useInvalidatePinsOnSuccess();
   return useMutation({
     mutationFn: async ({ messageId }: { chatId: string; messageId: string }) => {
-      const response = await api.post(`/messages/${messageId}/pin`);
-      return response.data as { chatId: string; messageId: string };
-    },
-    onSuccess: ({ chatId }) => {
-      queryClient.invalidateQueries({ queryKey: ['pins', chatId] });
-    },
-  });
-};
-
-export const useUnpinMessage = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ messageId }: { chatId: string; messageId: string }) => {
+      if (method === 'post') {
+        const response = await api.post(`/messages/${messageId}/pin`);
+        return response.data as { chatId: string; messageId: string };
+      }
       await api.delete(`/messages/${messageId}/pin`);
       return { messageId };
     },
     onSuccess: (_data, { chatId }) => {
-      queryClient.invalidateQueries({ queryKey: ['pins', chatId] });
+      invalidatePins(chatId);
     },
   });
-};
+}
 
-export const useAddReaction = () => {
+export const usePinMessage = () => usePinMutation('post');
+export const useUnpinMessage = () => usePinMutation('delete');
+
+function useReactionMutation(mode: 'add' | 'remove') {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const userId = user?.id ?? '';
   return useMutation({
     mutationFn: async ({ messageId, emoji }: { chatId: string; messageId: string; emoji: string }) => {
-      const response = await api.post(`/messages/${messageId}/reactions`, { emoji });
-      return response.data as { chatId: string; messageId: string; emoji: string };
-    },
-    onMutate: async ({ chatId, messageId, emoji }) => {
-      await queryClient.cancelQueries({ queryKey: ['messages', chatId] });
-      const previous = queryClient.getQueryData(['messages', chatId]);
-      queryClient.setQueryData(['messages', chatId], (old: any) =>
-        patchReactionOnMessage(old, messageId, emoji, 'add', user?.id ?? '', user?.id ?? ''),
-      );
-      return { previous, chatId };
-    },
-    onError: (_err, { chatId }, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['messages', chatId], context.previous);
+      if (mode === 'add') {
+        const response = await api.post(`/messages/${messageId}/reactions`, { emoji });
+        return response.data as { chatId: string; messageId: string; emoji: string };
       }
-    },
-  });
-};
-
-export const useRemoveReaction = () => {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async ({ messageId, emoji }: { chatId: string; messageId: string; emoji: string }) => {
       await api.delete(`/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);
       return { messageId, emoji };
     },
@@ -626,7 +516,7 @@ export const useRemoveReaction = () => {
       await queryClient.cancelQueries({ queryKey: ['messages', chatId] });
       const previous = queryClient.getQueryData(['messages', chatId]);
       queryClient.setQueryData(['messages', chatId], (old: any) =>
-        patchReactionOnMessage(old, messageId, emoji, 'remove', user?.id ?? '', user?.id ?? ''),
+        patchReactionOnMessage(old, messageId, emoji, mode, userId, userId),
       );
       return { previous, chatId };
     },
@@ -636,4 +526,7 @@ export const useRemoveReaction = () => {
       }
     },
   });
-};
+}
+
+export const useAddReaction = () => useReactionMutation('add');
+export const useRemoveReaction = () => useReactionMutation('remove');

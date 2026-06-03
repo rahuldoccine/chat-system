@@ -13,19 +13,16 @@ function patchMessage(message: Message, profile: ProfileBroadcast): Message {
   let next = message;
 
   if (message.senderId === profile.id) {
-    const displayName =
-      profile.displayName !== undefined && profile.displayName !== null
-        ? profile.displayName
-        : message.sender.displayName;
+    const displayName = profile.displayName ?? message.sender.displayName;
     next = {
       ...next,
       sender: {
         ...next.sender,
         displayName,
         name: displayName ?? next.sender.name,
-        ...(profile.avatarUrl !== undefined
-          ? { avatarUrl: profile.avatarUrl ?? undefined }
-          : {}),
+        ...(profile.avatarUrl === undefined
+          ? {}
+          : { avatarUrl: profile.avatarUrl ?? undefined }),
       },
     };
   }
@@ -33,8 +30,7 @@ function patchMessage(message: Message, profile: ProfileBroadcast): Message {
   if (
     next.replyTo?.senderId === profile.id &&
     next.replyTo.sender &&
-    profile.displayName !== undefined &&
-    profile.displayName !== null
+    profile.displayName != null
   ) {
     next = {
       ...next,
@@ -60,7 +56,7 @@ export function syncUserProfileInCaches(
       ? {
           ...old,
           displayName: profile.displayName ?? old.displayName,
-          username: profile.username !== undefined ? profile.username : old.username,
+          username: profile.username ?? old.username,
           avatarUrl: profile.avatarUrl,
         }
       : old,
@@ -78,15 +74,15 @@ export function syncUserProfileInCaches(
               ...chat,
               dmPeer: {
                 ...chat.dmPeer,
-                ...(profile.displayName !== undefined && profile.displayName !== null
-                  ? { displayName: profile.displayName }
-                  : {}),
-                ...(profile.username !== undefined
-                  ? { username: profile.username ?? undefined }
-                  : {}),
-                ...(profile.avatarUrl !== undefined
-                  ? { avatarUrl: profile.avatarUrl ?? undefined }
-                  : {}),
+                ...(profile.displayName == null
+                  ? {}
+                  : { displayName: profile.displayName }),
+                ...(profile.username === undefined
+                  ? {}
+                  : { username: profile.username ?? undefined }),
+                ...(profile.avatarUrl === undefined
+                  ? {}
+                  : { avatarUrl: profile.avatarUrl ?? undefined }),
               },
             };
           }
@@ -120,10 +116,9 @@ export function syncUserProfileInCaches(
           u.id === profile.id
             ? {
                 ...u,
-                displayName:
-                  profile.displayName !== undefined ? profile.displayName : u.displayName,
-                username: profile.username !== undefined ? profile.username : u.username,
-                avatarUrl: profile.avatarUrl !== undefined ? profile.avatarUrl : u.avatarUrl,
+                displayName: profile.displayName ?? u.displayName,
+                username: profile.username ?? u.username,
+                avatarUrl: profile.avatarUrl ?? u.avatarUrl,
               }
             : u,
         ),

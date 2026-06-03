@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Message, LinkPreviewMeta } from '../chat/types';
 import { useAuth } from '../../context/AuthContext';
 import { decryptDirectMessage, isE2eeMessage } from './directChat';
@@ -32,6 +32,61 @@ export type DecryptedBody = {
 
 const DECRYPT_CHUNK = 12;
 
+async function decryptMessageChunk(
+  chunk: Message[],
+  userId: string,
+  material: NonNullable<Awaited<ReturnType<typeof getLocalKeyMaterial>>>,
+  fingerprintCache: Map<string, string>,
+  isCancelled: () => boolean,
+  onBody: (messageId: string, body: DecryptedBody) => void,
+): Promise<void> {
+  for (const msg of chunk) {
+    if (isCancelled()) return;
+    const body = await resolveDecryptedBody(userId, msg, material, fingerprintCache);
+    if (isCancelled()) return;
+    onBody(msg.id, body);
+  }
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+type SetBodiesFn = React.Dispatch<React.SetStateAction<Record<string, DecryptedBody>>>;
+
+async function runMessageBodiesDecrypt(
+  userId: string,
+  messages: Message[],
+  isCancelled: () => boolean,
+  setBodies: SetBodiesFn,
+): Promise<void> {
+  await Promise.all([
+    ensureSentPlaintextHydrated(userId),
+    ensureDecryptedPayloadHydrated(userId),
+  ]);
+
+  const { initial, toDecrypt } = await partitionMessagesForDecrypt(messages, userId);
+
+  if (!isCancelled() && Object.keys(initial).length) {
+    setBodies((prev) => ({ ...prev, ...initial }));
+  }
+
+  if (!toDecrypt.length || isCancelled()) return;
+
+  const material = await getLocalKeyMaterial(userId);
+  if (!material || isCancelled()) return;
+
+  const fingerprintCache = new Map<string, string>();
+  const onBody = (messageId: string, body: DecryptedBody) => {
+    setBodies((prev) => ({ ...prev, [messageId]: body }));
+  };
+
+  for (let i = 0; i < toDecrypt.length; i += DECRYPT_CHUNK) {
+    if (isCancelled()) return;
+    const chunk = toDecrypt.slice(i, i + DECRYPT_CHUNK);
+    await decryptMessageChunk(chunk, userId, material, fingerprintCache, isCancelled, onBody);
+  }
+}
+
 function metaHasMediaAttachments(meta: Record<string, unknown> | undefined): boolean {
   if (!meta) return false;
   if (meta.voiceNote || meta.mediaBlob) return true;
@@ -44,9 +99,9 @@ function metaHasMediaAttachments(meta: Record<string, unknown> | undefined): boo
 function messageHasMediaAttachments(msg: Message, meta?: Record<string, unknown>): boolean {
   if (msg.kind === 'IMAGE' || msg.kind === 'FILE') return true;
   if (metaHasMediaAttachments(meta)) return true;
-  const transport = msg.contentMeta as Record<string, unknown> | undefined;
+  const transport = msg.contentMeta;
   if (metaHasMediaAttachments(transport)) return true;
-  const refs = transport?.attachmentRefs as { files?: unknown } | undefined;
+  const refs = transport?.attachmentRefs;
   return Array.isArray(refs?.files) && refs.files.length > 0;
 }
 
@@ -69,6 +124,112 @@ function unavailableSenderBody(msg: Message): DecryptedBody {
   return {
     text: messageHasMediaAttachments(msg) ? '' : '[Sent message unavailable on this device]',
   };
+}
+
+function plaintextBodyForMessage(msg: Message): DecryptedBody | null {
+  if (msg.ciphertext == null) return null;
+  return { text: msg.ciphertext };
+}
+
+async function senderBodyFromCache(
+  userId: string,
+  msg: Message,
+): Promise<DecryptedBody | null> {
+  const sent = getSentPlaintext(userId, msg) ?? (await getSentPlaintextAsync(userId, msg));
+  const sentMeta = getSentPayloadMeta(userId, msg);
+  const preview = sentMeta?.preview as LinkPreviewMeta | undefined;
+  if (sent === undefined && !sentMeta) return null;
+  return {
+    text: senderE2eeDisplayText(msg, sent, sentMeta),
+    preview,
+    meta: sentMeta,
+  };
+}
+
+async function cachedPeerBody(
+  userId: string,
+  msg: Message,
+  fp: string,
+): Promise<DecryptedBody | null> {
+  return (
+    getPayloadFromMemory(userId, msg.id, fp) ?? (await getPayloadCached(userId, msg.id, fp))
+  );
+}
+
+async function partitionMessagesForDecrypt(
+  messages: Message[],
+  userId: string,
+): Promise<{ initial: Record<string, DecryptedBody>; toDecrypt: Message[] }> {
+  const initial: Record<string, DecryptedBody> = {};
+  const toDecrypt: Message[] = [];
+
+  for (const msg of messages) {
+    if (!isE2eeMessage(msg)) {
+      const plain = plaintextBodyForMessage(msg);
+      if (plain) initial[msg.id] = plain;
+      continue;
+    }
+
+    const fp = ciphertextFingerprint(msg.ciphertext);
+
+    if (msg.senderId === userId) {
+      const senderBody = await senderBodyFromCache(userId, msg);
+      if (senderBody) {
+        initial[msg.id] = senderBody;
+        continue;
+      }
+      toDecrypt.push(msg);
+      continue;
+    }
+
+    const cached = await cachedPeerBody(userId, msg, fp);
+    if (cached) {
+      initial[msg.id] = cached;
+      continue;
+    }
+
+    toDecrypt.push(msg);
+  }
+
+  return { initial, toDecrypt };
+}
+
+async function resolveDecryptedBody(
+  userId: string,
+  msg: Message,
+  material: NonNullable<Awaited<ReturnType<typeof getLocalKeyMaterial>>>,
+  fingerprintCache: Map<string, string>,
+): Promise<DecryptedBody> {
+  const fp = ciphertextFingerprint(msg.ciphertext);
+  let payload = await decryptMessagePayload(userId, msg, material, fingerprintCache);
+
+  if (!payload) {
+    const retried = await retryDecryptMessage(userId, msg, material, fingerprintCache);
+    payload = retried.payload;
+    if (!payload) {
+      logDecryptFailure(msg, retried.reason);
+    }
+  }
+
+  if (payload) {
+    const body = bodyFromPayload(payload);
+    const senderDeviceId = msg.contentMeta?.senderDeviceId;
+    if (typeof senderDeviceId === 'string') {
+      rememberPeerDevice(msg.senderId, senderDeviceId);
+    }
+    void rememberPayload(userId, msg.id, fp, body);
+    return body;
+  }
+
+  if (msg.senderId === userId) {
+    return unavailableSenderBody(msg);
+  }
+  if (isGroupE2eeMessage(msg)) {
+    return { text: '[Unable to decrypt]' };
+  }
+
+  const plain = await decryptDirectMessage(userId, msg, userId);
+  return { text: plain ?? '[Unable to decrypt]' };
 }
 
 export function useMessageBodies(
@@ -100,123 +261,11 @@ export function useMessageBodies(
   useEffect(() => {
     if (!user?.id || !messages?.length || e2eeKeysLocked) return;
     let cancelled = false;
-
-    const run = async () => {
-      await Promise.all([
-        ensureSentPlaintextHydrated(user.id),
-        ensureDecryptedPayloadHydrated(user.id),
-      ]);
-
-      const initial: Record<string, DecryptedBody> = {};
-      const toDecrypt: Message[] = [];
-
-      for (const msg of messages) {
-        if (!isE2eeMessage(msg)) {
-          if (msg.ciphertext != null) initial[msg.id] = { text: msg.ciphertext };
-          continue;
-        }
-
-        const fp = ciphertextFingerprint(msg.ciphertext);
-
-        if (msg.senderId === user.id) {
-          const sent =
-            getSentPlaintext(user.id, msg) ?? (await getSentPlaintextAsync(user.id, msg));
-          const sentMeta = getSentPayloadMeta(user.id, msg);
-          const preview = sentMeta?.preview as LinkPreviewMeta | undefined;
-          if (sent !== undefined || sentMeta) {
-            initial[msg.id] = {
-              text: senderE2eeDisplayText(msg, sent, sentMeta),
-              preview,
-              meta: sentMeta,
-            };
-            continue;
-          }
-          toDecrypt.push(msg);
-          continue;
-        }
-
-        const cached =
-          getPayloadFromMemory(user.id, msg.id, fp) ??
-          (await getPayloadCached(user.id, msg.id, fp));
-        if (cached) {
-          initial[msg.id] = cached;
-        } else {
-          toDecrypt.push(msg);
-        }
-      }
-
-      if (!cancelled && Object.keys(initial).length) {
-        setBodies((prev) => ({ ...prev, ...initial }));
-      }
-
-      if (!toDecrypt.length || cancelled) return;
-
-      const material = await getLocalKeyMaterial(user.id);
-      if (!material || cancelled) return;
-
-      const fingerprintCache = new Map<string, string>();
-
-      for (let i = 0; i < toDecrypt.length; i += DECRYPT_CHUNK) {
-        if (cancelled) return;
-
-        const chunk = toDecrypt.slice(i, i + DECRYPT_CHUNK);
-        await Promise.all(
-          chunk.map(async (msg) => {
-            const fp = ciphertextFingerprint(msg.ciphertext);
-            let payload = await decryptMessagePayload(
-              user.id,
-              msg,
-              material,
-              fingerprintCache,
-            );
-
-            if (!payload) {
-              const retried = await retryDecryptMessage(
-                user.id,
-                msg,
-                material,
-                fingerprintCache,
-              );
-              payload = retried.payload;
-              if (!payload) {
-                logDecryptFailure(msg, retried.reason);
-              }
-            }
-
-            let body: DecryptedBody;
-            if (payload) {
-              body = bodyFromPayload(payload);
-              const senderDeviceId = (msg.contentMeta as Record<string, unknown> | undefined)
-                ?.senderDeviceId;
-              if (typeof senderDeviceId === 'string') {
-                rememberPeerDevice(msg.senderId, senderDeviceId);
-              }
-              void rememberPayload(user.id, msg.id, fp, body);
-            } else if (msg.senderId === user.id) {
-              body = unavailableSenderBody(msg);
-            } else if (isGroupE2eeMessage(msg)) {
-              body = { text: '[Unable to decrypt]' };
-            } else {
-              const plain = await decryptDirectMessage(user.id, msg, user.id);
-              body = { text: plain ?? '[Unable to decrypt]' };
-            }
-
-            if (cancelled) return;
-            setBodies((prev) => ({ ...prev, [msg.id]: body }));
-          }),
-        );
-
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 0);
-        });
-      }
-    };
-
-    void run();
+    void runMessageBodiesDecrypt(user.id, messages, () => cancelled, setBodies);
     return () => {
       cancelled = true;
     };
-  }, [messagesKey, user?.id, e2eeKeysLocked, unlockGeneration]);
+  }, [messagesKey, user?.id, e2eeKeysLocked, unlockGeneration, messages]);
 
   return bodies;
 }

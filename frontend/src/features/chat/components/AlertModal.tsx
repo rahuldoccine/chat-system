@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import styles from './ConfirmModal.module.css';
 import { AlertCircle } from 'lucide-react';
+import { ModalDialog } from '../../../components/ModalDialog';
 
 export type AlertModalProps = {
   open: boolean;
@@ -18,27 +19,16 @@ const AlertModal: React.FC<AlertModalProps> = ({
   okLabel = 'OK',
   onClose,
 }) => {
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
-
   if (!open) return null;
 
   return (
-    <div className={styles.overlay} role="presentation" onClick={onClose}>
-      <div
-        className={styles.modal}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="alert-modal-title"
-        aria-describedby="alert-modal-desc"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalDialog
+      className={styles.overlay}
+      aria-labelledby="alert-modal-title"
+      aria-describedby="alert-modal-desc"
+      onClose={onClose}
+    >
+      <div className={styles.modal}>
         <div className={styles.alertHeader}>
           <AlertCircle size={22} className={styles.alertIcon} aria-hidden />
           <h3 id="alert-modal-title" className={styles.alertTitle}>
@@ -54,7 +44,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

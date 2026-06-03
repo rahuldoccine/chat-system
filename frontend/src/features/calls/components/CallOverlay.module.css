@@ -35,7 +35,7 @@
 
 .headerSub {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--overlay-muted-foreground);
   margin-top: 0.15rem;
 }
 
@@ -173,8 +173,8 @@
 }
 
 .ctrlBtnOff {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 /* Must come after .ctrlBtn — otherwise default grey wins over active state */
@@ -414,7 +414,7 @@
 }
 
 .captionOff {
-  color: #94a3b8;
+  color: var(--overlay-muted-foreground);
 }
 
 .langSelect select {

@@ -27,7 +27,9 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => {
+    throw error;
+  },
 );
 
 api.interceptors.response.use(
@@ -37,13 +39,13 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     if (status !== 401 || !original) {
-      return Promise.reject(error);
+      throw error;
     }
 
     const requestUrl = original.url ?? '';
 
     if (original._retry || isSkipRefreshUrl(requestUrl)) {
-      return Promise.reject(error);
+      throw error;
     }
 
     original._retry = true;
@@ -59,7 +61,7 @@ api.interceptors.response.use(
       if (!globalThis.location.pathname.startsWith('/login')) {
         globalThis.location.href = '/login';
       }
-      return Promise.reject(error);
+      throw error;
     }
   },
 );

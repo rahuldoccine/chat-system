@@ -262,3 +262,14 @@
   display: inline-flex;
   align-items: center;
 }
+
+@media (max-width: 576px) {
+  .meta {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

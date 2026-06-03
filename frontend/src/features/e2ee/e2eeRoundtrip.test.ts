@@ -14,7 +14,6 @@ import { encodeEnvelope, encodePayload, decodeEnvelope, decodePayload } from './
 
 describe('e2ee dm-v1 roundtrip', () => {
   it('encrypts and decrypts with matching spk and fingerprint salt', async () => {
-    const senderIdentity = await generateEcdhKeyPair();
     const recipientSpk = await generateEcdhKeyPair();
     const ephemeral = await generateEcdhKeyPair();
 

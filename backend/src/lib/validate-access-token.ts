@@ -29,7 +29,7 @@ export async function verifyAccessTokenActive(
     select: { authVersion: true },
   });
 
-  if (!user || user.authVersion !== tokenVer) {
+  if (user?.authVersion !== tokenVer) {
     throw new UnauthorizedError("Session revoked");
   }
 

@@ -4,12 +4,14 @@ export function buildFileUrl(
   contentMeta: { url?: string; filename?: string },
   token: string | null,
 ): string {
-  const path = contentMeta.url?.startsWith('/')
-    ? contentMeta.url
-    : contentMeta.filename
-      ? `${env.filesApiPath}/${contentMeta.filename}`
-      : null;
+  let path: string | null = null;
+  if (contentMeta.url?.startsWith('/')) {
+    path = contentMeta.url;
+  } else if (contentMeta.filename) {
+    path = `${env.filesApiPath}/${contentMeta.filename}`;
+  }
 
   if (!path) return '';
-  return `${env.apiOrigin}${path}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  const query = token ? `?token=${encodeURIComponent(token)}` : '';
+  return `${env.apiOrigin}${path}${query}`;
 }

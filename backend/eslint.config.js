@@ -1,7 +1,8 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+// typescript-eslint flat config API (S1874: legacy overload still required by this package version)
+export default tseslint.config( // NOSONAR
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -14,6 +15,8 @@ export default tseslint.config(
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      "@typescript-eslint/prefer-optional-chain": "warn",
+      "@typescript-eslint/prefer-nullish-coalescing": "warn",
     },
   },
   {

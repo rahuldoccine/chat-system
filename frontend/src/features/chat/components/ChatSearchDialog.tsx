@@ -1,17 +1,92 @@
 import React, { useEffect, useRef } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
+import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './ChatSearchDialog.module.css';
-import { useChatMessageSearch, useE2eeChatMessageSearch } from '../hooks/useChatMessageSearch';
+import {
+  useChatMessageSearch,
+  useE2eeChatMessageSearch,
+  type SearchMessageHit,
+} from '../hooks/useChatMessageSearch';
 import { formatChatTimestamp } from '../../../utils/timeFormat';
 
-type ChatSearchDialogProps = {
+type ChatSearchDialogProps = Readonly<{
   chatId: string;
   open: boolean;
   onClose: () => void;
   onSelectMessage: (messageId: string) => void;
   /** When true, search runs on decrypted messages loaded in this chat (E2EE). */
   e2eeSearch?: boolean;
-};
+}>;
+
+function senderLabel(hit: SearchMessageHit): string {
+  return hit.sender.displayName || hit.sender.username || hit.sender.email || 'User';
+}
+
+function ChatSearchBody({
+  query,
+  serverUnavailable,
+  showLoading,
+  hits,
+  e2eeSearch,
+  isFetching,
+  onSelectMessage,
+  onClose,
+}: Readonly<{
+  query: string;
+  serverUnavailable: boolean;
+  showLoading: boolean;
+  hits: SearchMessageHit[];
+  e2eeSearch: boolean;
+  isFetching: boolean;
+  onSelectMessage: (messageId: string) => void;
+  onClose: () => void;
+}>): React.ReactNode {
+  if (query.trim().length === 0) {
+    return <p className={styles.hint}>Type to search messages in this conversation.</p>;
+  }
+  if (serverUnavailable) {
+    return (
+      <p className={styles.unavailable}>
+        Search isn&apos;t available in encrypted chats. Messages are stored securely on your devices only.
+      </p>
+    );
+  }
+  if (showLoading) {
+    return (
+      <div className={styles.loading}>
+        <Loader2 size={18} className={styles.spinner} />
+        Searching…
+      </div>
+    );
+  }
+  if (hits.length === 0) {
+    const emptyMessage =
+      e2eeSearch && isFetching ? 'Loading older messages…' : 'No messages match your search.';
+    return <p className={styles.empty}>{emptyMessage}</p>;
+  }
+  return (
+    <ul className={styles.list}>
+      {hits.map((hit) => (
+        <li key={hit.messageId}>
+          <button
+            type="button"
+            className={styles.item}
+            onClick={() => {
+              onSelectMessage(hit.messageId);
+              onClose();
+            }}
+          >
+            <div className={styles.itemMeta}>
+              <span className={styles.sender}>{senderLabel(hit)}</span>
+              <time dateTime={hit.createdAt}>{formatChatTimestamp(hit.createdAt)}</time>
+            </div>
+            <span className={styles.snippet}>{hit.snippet}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
   chatId,
@@ -50,18 +125,9 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
   const showLoading = (isLoading || isFetching) && query.trim().length > 0;
   const serverUnavailable = !e2eeSearch && data?.searchUnavailable === true;
 
-  const senderLabel = (hit: (typeof hits)[0]) =>
-    hit.sender.displayName || hit.sender.username || hit.sender.email || 'User';
-
   return (
-    <div className={styles.overlay} role="presentation" onClick={onClose}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="chat-search-title"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalDialog className={styles.overlay} aria-labelledby="chat-search-title" onClose={onClose}>
+      <div className={styles.modal}>
         <header className={styles.header}>
           <h3 id="chat-search-title">
             <Search size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
@@ -86,48 +152,19 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
         </div>
 
         <div className={styles.body}>
-          {query.trim().length === 0 ? (
-            <p className={styles.hint}>Type to search messages in this conversation.</p>
-          ) : serverUnavailable ? (
-            <p className={styles.unavailable}>
-              Search isn&apos;t available in encrypted chats. Messages are stored securely on your devices only.
-            </p>
-          ) : showLoading ? (
-            <div className={styles.loading}>
-              <Loader2 size={18} className={styles.spinner} />
-              Searching…
-            </div>
-          ) : hits.length === 0 ? (
-            <p className={styles.empty}>
-              {e2eeSearch && isFetching
-                ? 'Loading older messages…'
-                : 'No messages match your search.'}
-            </p>
-          ) : (
-            <ul className={styles.list}>
-              {hits.map((hit) => (
-                <li key={hit.messageId}>
-                  <button
-                    type="button"
-                    className={styles.item}
-                    onClick={() => {
-                      onSelectMessage(hit.messageId);
-                      onClose();
-                    }}
-                  >
-                    <div className={styles.itemMeta}>
-                      <span className={styles.sender}>{senderLabel(hit)}</span>
-                      <time dateTime={hit.createdAt}>{formatChatTimestamp(hit.createdAt)}</time>
-                    </div>
-                    <span className={styles.snippet}>{hit.snippet}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ChatSearchBody
+            query={query}
+            serverUnavailable={serverUnavailable}
+            showLoading={showLoading}
+            hits={hits}
+            e2eeSearch={e2eeSearch}
+            isFetching={isFetching}
+            onSelectMessage={onSelectMessage}
+            onClose={onClose}
+          />
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

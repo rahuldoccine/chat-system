@@ -62,7 +62,7 @@ const GifPickerPanel: React.FC<GifPickerPanelProps> = ({ onSelect, onClose, disa
   };
 
   return (
-    <div className={styles.panel} role="dialog" aria-label="Choose a GIF">
+    <dialog className={styles.panel} open aria-label="Choose a GIF">
       <div className={styles.header}>
         <div className={styles.searchWrap}>
           <Search size={16} className={styles.searchIcon} aria-hidden />
@@ -114,7 +114,7 @@ const GifPickerPanel: React.FC<GifPickerPanelProps> = ({ onSelect, onClose, disa
           GIPHY
         </a>
       </p>
-    </div>
+    </dialog>
   );
 };
 

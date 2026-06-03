@@ -33,18 +33,20 @@ export function parseMentionsFromText(
   return { userIds: [...userIds], all, displayText: text };
 }
 
-export function splitMentionSegments(text: string): Array<{ type: 'text' | 'mention'; value: string }> {
-  const parts: Array<{ type: 'text' | 'mention'; value: string }> = [];
+export function splitMentionSegments(
+  text: string,
+): Array<{ type: 'text' | 'mention'; value: string; offset: number }> {
+  const parts: Array<{ type: 'text' | 'mention'; value: string; offset: number }> = [];
   const re = /@[a-zA-Z0-9_.-]+/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) {
-      parts.push({ type: 'text', value: text.slice(last, m.index) });
+      parts.push({ type: 'text', value: text.slice(last, m.index), offset: last });
     }
-    parts.push({ type: 'mention', value: m[0] });
+    parts.push({ type: 'mention', value: m[0], offset: m.index });
     last = m.index + m[0].length;
   }
-  if (last < text.length) parts.push({ type: 'text', value: text.slice(last) });
-  return parts.length ? parts : [{ type: 'text', value: text }];
+  if (last < text.length) parts.push({ type: 'text', value: text.slice(last), offset: last });
+  return parts.length ? parts : [{ type: 'text', value: text, offset: 0 }];
 }

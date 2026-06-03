@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useViewerModalLock } from '../hooks/useViewerModalLock';
 import { createPortal } from 'react-dom';
 import { renderAsync } from 'docx-preview';
 import styles from './ImageViewerModal.module.css';
 import docStyles from './DocumentViewerModal.module.css';
 import { X, Download, Loader2 } from 'lucide-react';
-import type { DocumentViewerKind } from '../utils/documentViewer';
-import { isSpreadsheetViewerKind } from '../utils/documentViewer';
+import { isSpreadsheetViewerKind, type DocumentViewerKind } from '../utils/documentViewer';
 import { parseSpreadsheetBlob, type SpreadsheetSheet } from '../utils/spreadsheetPreview';
 import SpreadsheetPreview from './SpreadsheetPreview';
 import { downloadFileFromUrl } from '../utils/downloadFile';
+import { handler } from '../../../utils/asyncHandler';
+import { ModalDialog } from '../../../components/ModalDialog';
 
 /** Hide native PDF chrome (Chrome/Edge); harmless on browsers that ignore hash params. */
 function buildPdfIframeSrc(blobUrl: string): string {
@@ -30,9 +32,6 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   kind,
   onClose,
 }) => {
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
   const docxRef = useRef<HTMLDivElement>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [fileBlob, setFileBlob] = useState<Blob | null>(null);
@@ -41,24 +40,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-
-    document.addEventListener('keydown', handleKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.body.classList.add('image-viewer-open');
-
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = prevOverflow;
-      document.body.classList.remove('image-viewer-open');
-    };
-  }, [open]);
+  useViewerModalLock(open, onClose, { bodyClass: 'image-viewer-open' });
 
   useEffect(() => {
     if (!open) {
@@ -146,22 +128,12 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
 
   if (!open) return null;
 
-  const handleBackdropMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onCloseRef.current();
-  };
-
   const showSpreadsheet =
     isSpreadsheetViewerKind(kind) && spreadsheetSheets && !loading && !error;
 
   return createPortal(
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onMouseDown={handleBackdropMouseDown}
-    >
-      <div className={styles.panel} onMouseDown={(e) => e.stopPropagation()}>
+    <ModalDialog className={styles.overlay} aria-label={title} onClose={onClose}>
+      <div className={styles.panel}>
         <div className={docStyles.documentPanel}>
           <header className={docStyles.documentChrome}>
             <p className={docStyles.documentTitle} title={title}>
@@ -171,7 +143,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               <button
                 type="button"
                 className={docStyles.chromeBtn}
-                onClick={() => void handleDownload()}
+                onClick={handler(handleDownload)}
                 disabled={downloading}
                 aria-label="Download"
               >
@@ -180,7 +152,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               <button
                 type="button"
                 className={docStyles.chromeBtn}
-                onClick={() => onCloseRef.current()}
+                onClick={onClose}
                 aria-label="Close"
               >
                 <X size={20} />
@@ -202,7 +174,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                 <button
                   type="button"
                   className={docStyles.downloadLink}
-                  onClick={() => void handleDownload()}
+                  onClick={handler(handleDownload)}
                   disabled={downloading}
                 >
                   {downloading ? 'Downloading…' : 'Download file'}
@@ -230,7 +202,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           </div>
         </div>
       </div>
-    </div>,
+    </ModalDialog>,
     document.body,
   );
 };

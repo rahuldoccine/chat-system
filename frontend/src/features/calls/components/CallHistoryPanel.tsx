@@ -1,41 +1,29 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Info, Loader2, MoreHorizontal, Phone, Video } from 'lucide-react';
+import { handler } from '../../../utils/asyncHandler';
+import { Info, Loader2, MoreHorizontal, Phone, Video } from 'lucide-react';
+import { CallDirectionIcon } from './CallDirectionIcon';
 import { formatCallHistoryTimestamp } from '../../../utils/timeFormat';
 import { useCallHistory, type CallHistoryRow } from '../useCallHistory';
+import { filterCallHistoryRows } from '../utils/callHistoryFilters';
 import { useCall } from '../CallProvider';
 import UserAvatar from '../../chat/components/UserAvatar';
 import EmptyState from '../../chat/components/EmptyState';
+import {
+  callDirectionIconPrefix,
+  formatCallDirection,
+  formatCallStatusBadge,
+  formatCallTypeLabel,
+  resolveCallStatusTone,
+} from '../utils/callHistory.helpers';
 import styles from './CallHistoryPanel.module.css';
 
-type CallHistoryPanelProps = {
+type CallHistoryPanelProps = Readonly<{
   chatId: string;
   peerUserId?: string;
   peerDisplayName?: string;
   peerAvatarUrl?: string | null;
   peerEmail?: string;
-};
-
-function CallDirectionIcon({ direction }: { direction: CallHistoryRow['direction'] }) {
-  if (direction === 'dialed') {
-    return (
-      <span className={styles.arrowOutgoing} aria-label="Outgoing call">
-        <ArrowUpRight size={14} strokeWidth={2.5} />
-      </span>
-    );
-  }
-  if (direction === 'missed') {
-    return (
-      <span className={styles.arrowMissed} aria-label="Missed call">
-        <ArrowDownLeft size={14} strokeWidth={2.5} />
-      </span>
-    );
-  }
-  return (
-    <span className={styles.arrowIncoming} aria-label="Incoming call">
-      <ArrowDownLeft size={14} strokeWidth={2.5} />
-    </span>
-  );
-}
+}>;
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -72,14 +60,7 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
     [data?.pages],
   );
   const filteredRows = useMemo(() => {
-    const base =
-      filter === 'all'
-        ? rows
-        : filter === 'missed'
-          ? rows.filter((r) => r.direction === 'missed' || r.status === 'missed')
-          : filter === 'video'
-            ? rows.filter((r) => r.kind === 'VIDEO')
-            : rows.filter((r) => r.kind === 'AUDIO');
+    const base = filterCallHistoryRows(rows, filter);
     return [...base].sort(
       (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
     );
@@ -136,18 +117,15 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
           const avatarUrl = peerAvatarUrl ?? row.peer?.avatarUrl;
           const avatarEmail = peerEmail ?? row.peer?.email;
           const avatarUserId = peerUserId ?? row.peer?.id;
-          const statusTone =
-            row.status === 'missed'
-              ? styles.statusMissed
-              : row.status === 'cancelled'
-                ? styles.statusCancelled
-                : row.status === 'rejected'
-                  ? styles.statusDeclined
-                  : styles.statusCompleted;
-          const directionLabel =
-            row.direction === 'dialed' ? 'Outgoing' : row.direction === 'received' ? 'Incoming' : 'Missed';
-          const typeLabel = row.kind === 'VIDEO' ? 'Video' : 'Audio';
-          const iconPrefix = row.direction === 'dialed' ? '⬆️' : row.direction === 'received' ? '⬇️' : '🔴';
+          const statusToneClass = {
+            completed: styles.statusCompleted,
+            missed: styles.statusMissed,
+            cancelled: styles.statusCancelled,
+            declined: styles.statusDeclined,
+          }[resolveCallStatusTone(row.status)];
+          const directionLabel = formatCallDirection(row);
+          const typeLabel = formatCallTypeLabel(row.kind);
+          const iconPrefix = callDirectionIconPrefix(row.direction);
 
           return (
             <li key={row.id} className={styles.listItem}>
@@ -170,16 +148,17 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
                     {peerDisplayName ?? row.peer?.displayName ?? row.peer?.email ?? displayName}
                   </span>
                   <div className={styles.meta}>
-                    <CallDirectionIcon direction={row.direction} />
+                    <CallDirectionIcon
+                      direction={row.direction}
+                      classNames={{
+                        outgoing: styles.arrowOutgoing,
+                        missed: styles.arrowMissed,
+                        incoming: styles.arrowIncoming,
+                      }}
+                    />
                     <span className={styles.time}>{iconPrefix} {directionLabel} {typeLabel} Call</span>
-                    <span className={`${styles.statusBadge} ${statusTone}`}>
-                      {row.status === 'completed'
-                        ? '🟢 Completed'
-                        : row.status === 'missed'
-                          ? '🔴 Missed'
-                          : row.status === 'cancelled'
-                            ? '🟡 Cancelled'
-                            : '⚪ Declined'}
+                    <span className={`${styles.statusBadge} ${statusToneClass}`}>
+                      {formatCallStatusBadge(row.status)}
                     </span>
                   </div>
                   <div className={styles.detailGrid}>
@@ -227,7 +206,9 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
           type="button"
           className={styles.loadMore}
           disabled={isFetchingNextPage}
-          onClick={() => void fetchNextPage()}
+          onClick={handler(() => {
+            void fetchNextPage();
+          })}
         >
           {isFetchingNextPage ? (
             <>

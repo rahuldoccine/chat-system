@@ -322,7 +322,7 @@ async function main() {
         const a = shuffled[i * 2];
         const b = shuffled[i * 2 + 1];
         if (!a || !b) break;
-        const dmKey = [a, b].sort().join(":");
+        const dmKey = [a, b].sort((x, y) => x.localeCompare(y)).join(":");
         const exists = await prisma.chat.findUnique({ where: { dmKey }, select: { id: true } });
         if (exists) continue;
         const dm = await prisma.chat.create({

@@ -25,6 +25,8 @@ export type PreparedOutbound = {
   contentMeta: unknown;
 };
 
+import { isPlainObject } from '../../utils/plainObject';
+
 function fileRefFromRecord(
   rec: Record<string, unknown>,
 ): { uploadId?: string; filename?: string; url?: string } | null {
@@ -45,8 +47,8 @@ function buildAttachmentRefs(
   const raw = contentMeta.files;
   if (Array.isArray(raw)) {
     for (const entry of raw) {
-      if (!entry || typeof entry !== 'object') continue;
-      const ref = fileRefFromRecord(entry as Record<string, unknown>);
+      if (!isPlainObject(entry)) continue;
+      const ref = fileRefFromRecord(entry);
       if (ref) files.push(ref);
     }
   }
@@ -60,7 +62,7 @@ function buildAttachmentRefs(
 }
 
 function plainMetaFromInput(meta: unknown): Record<string, unknown> | undefined {
-  return meta && typeof meta === 'object' ? (meta as Record<string, unknown>) : undefined;
+  return isPlainObject(meta) ? meta : undefined;
 }
 
 function mentionsMetaFromInput(
@@ -77,14 +79,22 @@ function mentionsMetaFromInput(
   return { userIds, ...(all ? { all: true as const } : {}) };
 }
 
+function resolveDmPeerUserId(
+  chat: Pick<Chat, 'type' | 'dmPeer'> | null | undefined,
+  peerUserId?: string,
+): string | undefined {
+  if (peerUserId) return peerUserId;
+  if (chat?.type === 'DIRECT') return chat.dmPeer?.id;
+  return undefined;
+}
+
 export async function prepareOutboundMessage(
   userId: string,
   input: OutboundPlainMessage,
   offlineMode = false,
 ): Promise<PreparedOutbound> {
   const chat = input.chat;
-  const peerUserId =
-    input.peerUserId ?? (chat?.type === 'DIRECT' ? chat.dmPeer?.id : undefined);
+  const peerUserId = resolveDmPeerUserId(chat ?? null, input.peerUserId);
 
   if (isGroupE2eeChat(chat ?? null) && input.chatId) {
     await ensureE2eeReady(userId, { offline: offlineMode });
@@ -121,10 +131,7 @@ export async function prepareOutboundMessage(
     };
   }
 
-  const plainMeta =
-    input.contentMeta && typeof input.contentMeta === 'object'
-      ? (input.contentMeta as Record<string, unknown>)
-      : undefined;
+  const plainMeta = isPlainObject(input.contentMeta) ? input.contentMeta : undefined;
   const attachmentRefs = buildAttachmentRefs(plainMeta);
 
   try {
@@ -184,8 +191,7 @@ export async function prepareOutboundPoll(
   input: OutboundPollInput,
   offlineMode = false,
 ): Promise<PreparedOutbound> {
-  const peerUserId =
-    input.peerUserId ?? (input.chat?.type === 'DIRECT' ? input.chat.dmPeer?.id : undefined);
+  const peerUserId = resolveDmPeerUserId(input.chat ?? null, input.peerUserId);
   if (!peerUserId) {
     throw new Error('E2EE poll requires a direct chat peer');
   }

@@ -17,11 +17,15 @@ export type DeviceRow = {
 
 type ApiOk<T> = { ok?: boolean; data: T };
 
+function isApiOk<T>(payload: unknown): payload is ApiOk<T> {
+  return Boolean(payload && typeof payload === 'object' && 'data' in payload);
+}
+
 function unwrap<T>(payload: ApiOk<T> | T): T {
-  if (payload && typeof payload === 'object' && 'data' in payload) {
-    return (payload as ApiOk<T>).data;
+  if (isApiOk<T>(payload)) {
+    return payload.data;
   }
-  return payload as T;
+  return payload;
 }
 
 export async function putIdentityKey(publicKey: string, fingerprint: string): Promise<void> {

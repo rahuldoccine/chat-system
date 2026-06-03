@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { handler, handlerArg, runHandler } from '../utils/asyncHandler';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, LogOut, ShieldAlert, Loader2, User, Shield, Palette } from 'lucide-react';
-import { useTheme, type ThemePreference } from '../context/ThemeContext';
+import { ArrowLeft, ShieldAlert, User, Shield, Palette } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 import { toast, Toaster } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../features/chat/components/ConfirmModal';
@@ -15,11 +16,12 @@ import {
   useUpdateAppSettings,
   getApiErrorMessage,
 } from '../features/settings/hooks/useUserSettings';
-import ProfileAvatarUpload from '../features/settings/components/ProfileAvatarUpload';
-import AdminReportsPanel from '../features/settings/components/AdminReportsPanel';
-import E2eeRecoveryPanel from '../features/settings/components/E2eeRecoveryPanel';
-import ChangePasswordForm from '../features/settings/components/ChangePasswordForm';
 import { useProfileSync } from '../features/settings/hooks/useProfileSync';
+import AccountSettingsSection from '../features/settings/components/AccountSettingsSection';
+import AppearanceSettingsSection from '../features/settings/components/AppearanceSettingsSection';
+import PrivacySettingsSection from '../features/settings/components/PrivacySettingsSection';
+import ReportsSettingsSection from '../features/settings/components/ReportsSettingsSection';
+import type { ProfileFormValues } from '../features/settings/types/settingsForm';
 import {
   BROWSER_NOTIFICATION_BLOCKED_HINT,
   getBrowserNotificationPermission,
@@ -48,19 +50,31 @@ const profileSchema = z.object({
   username: z
     .string()
     .max(32)
-    .regex(/^[a-zA-Z0-9_]*$/, 'Letters, numbers, and underscores only')
+    .regex(/^\w*$/, 'Letters, numbers, and underscores only')
     .optional()
     .or(z.literal('')),
 });
 
-type ProfileFormValues = z.infer<typeof profileSchema>;
+function resolveSectionFromSearchParam(
+  requested: string | null,
+  isAdmin: boolean,
+): SettingsSection | null {
+  if (requested === 'appearance' || requested === 'privacy' || requested === 'account') {
+    return requested;
+  }
+  if (requested === 'reports') {
+    return isAdmin ? 'reports' : 'account';
+  }
+  return null;
+}
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { logout, logoutAll } = useAuth();
   const isMobile = useIsMobile();
-  const { preference: themePreference, resolved: resolvedTheme, setPreference: setThemePreference } = useTheme();
+  const { preference: themePreference, resolved: resolvedTheme, setPreference: setThemePreference } =
+    useTheme();
   const { syncProfileEverywhere } = useProfileSync();
   const [section, setSection] = useState<SettingsSection>('account');
   const [busy, setBusy] = useState<'logout' | 'logoutAll' | null>(null);
@@ -101,16 +115,8 @@ const SettingsPage: React.FC = () => {
   }, [profile, reset]);
 
   useEffect(() => {
-    const requested = searchParams.get('section');
-    if (requested === 'appearance' || requested === 'privacy' || requested === 'account') {
-      setSection(requested);
-    } else if (requested === 'reports') {
-      if (isAdmin) {
-        setSection('reports');
-      } else {
-        setSection('account');
-      }
-    }
+    const nextSection = resolveSectionFromSearchParam(searchParams.get('section'), isAdmin);
+    if (nextSection) setSection(nextSection);
   }, [searchParams, isAdmin]);
 
   useEffect(() => {
@@ -209,7 +215,9 @@ const SettingsPage: React.FC = () => {
       }
       const result = await registerWebPush();
       if (!result.ok) {
-        toast.error('message' in result ? result.message : "We couldn't turn on notifications. Please try again.");
+        toast.error(
+          'message' in result ? result.message : "We couldn't turn on notifications. Please try again.",
+        );
         return;
       }
       try {
@@ -322,261 +330,45 @@ const SettingsPage: React.FC = () => {
 
       <main className={styles.main}>
         {section === 'account' && (
-          <>
-            <header className={styles.mainHeader}>
-              <h2 className={styles.mainTitle}>Account</h2>
-              <p className={styles.mainDescription}>Manage your profile and active sessions</p>
-            </header>
-
-            <section className={styles.card}>
-              <h3 className={styles.cardTitle}>Profile</h3>
-              {profileLoading ? (
-                <div className={styles.loading}>
-                  <Loader2 size={22} className={styles.spinner} />
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit(onSaveProfile)}>
-                  {profile && (
-                    <ProfileAvatarUpload
-                      profile={profile}
-                      disabled={savingProfile}
-                      onUpdated={(user) => syncProfileEverywhere(user)}
-                    />
-                  )}
-                  {formError && <p className={styles.formError}>{formError}</p>}
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel} htmlFor="displayName">
-                      Display name
-                    </label>
-                    <input
-                      id="displayName"
-                      className={`${styles.input} ${errors.displayName ? styles.inputError : ''}`}
-                      {...register('displayName')}
-                    />
-                    {errors.displayName && (
-                      <p className={styles.errorText}>{errors.displayName.message}</p>
-                    )}
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel} htmlFor="username">
-                      Username
-                    </label>
-                    <input
-                      id="username"
-                      className={`${styles.input} ${errors.username ? styles.inputError : ''}`}
-                      placeholder="optional"
-                      {...register('username')}
-                    />
-                    {errors.username && (
-                      <p className={styles.errorText}>{errors.username.message}</p>
-                    )}
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel} htmlFor="email">
-                      Email
-                    </label>
-                    <input
-                      id="email"
-                      type="email"
-                      className={`${styles.input} ${styles.inputDisabled}`}
-                      value={profile?.email ?? ''}
-                      disabled
-                      readOnly
-                      aria-readonly="true"
-                    />
-                  </div>
-                  <div className={styles.formActions}>
-                    <button
-                      type="submit"
-                      className={`${styles.btn} ${styles.btnPrimary}`}
-                      disabled={savingProfile}
-                    >
-                      {savingProfile ? <Loader2 size={18} /> : null}
-                      Save profile
-                    </button>
-                  </div>
-                </form>
-              )}
-            </section>
-
-            <section className={styles.card}>
-              <h3 className={styles.cardTitle}>Password</h3>
-              <p className={styles.mainDescription} style={{ marginTop: 0 }}>
-                Changing your password also updates your encrypted key backup on the server.
-              </p>
-              <ChangePasswordForm />
-            </section>
-
-            <section className={styles.card}>
-              <h3 className={styles.cardTitle}>Sessions</h3>
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.btn}
-                  disabled={busy !== null}
-                  onClick={() => void handleLogout()}
-                >
-                  {busy === 'logout' ? <Loader2 size={18} /> : <LogOut size={18} />}
-                  Sign out
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnDanger}`}
-                  disabled={busy !== null}
-                  onClick={() => setShowLogoutAllConfirm(true)}
-                >
-                  <ShieldAlert size={18} />
-                  Sign out everywhere
-                </button>
-              </div>
-            </section>
-          </>
+          <AccountSettingsSection
+            profileLoading={profileLoading}
+            profile={profile}
+            savingProfile={savingProfile}
+            formError={formError}
+            busy={busy}
+            register={register}
+            errors={errors}
+            handleSubmit={handleSubmit}
+            onSaveProfile={onSaveProfile}
+            onProfileUpdated={(user) => syncProfileEverywhere(user)}
+            onLogout={handler(handleLogout)}
+            onLogoutAll={() => setShowLogoutAllConfirm(true)}
+          />
         )}
 
         {section === 'appearance' && (
-          <>
-            <header className={styles.mainHeader}>
-              <h2 className={styles.mainTitle}>Appearance</h2>
-              <p className={styles.mainDescription}>Customize how Chat System looks on your device</p>
-            </header>
-            <section className={styles.card}>
-              <h3 className={styles.cardTitle}>Theme</h3>
-              <p className={styles.mainDescription} style={{ marginBottom: '1rem' }}>
-                Choose light, dark, or match your system setting.
-              </p>
-              <div className={styles.themeOptions} role="radiogroup" aria-label="Theme">
-                {(['light', 'dark', 'system'] as ThemePreference[]).map((opt) => (
-                  <label key={opt} className={styles.themeOption}>
-                    <input
-                      type="radio"
-                      name="theme"
-                      value={opt}
-                      checked={themePreference === opt}
-                      onChange={() => setThemePreference(opt)}
-                    />
-                    <span>{opt === 'system' ? 'System default' : opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
-          </>
+          <AppearanceSettingsSection
+            themePreference={themePreference}
+            onThemeChange={setThemePreference}
+          />
         )}
 
         {section === 'privacy' && (
-          <>
-            <header className={styles.mainHeader}>
-              <h2 className={styles.mainTitle}>Privacy</h2>
-              <p className={styles.mainDescription}>
-                Control notifications and read receipt visibility
-              </p>
-            </header>
-
-            <section className={styles.card}>
-              <h3 className={styles.cardTitle}>Notifications & privacy</h3>
-              {settingsLoading || !appSettings ? (
-                <div className={styles.loading}>
-                  <Loader2 size={22} className={styles.spinner} />
-                </div>
-              ) : (
-                <>
-                  <div className={styles.toggleRow}>
-                    <div>
-                      <div className={styles.toggleLabel}>Push notifications</div>
-                      <div className={styles.toggleHint}>Alerts when you are offline</div>
-                    </div>
-                    <label className={styles.toggle}>
-                      <input
-                        type="checkbox"
-                        checked={appSettings.notifyPush}
-                        disabled={savingSettings}
-                        onChange={(e) => void onTogglePush(e.target.checked)}
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-                  {isWebPushSupported() && browserNotificationPermission !== 'granted' && (
-                    <div className={styles.permissionBanner}>
-                      <p className={styles.permissionBannerText}>
-                        {browserNotificationPermission === 'denied'
-                          ? 'Browser notifications are blocked for this site.'
-                          : 'Allow browser notifications to receive alerts on this device.'}
-                      </p>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnPrimary} ${styles.permissionBannerBtn}`}
-                        disabled={requestingNotificationPermission || savingSettings}
-                        onClick={() => void handleRequestBrowserNotificationPermission()}
-                      >
-                        {requestingNotificationPermission ? (
-                          <Loader2 size={16} className={styles.spinner} />
-                        ) : null}
-                        {browserNotificationPermission === 'denied'
-                          ? 'How to enable notifications'
-                          : 'Allow browser notifications'}
-                      </button>
-                      {browserNotificationPermission === 'denied' && (
-                        <p className={styles.permissionBannerHint}>
-                          Click the lock or site icon in the address bar → Notifications → Allow, then reload
-                          this page.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <div className={styles.toggleRow}>
-                    <div>
-                      <div className={styles.toggleLabel}>Email notifications</div>
-                      <div className={styles.toggleHint}>Updates sent to your email</div>
-                    </div>
-                    <label className={styles.toggle}>
-                      <input
-                        type="checkbox"
-                        checked={appSettings.notifyEmail}
-                        disabled={savingSettings}
-                        onChange={(e) => void onToggleSetting('notifyEmail', e.target.checked)}
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-                  <div className={styles.toggleRow}>
-                    <div>
-                      <div className={styles.toggleLabel}>Read receipts</div>
-                      <div className={styles.toggleHint}>Let others see when you read messages</div>
-                    </div>
-                    <label className={styles.toggle}>
-                      <input
-                        type="checkbox"
-                        checked={appSettings.showReadReceipts}
-                        disabled={savingSettings}
-                        onChange={(e) =>
-                          void onToggleSetting('showReadReceipts', e.target.checked)
-                        }
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-                </>
-              )}
-            </section>
-
-            <section className={styles.card}>
-              <E2eeRecoveryPanel />
-            </section>
-          </>
+          <PrivacySettingsSection
+            settingsLoading={settingsLoading}
+            appSettings={appSettings}
+            savingSettings={savingSettings}
+            browserNotificationPermission={browserNotificationPermission}
+            requestingNotificationPermission={requestingNotificationPermission}
+            onTogglePush={handlerArg(onTogglePush)}
+            onToggleSetting={(key, value) => runHandler(() => onToggleSetting(key, value))}
+            onRequestBrowserNotificationPermission={handler(
+              handleRequestBrowserNotificationPermission,
+            )}
+          />
         )}
 
-        {section === 'reports' && isAdmin && (
-          <>
-            <header className={styles.mainHeader}>
-              <h2 className={styles.mainTitle}>Reports</h2>
-              <p className={styles.mainDescription}>
-                Review user reports submitted from direct messages
-              </p>
-            </header>
-            <section className={styles.card}>
-              <AdminReportsPanel />
-            </section>
-          </>
-        )}
+        {section === 'reports' && isAdmin && <ReportsSettingsSection />}
       </main>
 
       <ConfirmModal
@@ -587,7 +379,7 @@ const SettingsPage: React.FC = () => {
         cancelLabel="Cancel"
         variant="danger"
         isLoading={busy === 'logoutAll'}
-        onConfirm={() => void handleLogoutAllConfirm()}
+        onConfirm={handler(handleLogoutAllConfirm)}
         onCancel={() => {
           if (busy !== 'logoutAll') setShowLogoutAllConfirm(false);
         }}

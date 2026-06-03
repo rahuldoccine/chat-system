@@ -58,7 +58,10 @@ const ThreadPanel: React.FC = () => {
   const isDirectChat = activeChat?.type === 'DIRECT';
   const { data: groupDetails } = useQuery({
     queryKey: ['group', activeId],
-    queryFn: () => fetchGroup(activeId!),
+    queryFn: () => {
+      if (!activeId) throw new Error('activeId required');
+      return fetchGroup(activeId);
+    },
     enabled: Boolean(activeId && activeChat?.type === 'GROUP'),
   });
   const canPinInThread = isDirectChat || Boolean(groupDetails && canModerateMessages(groupDetails.myRole));
@@ -80,7 +83,8 @@ const ThreadPanel: React.FC = () => {
 
   const decryptedBodies = useMessageBodies(allMessages);
   const replyCount = data?.replies?.length ?? 0;
-  const showLoadingOverlay = isLoading && !data?.root;
+  const threadData = data as { root: Message | null; replies: Message[] } | undefined;
+  const showLoadingOverlay = isLoading && (threadData?.root ?? null) === null;
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -168,7 +172,7 @@ const ThreadPanel: React.FC = () => {
         case 'edit':
           setEditingMessage({
             id: msg.id,
-            text: getMessageDisplayBody(msg, decryptedBodies, user?.id) || '',
+            text: getMessageDisplayBody(msg, decryptedBodies, user?.id ?? '') || '',
           });
           break;
         case 'delete':

@@ -6,9 +6,9 @@ import {
   importEcdhPrivateKey,
   importEcdsaPrivateKey,
 } from './crypto';
+import { idbGetValue, idbPutValue } from './e2eeIdb';
 
 const DB_NAME = 'chat-e2ee-v1';
-const DB_VERSION = 1;
 const STORE = 'keys';
 
 export type SignedPreKeyRecord = {
@@ -34,38 +34,12 @@ export type E2eeKeyMaterial = {
   oneTimePreKeys: OneTimePreKeyRecord[];
 };
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve(req.result);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE);
-      }
-    };
-  });
-}
-
 export async function loadKeyMaterial(userId: string): Promise<E2eeKeyMaterial | null> {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).get(userId);
-    req.onsuccess = () => resolve((req.result as E2eeKeyMaterial) ?? null);
-    req.onerror = () => reject(req.error);
-  });
+  return idbGetValue<E2eeKeyMaterial>(DB_NAME, STORE, userId);
 }
 
 export async function saveKeyMaterial(material: E2eeKeyMaterial): Promise<void> {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(material, material.userId);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  await idbPutValue(DB_NAME, STORE, material.userId, material);
 }
 
 export async function createKeyMaterial(userId: string): Promise<E2eeKeyMaterial> {

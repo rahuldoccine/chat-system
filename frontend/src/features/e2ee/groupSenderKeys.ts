@@ -22,17 +22,16 @@ function cacheKey(chatId: string, senderId: string, epoch: number) {
 }
 
 function keyBytesToB64(keyBytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...keyBytes));
+  return btoa(String.fromCodePoint(...keyBytes));
 }
 
 function keyBytesFromB64(keyB64: string): Uint8Array {
-  return Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+  return Uint8Array.from(atob(keyB64), (c) => c.codePointAt(0) ?? 0);
 }
 
 async function ensureIdbHydrated(): Promise<void> {
   if (idbHydrated) return;
-  if (!idbHydratePromise) {
-    idbHydratePromise = (async () => {
+  idbHydratePromise ??= (async () => {
       const rows = await idbLoadGroupSenderKeys();
       for (const row of rows) {
         localKeys.set(
@@ -44,7 +43,6 @@ async function ensureIdbHydrated(): Promise<void> {
     })().finally(() => {
       idbHydratePromise = null;
     });
-  }
   await idbHydratePromise;
 }
 
@@ -102,7 +100,7 @@ async function parseDistributionRow(
         ciphertext: wrapped,
         senderId: row.senderId,
         contentMeta: {},
-      });
+      }, viewerUserId);
       const meta = payload?.meta as { groupSenderKey?: { key?: string } } | undefined;
       const keyB64 = meta?.groupSenderKey?.key;
       if (typeof keyB64 === 'string') {

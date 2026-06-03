@@ -1,3 +1,4 @@
+import { isPlainObject } from '../../utils/plainObject';
 import type { DeviceRow } from './e2eeApi';
 
 const STORAGE_PREFIX = 'e2ee-peer-device:';
@@ -18,11 +19,10 @@ export function latestPeerSenderDeviceId(
   peerUserId: string,
 ): string | null {
   if (!messages?.length) return null;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]!;
+  for (const msg of messages.toReversed()) {
     if (msg.senderId !== peerUserId) continue;
-    const meta = msg.contentMeta as Record<string, unknown> | undefined;
-    const id = meta?.senderDeviceId;
+    if (!isPlainObject(msg.contentMeta)) continue;
+    const id = msg.contentMeta.senderDeviceId;
     if (typeof id === 'string' && id.length > 0) return id;
   }
   return null;

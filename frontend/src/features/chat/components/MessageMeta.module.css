@@ -21,7 +21,7 @@
 .time {
   font-size: 0.65rem;
   line-height: 1;
-  color: #64748b;
+  color: #5c6b7a;
   white-space: nowrap;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .meta:not(.metaMe):not(.metaOnMedia) .time {
-  color: #64748b;
+  color: #5c6b7a;
 }
 
 .ticks {

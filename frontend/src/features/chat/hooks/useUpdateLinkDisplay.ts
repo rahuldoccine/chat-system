@@ -21,7 +21,7 @@ export function useUpdateLinkDisplay() {
       existingMeta?: Message['contentMeta'];
     }) => {
       const nextPreview = withLinkDisplay(preview, displayAs);
-      const contentMeta = { ...(existingMeta ?? {}), preview: nextPreview };
+      const contentMeta = { ...existingMeta, preview: nextPreview };
       const response = await api.patch<{ message: Message }>(`/messages/${messageId}`, {
         contentMeta,
       });

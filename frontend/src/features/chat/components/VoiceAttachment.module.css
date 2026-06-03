@@ -1,13 +1,26 @@
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .card {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
+  border: none;
+  margin: 0;
+  padding: 0.15rem 0.1rem 0.1rem;
   min-width: 220px;
   max-width: 300px;
   width: 100%;
-  padding: 0.15rem 0.1rem 0.1rem;
   background: transparent;
-  border: none;
   box-sizing: border-box;
 }
 
@@ -30,8 +43,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  background: #6366f1;
-  color: #fff;
+  background: #4f46e5;
+  color: var(--primary-foreground);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -190,7 +203,7 @@
 
 .unavailable {
   font-size: 0.85rem;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   padding: 0.5rem 0.65rem;
 }
 

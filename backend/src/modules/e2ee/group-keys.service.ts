@@ -10,7 +10,7 @@ export async function upsertGroupSenderKey(
   const me = await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, e2eeMode: true } });
-  if (!chat || chat.type !== "GROUP" || chat.e2eeMode !== "GROUP_V1") {
+  if (chat?.type !== "GROUP" || chat?.e2eeMode !== "GROUP_V1") {
     throw new AppError(400, "INVALID_CHAT", "Group sender keys require GROUP_V1");
   }
   if (!input.distribution || input.distribution.length < 8) {

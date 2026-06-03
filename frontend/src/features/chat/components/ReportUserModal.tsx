@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useReportUser, getApiErrorMessage } from '../../settings/hooks/useUserSettings';
+import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './ReportUserModal.module.css';
+import { handlerSubmit } from '../../../utils/asyncHandler';
 
 const REASONS = ['Spam', 'Harassment', 'Other'] as const;
 type ReasonOption = (typeof REASONS)[number];
@@ -37,8 +39,7 @@ const ReportUserModal: React.FC<ReportUserModalProps> = ({
 
   const resolvedReason = reason === 'Other' ? otherReason.trim() : reason;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError(null);
     if (!resolvedReason) {
       setError('Please enter a reason');
@@ -65,14 +66,14 @@ const ReportUserModal: React.FC<ReportUserModalProps> = ({
   };
 
   return (
-    <div className={styles.overlay} role="presentation" onClick={isPending ? undefined : onClose}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="report-modal-title"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalDialog
+      className={styles.overlay}
+      aria-labelledby="report-modal-title"
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+    >
+      <div className={styles.modal}>
         <div className={styles.header}>
           <h3 id="report-modal-title">Report {peerName}</h3>
           <button
@@ -85,7 +86,7 @@ const ReportUserModal: React.FC<ReportUserModalProps> = ({
             <X size={18} />
           </button>
         </div>
-        <form onSubmit={(e) => void handleSubmit(e)}>
+        <form onSubmit={handlerSubmit(handleSubmit)}>
           <div className={styles.body}>
             <div className={styles.field}>
               <label htmlFor="report-reason">Reason</label>
@@ -142,7 +143,7 @@ const ReportUserModal: React.FC<ReportUserModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

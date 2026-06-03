@@ -1,4 +1,6 @@
-import { env, giphyMissingKeyMessage, isGifPickerConfigured } from '../../../config/env';
+import { env, giphyMissingKeyMessage } from '../../../config/env';
+
+export { isGifPickerConfigured } from '../../../config/env';
 
 export type GifResult = {
   id: string;
@@ -53,29 +55,31 @@ function imageBytes(img: GiphyImage | undefined): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** Pick the highest-quality GIF URL we can upload (respects size cap). */
-function pickDownloadImage(item: GiphyItem): GiphyImage | undefined {
+function pickHdDownloadImage(item: GiphyItem): GiphyImage | undefined {
   const original = item.images.original;
   const large = item.images.downsized_large;
   const medium = item.images.downsized_medium;
   const maxBytes = env.giphyMaxDownloadBytes;
-
-  if (env.giphyDownloadQuality === 'hd') {
-    if (original && gifUrl(original)) {
-      const bytes = imageBytes(original);
-      if (!bytes || bytes <= maxBytes) return original;
-    }
-    if (large && gifUrl(large)) return large;
-    if (original && gifUrl(original)) return original;
-    return medium ?? item.images.downsized ?? item.images.fixed_height;
+  if (original && gifUrl(original)) {
+    const bytes = imageBytes(original);
+    if (!bytes || bytes <= maxBytes) return original;
   }
+  if (large && gifUrl(large)) return large;
+  if (original && gifUrl(original)) return original;
+  return medium ?? item.images.downsized ?? item.images.fixed_height;
+}
 
-  if (env.giphyDownloadQuality === 'balanced') {
-    if (large && gifUrl(large)) return large;
-    if (original && gifUrl(original)) return original;
-    return medium ?? item.images.downsized ?? item.images.fixed_height;
-  }
+function pickBalancedDownloadImage(item: GiphyItem): GiphyImage | undefined {
+  const large = item.images.downsized_large;
+  const original = item.images.original;
+  const medium = item.images.downsized_medium;
+  if (large && gifUrl(large)) return large;
+  if (original && gifUrl(original)) return original;
+  return medium ?? item.images.downsized ?? item.images.fixed_height;
+}
 
+function pickCompactDownloadImage(item: GiphyItem): GiphyImage | undefined {
+  const medium = item.images.downsized_medium;
   return (
     medium ??
     item.images.downsized ??
@@ -83,6 +87,13 @@ function pickDownloadImage(item: GiphyItem): GiphyImage | undefined {
     item.images.fixed_height_small ??
     item.images.preview_gif
   );
+}
+
+/** Pick the highest-quality GIF URL we can upload (respects size cap). */
+function pickDownloadImage(item: GiphyItem): GiphyImage | undefined {
+  if (env.giphyDownloadQuality === 'hd') return pickHdDownloadImage(item);
+  if (env.giphyDownloadQuality === 'balanced') return pickBalancedDownloadImage(item);
+  return pickCompactDownloadImage(item);
 }
 
 function pickPreviewImage(item: GiphyItem): GiphyImage | undefined {
@@ -164,5 +175,3 @@ export async function gifToFile(gif: GifResult): Promise<File> {
   const safeName = `${source.id}.${ext}`;
   return new File([blob], safeName, { type: mime });
 }
-
-export { isGifPickerConfigured };

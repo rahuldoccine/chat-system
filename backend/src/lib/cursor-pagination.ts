@@ -12,7 +12,7 @@ export function decodeMessageCursor(raw: string): MessageCursorPayload {
     const json = Buffer.from(raw, "base64url").toString("utf8");
     const data = JSON.parse(json) as MessageCursorPayload;
     if (typeof data?.c !== "string" || typeof data?.i !== "string") {
-      throw new Error("invalid shape");
+      throw new TypeError("invalid shape");
     }
     return data;
   } catch {

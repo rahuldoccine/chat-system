@@ -32,12 +32,13 @@ export async function getCall(req: Request, res: Response) {
     return;
   }
   const meta = row.metadata ?? {};
-  const durationSec =
-    typeof (meta as { durationSec?: number }).durationSec === "number"
-      ? (meta as { durationSec: number }).durationSec
-      : row.endedAt && row.startedAt
-        ? Math.max(0, Math.floor((row.endedAt.getTime() - row.startedAt.getTime()) / 1000))
-        : 0;
+  const metaDuration = (meta as { durationSec?: number }).durationSec;
+  let durationSec = 0;
+  if (typeof metaDuration === "number") {
+    durationSec = metaDuration;
+  } else if (row.endedAt && row.startedAt) {
+    durationSec = Math.max(0, Math.floor((row.endedAt.getTime() - row.startedAt.getTime()) / 1000));
+  }
   res.status(200).json({
     ok: true,
     data: {

@@ -1,19 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import {
-  Hash,
-  MessageSquarePlus,
-  MessagesSquare,
-  Search,
-  Sparkles,
-  Users,
-  Wifi,
-  AtSign,
-} from 'lucide-react';
+import { AtSign, Hash, MessagesSquare, Sparkles, Wifi } from 'lucide-react';
 import type { Chat } from '../types';
 import UserAvatar from './UserAvatar';
 import GroupChannelIcon from './GroupChannelIcon';
-import { getServerAccountKeyStatus } from '../../e2ee/recovery';
+import HomeDashboardStats from './HomeDashboardStats';
+import HomeQuickActions from './HomeQuickActions';
+import { useHomeDashboardMetrics } from '../hooks/useHomeDashboardMetrics';
 import styles from './HomeDashboard.module.css';
 
 type HomeDashboardProps = {
@@ -28,51 +21,22 @@ function getChatLabel(chat: Chat): string {
   return chat.dmPeer?.displayName || chat.dmPeer?.email || 'Unknown User';
 }
 
-function dispatchUiAction(name: 'chat:open-new-dm' | 'chat:open-create-group' | 'chat:open-jump-to') {
-  globalThis.dispatchEvent(new CustomEvent(name));
-}
-
 const HomeDashboard: React.FC<HomeDashboardProps> = ({
   userName,
   conversations,
   onlineUserIds,
   onSelectChat,
 }) => {
-  const [needsKeyBackup, setNeedsKeyBackup] = useState(false);
-
-  useEffect(() => {
-    void getServerAccountKeyStatus()
-      .then((status) => setNeedsKeyBackup(status.hasIdentityKey && !status.hasBackup))
-      .catch(() => setNeedsKeyBackup(false));
-  }, []);
-
-  const memberChats = useMemo(
-    () =>
-      conversations.filter(
-        (c) => c.type === 'DIRECT' || (c.type === 'GROUP' && c.isMember !== false),
-      ),
-    [conversations],
-  );
-
-  const channels = memberChats.filter((c) => c.type === 'GROUP');
-  const dms = memberChats.filter((c) => c.type === 'DIRECT');
-
-  const totalUnread = memberChats.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
-  const mentionUnread = memberChats.reduce((sum, c) => sum + (c.unreadMentionCount ?? 0), 0);
-  const onlineDmCount = dms.filter((c) => c.dmPeer && onlineUserIds.has(c.dmPeer.id)).length;
-
-  const recentChats = useMemo(() => {
-    return [...memberChats]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, 6);
-  }, [memberChats]);
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+  const {
+    greeting,
+    needsKeyBackup,
+    memberChats,
+    channels,
+    totalUnread,
+    mentionUnread,
+    onlineDmCount,
+    recentChats,
+  } = useHomeDashboardMetrics(conversations, onlineUserIds);
 
   return (
     <div className={styles.root}>
@@ -96,82 +60,22 @@ const HomeDashboard: React.FC<HomeDashboardProps> = ({
           Pick up where you left off or start something new with your team.
         </p>
         {needsKeyBackup ? (
-          <p className={styles.backupWarning} role="status">
+          <output className={styles.backupWarning}>
             Your encryption keys are not backed up to your account yet. Sign out and sign in with
             your password once to protect message history across devices.
-          </p>
+          </output>
         ) : null}
       </motion.header>
 
-      <div className={styles.statsGrid}>
-        {[
-          { label: 'Unread', value: totalUnread, accent: styles.statAccentRed },
-          { label: 'Mentions', value: mentionUnread, accent: styles.statAccentIndigo },
-          { label: 'Channels', value: channels.length, accent: styles.statAccentBlue },
-          { label: 'Online DMs', value: onlineDmCount, accent: styles.statAccentGreen },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            className={styles.statCard}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 * i, duration: 0.3 }}
-          >
-            <span className={`${styles.statValue} ${stat.accent}`}>{stat.value}</span>
-            <span className={styles.statLabel}>{stat.label}</span>
-          </motion.div>
-        ))}
-      </div>
+      <HomeDashboardStats
+        totalUnread={totalUnread}
+        mentionUnread={mentionUnread}
+        channelCount={channels.length}
+        onlineDmCount={onlineDmCount}
+      />
 
       <div className={styles.mainGrid}>
-        <motion.section
-          className={styles.panel}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.35 }}
-        >
-          <div className={styles.panelHeader}>
-            <h2>Quick actions</h2>
-            <p>Jump in with one click</p>
-          </div>
-          <div className={styles.actionsGrid}>
-            <button
-              type="button"
-              className={styles.actionCard}
-              onClick={() => dispatchUiAction('chat:open-new-dm')}
-            >
-              <span className={`${styles.actionIcon} ${styles.actionIconPrimary}`}>
-                <MessageSquarePlus size={20} />
-              </span>
-              <span className={styles.actionTitle}>New message</span>
-              <span className={styles.actionHint}>Start a direct chat</span>
-            </button>
-            <button
-              type="button"
-              className={styles.actionCard}
-              onClick={() => dispatchUiAction('chat:open-create-group')}
-            >
-              <span className={`${styles.actionIcon} ${styles.actionIconViolet}`}>
-                <Users size={20} />
-              </span>
-              <span className={styles.actionTitle}>Create group</span>
-              <span className={styles.actionHint}>Channels & teams</span>
-            </button>
-            <button
-              type="button"
-              className={styles.actionCard}
-              onClick={() => dispatchUiAction('chat:open-jump-to')}
-            >
-              <span className={`${styles.actionIcon} ${styles.actionIconSlate}`}>
-                <Search size={20} />
-              </span>
-              <span className={styles.actionTitle}>Jump to…</span>
-              <span className={styles.actionHint}>
-                <kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>K</kbd>
-              </span>
-            </button>
-          </div>
-        </motion.section>
+        <HomeQuickActions />
 
         <motion.section
           className={styles.panel}

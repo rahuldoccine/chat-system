@@ -6,7 +6,7 @@ export const patchMeBodySchema = z.object({
     .string()
     .min(2)
     .max(32)
-    .regex(/^[a-zA-Z0-9_]+$/, "Username may only contain letters, numbers, and underscores")
+    .regex(/^\w+$/, "Username may only contain letters, numbers, and underscores")
     .optional()
     .nullable(),
   /** File name (e.g. uuid.jpg), storage key (logos/uuid.jpg), or legacy full URL — normalized on save. */

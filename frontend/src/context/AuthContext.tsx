@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
 import {
   clearAccessToken,
@@ -82,6 +82,50 @@ async function hydrateE2eeCaches(userId: string): Promise<void> {
   ]);
 }
 
+async function bootstrapAuthSession(): Promise<{
+  token: string;
+  user: User;
+  e2eeLocked: boolean;
+} | null> {
+  let accessToken = getAccessToken();
+  let loadedUser: User | null = null;
+
+  if (accessToken) {
+    try {
+      loadedUser = await fetchCurrentUser();
+    } catch {
+      accessToken = null;
+    }
+  }
+
+  if (!loadedUser) {
+    const refreshed = await refreshAccessToken();
+    accessToken = refreshed.accessToken;
+    setAccessToken(refreshed.accessToken);
+    loadedUser = await fetchCurrentUser();
+  }
+
+  if (!accessToken || !loadedUser) {
+    return null;
+  }
+
+  let e2eeLocked = false;
+  if (loadedUser.id) {
+    try {
+      await ensureE2eeReady(loadedUser.id);
+      void hydrateE2eeCaches(loadedUser.id);
+    } catch (err) {
+      if (err instanceof E2eeKeysLockedError) {
+        e2eeLocked = true;
+      } else {
+        console.warn('[e2ee] ensureE2eeReady on session start failed', err);
+      }
+    }
+  }
+
+  return { token: accessToken, user: loadedUser, e2eeLocked };
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => getAccessToken());
@@ -102,40 +146,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bootstrap = async () => {
       setIsLoading(true);
       try {
-        let accessToken = getAccessToken();
-        let loadedUser: User | null = null;
-
-        if (accessToken) {
-          try {
-            loadedUser = await fetchCurrentUser();
-          } catch {
-            accessToken = null;
-          }
-        }
-
-        if (!loadedUser) {
-          const refreshed = await refreshAccessToken();
-          accessToken = refreshed.accessToken;
-          setAccessToken(accessToken);
-          loadedUser = await fetchCurrentUser();
-        }
-
-        if (cancelled) return;
-        setToken(accessToken);
-        setUser(loadedUser);
-        if (loadedUser?.id) {
-          try {
-            await ensureE2eeReady(loadedUser.id);
-            setE2eeKeysLocked(false);
-            void hydrateE2eeCaches(loadedUser.id);
-          } catch (err) {
-            if (err instanceof E2eeKeysLockedError) {
-              setE2eeKeysLocked(true);
-            } else {
-              console.warn('[e2ee] ensureE2eeReady on session start failed', err);
-            }
-          }
-        }
+        const session = await bootstrapAuthSession();
+        if (cancelled || !session) return;
+        setToken(session.token);
+        setUser(session.user);
+        setE2eeKeysLocked(session.e2eeLocked);
       } catch {
         if (!cancelled) {
           clearAuth();
@@ -204,18 +219,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser((prev) => {
         if (prev && prev.id !== profile.id) return prev;
         const email = profile.email || prev?.email || '';
-        const displayName =
-          profile.displayName !== undefined && profile.displayName !== null
-            ? profile.displayName
-            : prev?.name;
+        const displayName = profile.displayName ?? prev?.name;
         return {
           id: profile.id,
           email,
           name: displayName || email.split('@')[0],
-          avatar:
-            profile.avatarUrl !== undefined
-              ? profile.avatarUrl ?? undefined
-              : prev?.avatar,
+          avatar: profile.avatarUrl === undefined ? prev?.avatar : (profile.avatarUrl ?? undefined),
         };
       });
     },
@@ -264,26 +273,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuth();
   }, [clearAuth, user?.id]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        login,
-        e2eeKeysLocked,
-        markE2eeUnlocked,
-        unlockE2eeWithPassword,
-        applyProfile,
-        refreshProfile,
-        logout,
-        logoutAll,
-        isAuthenticated: !!token && !!user,
-        isLoading,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      login,
+      e2eeKeysLocked,
+      markE2eeUnlocked,
+      unlockE2eeWithPassword,
+      applyProfile,
+      refreshProfile,
+      logout,
+      logoutAll,
+      isAuthenticated: !!token && !!user,
+      isLoading,
+    }),
+    [
+      user,
+      token,
+      login,
+      e2eeKeysLocked,
+      markE2eeUnlocked,
+      unlockE2eeWithPassword,
+      applyProfile,
+      refreshProfile,
+      logout,
+      logoutAll,
+      isLoading,
+    ],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

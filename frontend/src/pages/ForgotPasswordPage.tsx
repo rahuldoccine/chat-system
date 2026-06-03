@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '../utils/userFriendlyErrors';
 
 const forgotSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.email('Invalid email address'),
 });
 
 type ForgotFormValues = z.infer<typeof forgotSchema>;
@@ -63,7 +63,17 @@ const ForgotPasswordPage: React.FC = () => {
         </motion.p>
       </div>
 
-      {!isSent ? (
+      {isSent ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className={styles.successState}
+        >
+          <button type="button" onClick={() => setIsSent(false)} className={styles.secondaryBtn}>
+            Try another email
+          </button>
+        </motion.div>
+      ) : (
         <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
           <motion.div
             initial={{ x: -20, opacity: 0 }}
@@ -71,10 +81,11 @@ const ForgotPasswordPage: React.FC = () => {
             transition={{ delay: 0.4 }}
             className={styles.inputGroup}
           >
-            <label>Email Address</label>
+            <label htmlFor="forgot-password-email">Email Address</label>
             <div className={styles.inputWrapper}>
               <Mail size={18} className={styles.icon} />
               <input
+                id="forgot-password-email"
                 {...register('email')}
                 type="email"
                 placeholder="name@example.com"
@@ -101,16 +112,6 @@ const ForgotPasswordPage: React.FC = () => {
             )}
           </motion.button>
         </form>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className={styles.successState}
-        >
-          <button type="button" onClick={() => setIsSent(false)} className={styles.secondaryBtn}>
-            Try another email
-          </button>
-        </motion.div>
       )}
 
       <motion.p

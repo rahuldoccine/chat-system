@@ -44,7 +44,7 @@
 }
 
 .dot {
-  color: #94a3b8;
+  color: var(--overlay-muted-foreground);
 }
 
 .stage {

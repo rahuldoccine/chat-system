@@ -13,14 +13,16 @@ import {
   getAvatarImageSrc,
   avatarFileNameFromUpload,
   validateAvatarFile,
+  resolveLiveAvatarUrl,
 } from '../utils/avatarUrl';
 import styles from './ProfileAvatarUpload.module.css';
+import { handler, handlerEvent } from '../../../utils/asyncHandler';
 
-type ProfileAvatarUploadProps = {
+type ProfileAvatarUploadProps = Readonly<{
   profile: Profile | undefined;
   onUpdated: (user: Profile) => void;
   disabled?: boolean;
-};
+}>;
 
 const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
   profile,
@@ -38,8 +40,7 @@ const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
   const isBusy = disabled || uploadStatus === 'uploading' || savingAvatar;
   const displayName = profile?.displayName || profile?.email || 'User';
   const initial = displayName.charAt(0).toUpperCase();
-  const liveAvatarUrl =
-    user?.id === profile?.id ? (user?.avatar ?? profile?.avatarUrl) : profile?.avatarUrl;
+  const liveAvatarUrl = resolveLiveAvatarUrl(profile?.id, user?.id, user?.avatar, profile?.avatarUrl);
   const previewSrc = getAvatarImageSrc(liveAvatarUrl, token);
 
   const handlePickFile = () => {
@@ -110,7 +111,7 @@ const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
         type="file"
         accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
         className={styles.fileInput}
-        onChange={(e) => void handleFileChange(e)}
+        onChange={handlerEvent(handleFileChange)}
         disabled={isBusy}
       />
 
@@ -138,7 +139,7 @@ const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
             {profile?.avatarUrl ? 'Change photo' : 'Upload photo'}
           </button>
           {profile?.avatarUrl && (
-            <button type="button" className={styles.btnSecondary} onClick={() => void handleRemove()} disabled={isBusy}>
+            <button type="button" className={styles.btnSecondary} onClick={handler(handleRemove)} disabled={isBusy}>
               <Trash2 size={16} />
               Remove
             </button>

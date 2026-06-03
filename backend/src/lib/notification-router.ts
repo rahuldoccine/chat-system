@@ -14,7 +14,7 @@ import { shouldSendPush } from "./notification-policy.js";
 import { enqueuePushNotification } from "./push-queue.js";
 import { getPrisma } from "./prisma.js";
 
-export type { NewMessageNotificationPayload };
+export type { NewMessageNotificationPayload } from "./push-notification-content.js";
 
 type MentionsMeta = { userIds?: string[]; all?: boolean };
 

@@ -9,7 +9,7 @@ export async function restoreAuxiliaryBackupData(
   await importSentPlaintextEntries(restored.material.userId, restored.sentPlaintext);
   await idbImportGroupSenderKeys(restored.groupSenderKeys);
   for (const row of restored.groupSenderKeys) {
-    const raw = Uint8Array.from(atob(row.keyB64), (c) => c.charCodeAt(0));
+    const raw = Uint8Array.from(atob(row.keyB64), (c) => c.codePointAt(0) ?? 0);
     rememberSenderKey(row.chatId, row.senderId, row.epoch, raw);
   }
   await hydrateGroupSenderKeysFromIdb();

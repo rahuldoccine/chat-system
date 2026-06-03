@@ -1,7 +1,7 @@
 /** Shared mark SVG — viewBox 0 0 64 64 */
 export const LOGO_MARK_VIEWBOX = '0 0 64 64';
 
-export function LogoMarkDefs({ idPrefix = 'cs' }: { idPrefix?: string }) {
+export function LogoMarkDefs({ idPrefix = 'cs' }: Readonly<{ idPrefix?: string }>) {
   const bg = `${idPrefix}-bg`;
   const border = `${idPrefix}-border`;
   const shine = `${idPrefix}-shine`;
@@ -45,7 +45,7 @@ export function LogoMarkDefs({ idPrefix = 'cs' }: { idPrefix?: string }) {
   );
 }
 
-export function LogoMarkShapes({ idPrefix = 'cs' }: { idPrefix?: string }) {
+export function LogoMarkShapes({ idPrefix = 'cs' }: Readonly<{ idPrefix?: string }>) {
   const bg = `${idPrefix}-bg`;
   const border = `${idPrefix}-border`;
   const shine = `${idPrefix}-shine`;

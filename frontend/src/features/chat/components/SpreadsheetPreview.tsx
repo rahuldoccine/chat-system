@@ -45,10 +45,12 @@ const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({ sheets }) => {
                 <td className={styles.sheetEmpty}>No data</td>
               </tr>
             ) : (
-              rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
+              rows.map((row) => (
+                <tr key={row.map((c) => c ?? '').join('\u001f')}>
                   {Array.from({ length: colCount }, (_, colIndex) => (
-                    <td key={colIndex}>{row[colIndex] ?? ''}</td>
+                    <td key={`${row[colIndex] ?? ''}:${colIndex}`}>
+                      {row[colIndex] ?? ''}
+                    </td>
                   ))}
                 </tr>
               ))

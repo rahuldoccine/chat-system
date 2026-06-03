@@ -9,14 +9,11 @@ const globalForPrisma = globalThis as unknown as {
 let prisma: PrismaClient | undefined;
 
 export function initPrisma(config: AppConfig): PrismaClient {
-  if (prisma) {
-    return prisma;
-  }
   const logLevels: ("query" | "info" | "warn" | "error")[] = config.isDev
     ? ["warn", "error"]
     : ["error"];
 
-  prisma =
+  prisma ??=
     globalForPrisma.prisma ??
     new PrismaClient({
       log: logLevels,

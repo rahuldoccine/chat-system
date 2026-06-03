@@ -14,7 +14,7 @@ export async function validateAndMergeMentions(
   senderRole: ChatMemberRole,
   contentMeta: Record<string, unknown> | null | undefined,
 ): Promise<Record<string, unknown> | null | undefined> {
-  if (!contentMeta || typeof contentMeta !== "object") {
+  if (typeof contentMeta !== "object" || contentMeta === null) {
     return contentMeta;
   }
   const raw = (contentMeta as { mentions?: unknown }).mentions;
@@ -52,7 +52,7 @@ export function isUserMentioned(
   userId: string,
   contentMeta: unknown,
 ): boolean {
-  if (!contentMeta || typeof contentMeta !== "object") return false;
+  if (typeof contentMeta !== "object" || contentMeta === null) return false;
   const mentions = (contentMeta as { mentions?: MentionsMeta }).mentions;
   if (!mentions) return false;
   if (mentions.all) return true;

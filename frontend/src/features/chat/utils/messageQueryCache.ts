@@ -31,12 +31,10 @@ const RECEIPT_RANK: Record<NonNullable<Message['receiptStatus']>, number> = {
 };
 
 function maxReceiptDisplay(
-  a: Message['receiptStatus'] | undefined,
-  b: Message['receiptStatus'] | undefined,
+  a: Message['receiptStatus'] | undefined = 'sent',
+  b: Message['receiptStatus'] | undefined = 'sent',
 ): Message['receiptStatus'] | undefined {
-  const aa = a ?? 'sent';
-  const bb = b ?? 'sent';
-  return RECEIPT_RANK[bb] > RECEIPT_RANK[aa] ? bb : aa;
+  return RECEIPT_RANK[b] > RECEIPT_RANK[a] ? b : a;
 }
 
 function isSameMessageRow(existing: Message, incoming: Message): boolean {
@@ -100,21 +98,21 @@ function mergeMessageContentMeta(
   existing: Message['contentMeta'],
   incoming: Message['contentMeta'],
 ): Message['contentMeta'] {
-  const prev = (existing ?? {}) as Record<string, unknown>;
-  const next = (incoming ?? {}) as Record<string, unknown>;
-  const prevFiles = prev.files;
-  const nextFiles = next.files;
-  const files =
-    Array.isArray(nextFiles) && nextFiles.length
-      ? nextFiles
-      : Array.isArray(prevFiles) && prevFiles.length
-        ? prevFiles
-        : undefined;
+  const prevFiles = existing?.files;
+  const nextFiles = incoming?.files;
+  let files: typeof nextFiles;
+  if (Array.isArray(nextFiles) && nextFiles.length) {
+    files = nextFiles;
+  } else if (Array.isArray(prevFiles) && prevFiles.length) {
+    files = prevFiles;
+  } else {
+    files = undefined;
+  }
   return {
-    ...prev,
-    ...next,
+    ...existing,
+    ...incoming,
     ...(files ? { files } : {}),
-  } as Message['contentMeta'];
+  };
 }
 
 export function mergeMessageIntoInfiniteCache(

@@ -136,7 +136,7 @@ const ChatPinsPanel: React.FC = () => {
                         contentMeta={displayMsg.contentMeta}
                         e2eeMessage={m}
                         transportMeta={
-                          displayMsg.contentMeta as Record<string, unknown> | undefined
+                          displayMsg.contentMeta
                         }
                         embedded
                         caption={

@@ -1,6 +1,7 @@
 import type { FileAttachmentMeta } from '../chat/utils/fileMeta';
 import { buildFileUrl } from '../chat/utils/fileUrl';
-import type { Message } from '../chat/types';
+import type { ContentMeta, Message } from '../chat/types';
+import { isPlainObject } from '../../utils/plainObject';
 import { aesGcmDecrypt, aesGcmDecryptBytes, aesGcmEncrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
 import { bufToB64, b64ToBuf } from './encoding';
 import { decodeEnvelope, decodePayload, isGroupE2eeMessage } from './protocol';
@@ -33,7 +34,7 @@ export async function encryptFileBlob(plaintext: ArrayBuffer): Promise<Encrypted
 
 type FileMetaEntry = FileAttachmentMeta & { attachment?: E2eeFileAttachmentKeys };
 
-function filesFromMeta(meta: Record<string, unknown> | undefined): FileMetaEntry[] {
+function filesFromMeta(meta: ContentMeta | undefined): FileMetaEntry[] {
   const bundled = meta?.files;
   if (!Array.isArray(bundled)) return [];
   return bundled as FileMetaEntry[];
@@ -45,13 +46,13 @@ function matchFileEntry(files: FileMetaEntry[], file: FileAttachmentMeta): FileM
       (file.uploadId && f.uploadId === file.uploadId) ||
       (file.url && f.url === file.url) ||
       (file.filename && f.filename === file.filename) ||
-      (file.originalName && f.originalName === f.originalName),
+      (file.originalName && f.originalName === file.originalName),
   );
 }
 
 export function resolveFileAttachmentKeys(
   file: FileAttachmentMeta,
-  transportMeta?: Record<string, unknown>,
+  transportMeta?: ContentMeta,
 ): E2eeFileAttachmentKeys | null {
   const direct = (file as FileMetaEntry).attachment;
   if (direct?.fileKey && direct.iv) return direct;
@@ -65,7 +66,7 @@ export function resolveFileAttachmentKeys(
 async function resolveFingerprint(
   msg: Pick<Message, 'contentMeta' | 'senderId'>,
 ): Promise<string | null> {
-  const meta = msg.contentMeta as Record<string, unknown> | undefined;
+  const meta = msg.contentMeta;
   if (typeof meta?.senderFingerprint === 'string') return meta.senderFingerprint;
   try {
     const row = await e2eeApi.getIdentityKey(msg.senderId);
@@ -97,8 +98,8 @@ async function decryptMessagePayloadMeta(
   try {
     const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
     const payload = decodePayload(plainBuf);
-    if (payload?.meta && typeof payload.meta === 'object') {
-      return payload.meta as Record<string, unknown>;
+    if (isPlainObject(payload?.meta)) {
+      return payload.meta;
     }
   } catch {
     return null;
@@ -106,21 +107,23 @@ async function decryptMessagePayloadMeta(
   return null;
 }
 
+type MessageTransportFields = Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
+
 async function resolveTransportMeta(
   userId: string,
-  msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
+  msg: MessageTransportFields,
   _viewerId: string,
-  transportMeta?: Record<string, unknown>,
-): Promise<Record<string, unknown> | undefined> {
-  const hasFileKeys = (meta: Record<string, unknown> | undefined) => {
+  transportMeta?: ContentMeta,
+): Promise<ContentMeta | undefined> {
+  const hasFileKeys = (meta: ContentMeta | undefined) => {
     const files = meta?.files;
     if (!Array.isArray(files)) return false;
-    return files.some(
-      (f) =>
-        f &&
-        typeof f === 'object' &&
-        (f as { attachment?: { fileKey?: string } }).attachment?.fileKey,
-    );
+    return files.some((entry) => {
+      const f: unknown = entry;
+      if (!isPlainObject(f)) return false;
+      const attachment = f['attachment'];
+      return isPlainObject(attachment) && typeof attachment.fileKey === 'string';
+    });
   };
 
   if (transportMeta && hasFileKeys(transportMeta)) return transportMeta;
@@ -173,7 +176,7 @@ export async function decryptMessageFile(
   file: FileAttachmentMeta,
   viewerId: string,
   token: string | null,
-  transportMeta?: Record<string, unknown>,
+  transportMeta?: ContentMeta,
 ): Promise<Blob | null> {
   if (!isE2eeMessage(msg)) {
     const buf = await fetchEncryptedFileBytes(file, token);
@@ -209,16 +212,17 @@ export async function decryptMessageFile(
 /** @deprecated Use decryptMessageFile — kept for voice note call sites during migration */
 export async function decryptAttachmentFromMessage(
   userId: string,
-  msg: Pick<Message, 'ciphertext' | 'contentMeta' | 'senderId'>,
+  msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
   viewerId: string,
   token: string | null = null,
-  transportMeta?: Record<string, unknown>,
+  transportMeta?: ContentMeta,
 ): Promise<ArrayBuffer | null> {
   const files = transportMeta ? filesFromMeta(transportMeta) : [];
+  const legacyMeta = isPlainObject(msg.contentMeta) ? msg.contentMeta : null;
   const primary = files[0] ?? {
-    url: (msg.contentMeta as { url?: string })?.url,
-    filename: (msg.contentMeta as { filename?: string })?.filename,
-    mimetype: (msg.contentMeta as { mimetype?: string })?.mimetype,
+    url: typeof legacyMeta?.url === 'string' ? legacyMeta.url : undefined,
+    filename: typeof legacyMeta?.filename === 'string' ? legacyMeta.filename : undefined,
+    mimetype: typeof legacyMeta?.mimetype === 'string' ? legacyMeta.mimetype : undefined,
   };
   const blob = await decryptMessageFile(userId, msg, primary, viewerId, token, transportMeta);
   if (!blob) return null;
@@ -230,11 +234,6 @@ export async function encryptAttachment(
   _userId: string,
   _peerUserId: string,
   blob: ArrayBuffer,
-  _options?: {
-    caption?: string;
-    transportMeta?: Record<string, unknown>;
-    clientMessageId?: string;
-  },
 ): Promise<{ encryptedBlob: Blob; encryptResult: null; attachment: E2eeFileAttachmentKeys }> {
   const { encryptedBlob, attachment } = await encryptFileBlob(blob);
   return { encryptedBlob, encryptResult: null, attachment };

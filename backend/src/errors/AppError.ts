@@ -13,7 +13,7 @@ export class AppError extends Error {
     details?: ErrorDetails,
     options?: { cause?: unknown },
   ) {
-    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = "AppError";
     this.httpStatus = httpStatus;
     this.code = code;

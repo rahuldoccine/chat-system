@@ -37,7 +37,7 @@
   margin: 0.35rem 0 0;
   font-size: 0.875rem;
   font-weight: 400;
-  color: var(--muted-foreground, #94a3b8);
+  color: var(--muted-foreground);
 }
 
 .avatarWrap {
@@ -60,8 +60,8 @@
   min-height: var(--touch-target-min);
   border: none;
   border-radius: 50%;
-  background: #ef4444;
-  color: #ffffff;
+  background: var(--destructive-btn-bg);
+  color: var(--primary-foreground);
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);

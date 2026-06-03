@@ -20,15 +20,15 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  background: #6366f1;
-  color: #fff;
+  background: #4f46e5;
+  color: var(--primary-foreground);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .cardSent .playBtn {
-  background: rgba(255, 255, 255, 0.95);
-  color: #6366f1;
+  background: #ffffff;
+  color: #4f46e5;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 

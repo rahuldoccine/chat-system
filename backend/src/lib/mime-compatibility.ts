@@ -1,4 +1,4 @@
-import { isAllowedUploadMime, isAudioMime, isImageMime, isVideoMime } from "./upload-allowlist.js";
+import { isAudioMime, isImageMime, isVideoMime } from "./upload-allowlist.js";
 
 /**
  * MIME compatibility between browser-declared types and `file-type` sniff results.

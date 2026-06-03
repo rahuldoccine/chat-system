@@ -8,7 +8,17 @@ import GroupCallParticipantGrid from './GroupCallParticipantGrid';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
 
-type GroupCallOverlayProps = {
+function groupCallParticipantIds(participants: string[], userId: string | undefined): string[] {
+  if (participants.length) return participants;
+  if (userId) return [userId];
+  return [];
+}
+
+function groupCallKindLabel(kind: 'AUDIO' | 'VIDEO'): string {
+  return kind === 'VIDEO' ? 'video' : 'voice';
+}
+
+type GroupCallOverlayProps = Readonly<{
   sessionId: string;
   chatId: string;
   kind: 'AUDIO' | 'VIDEO';
@@ -18,7 +28,7 @@ type GroupCallOverlayProps = {
   onLeave: () => void;
   onToggleMute: () => boolean;
   onToggleCamera: () => boolean;
-};
+}>;
 
 const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
   sessionId,
@@ -59,7 +69,7 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
       )}
       <div className={styles.header}>
         <Users size={18} />
-        <span>Group {kind === 'VIDEO' ? 'video' : 'voice'} call</span>
+        <span>Group {groupCallKindLabel(kind)} call</span>
         <span className={styles.dot}>•</span>
         <span>{participants.length || 1} participant(s)</span>
         <span className={styles.dot}>•</span>
@@ -69,7 +79,7 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
       <div className={styles.stage}>
         <GroupCallParticipantGrid
           chatId={chatId}
-          participantIds={participants.length ? participants : user?.id ? [user.id] : []}
+          participantIds={groupCallParticipantIds(participants, user?.id)}
           localUserId={user?.id}
           kind={kind}
           localStream={localStream}

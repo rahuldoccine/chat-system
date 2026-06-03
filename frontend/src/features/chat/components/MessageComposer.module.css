@@ -595,7 +595,6 @@
 }
 
 .recordingCancel {
-  border: none;
   background: var(--surface-elevated);
   color: var(--destructive);
   font-size: 0.8125rem;

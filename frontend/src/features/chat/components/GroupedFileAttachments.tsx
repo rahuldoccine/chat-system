@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import styles from './GroupedFileAttachments.module.css';
+import { handler } from '../../../utils/asyncHandler';
 import { ChevronDown, CloudDownload, Download, Eye, ImageIcon, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { buildFileUrl } from '../utils/fileUrl';
@@ -7,7 +8,7 @@ import { downloadBlob, downloadFileFromUrl } from '../utils/downloadFile';
 import { decryptMessageFile } from '../../e2ee/attachmentCrypto';
 import { isE2eeMessage } from '../../e2ee/directChat';
 import { useDecryptedFileUrl } from '../../e2ee/useDecryptedFileUrl';
-import type { Message } from '../types';
+import type { ContentMeta, Message } from '../types';
 import { getDocumentViewerKind, type DocumentViewerKind } from '../utils/documentViewer';
 import { truncateFilenameMiddle } from '../utils/formatFilename';
 import {
@@ -25,10 +26,10 @@ import ImageViewerModal from './ImageViewerModal';
 import MediaPreviewModal from './MediaPreviewModal';
 import MessageMeta from './MessageMeta';
 
-type GroupedFileAttachmentsProps = {
+type GroupedFileAttachmentsProps = Readonly<{
   files: FileAttachmentMeta[];
   e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
   embedded?: boolean;
   caption?: string;
   bubbleVariant?: 'sent' | 'received';
@@ -38,7 +39,7 @@ type GroupedFileAttachmentsProps = {
     isMe: boolean;
     receiptStatus?: 'sent' | 'delivered' | 'read';
   };
-};
+}>;
 
 function E2eeSingleImagePreview({
   file,
@@ -46,13 +47,13 @@ function E2eeSingleImagePreview({
   transportMeta,
   name,
   onOpen,
-}: {
+}: Readonly<{
   file: FileAttachmentMeta;
   e2eeMessage?: GroupedFileAttachmentsProps['e2eeMessage'];
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
   name: string;
   onOpen: () => void;
-}) {
+}>) {
   const src = useDecryptedFileUrl(e2eeMessage, file, transportMeta);
   if (!src) {
     return (
@@ -87,13 +88,13 @@ type ActiveViewer =
   | { kind: 'audio'; src: string; title: string; durationMs?: number }
   | null;
 
-type FileCardProps = {
+type FileCardProps = Readonly<{
   file: FileAttachmentMeta;
   layout: 'row' | 'grid';
   onView: (file: FileAttachmentMeta) => void;
   onDownload: (file: FileAttachmentMeta) => void;
   downloading?: boolean;
-};
+}>;
 
 function fileKey(file: FileAttachmentMeta, index: number): string {
   return `${file.uploadId ?? file.filename ?? file.originalName ?? 'file'}-${index}`;
@@ -276,7 +277,7 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
         }
 
         if (isAudioFile(file)) {
-          const durationMs = getVoiceDurationMs(transportMeta as Message['contentMeta']);
+          const durationMs = getVoiceDurationMs(transportMeta);
           setViewer({ kind: 'audio', src: url, title, durationMs });
           return;
         }
@@ -325,6 +326,47 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
 
   const singleImage = !isMulti && isImageFile(files[0]);
   const singleImageName = files[0].originalName || files[0].filename || 'Image';
+
+  const renderFileList = () => {
+    if (isMulti && collapsed) return null;
+    if (singleImage) {
+      return (
+        <E2eeSingleImagePreview
+          file={files[0]}
+          e2eeMessage={e2eeMessage}
+          transportMeta={transportMeta}
+          name={singleImageName}
+          onOpen={() => openFile(files[0])}
+        />
+      );
+    }
+    if (isMulti) {
+      return (
+        <div className={styles.grid}>
+          {files.map((file, index) => (
+            <FileAttachmentCard
+              key={fileKey(file, index)}
+              file={file}
+              layout="grid"
+              onView={openFile}
+              onDownload={handler(() => handleDownloadFile(file, index))}
+              downloading={downloadingKey === fileKey(file, index)}
+            />
+          ))}
+        </div>
+      );
+    }
+    return (
+      <FileAttachmentCard
+        file={files[0]}
+        layout="row"
+        onView={openFile}
+        onDownload={handler(() => handleDownloadFile(files[0], 0))}
+        downloading={downloadingKey === fileKey(files[0], 0)}
+      />
+    );
+  };
+
   return (
     <>
       <div
@@ -350,7 +392,7 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
             <button
               type="button"
               className={styles.downloadAllBtn}
-              onClick={() => void handleDownloadAll()}
+              onClick={handler(handleDownloadAll)}
               disabled={downloadingAll}
             >
               {downloadingAll ? (
@@ -363,37 +405,7 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
           </div>
         )}
 
-        {(!isMulti || !collapsed) &&
-          (singleImage ? (
-            <E2eeSingleImagePreview
-              file={files[0]}
-              e2eeMessage={e2eeMessage}
-              transportMeta={transportMeta}
-              name={singleImageName}
-              onOpen={() => openFile(files[0])}
-            />
-          ) : isMulti ? (
-            <div className={styles.grid}>
-              {files.map((file, index) => (
-                <FileAttachmentCard
-                  key={fileKey(file, index)}
-                  file={file}
-                  layout="grid"
-                  onView={openFile}
-                  onDownload={() => void handleDownloadFile(file, index)}
-                  downloading={downloadingKey === fileKey(file, index)}
-                />
-              ))}
-            </div>
-          ) : (
-            <FileAttachmentCard
-              file={files[0]}
-              layout="row"
-              onView={openFile}
-              onDownload={() => void handleDownloadFile(files[0], 0)}
-              downloading={downloadingKey === fileKey(files[0], 0)}
-            />
-          ))}
+        {renderFileList()}
 
         {mediaTimestamp && (
           <div className={styles.mediaTimestamp}>

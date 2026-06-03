@@ -83,12 +83,12 @@ export function loadConfig(overrides?: Partial<NodeJS.ProcessEnv>): AppConfig {
   }
   const env = parseEnv({ ...process.env, ...overrides });
   const swaggerFlag = env.ENABLE_SWAGGER?.toLowerCase();
-  const swaggerEnabled =
-    swaggerFlag === "false" || swaggerFlag === "0"
-      ? false
-      : swaggerFlag === "true" || swaggerFlag === "1"
-        ? true
-        : env.NODE_ENV === "development";
+  let swaggerEnabled = env.NODE_ENV === "development";
+  if (swaggerFlag === "false" || swaggerFlag === "0") {
+    swaggerEnabled = false;
+  } else if (swaggerFlag === "true" || swaggerFlag === "1") {
+    swaggerEnabled = true;
+  }
 
   const cfg: AppConfig = {
     nodeEnv: env.NODE_ENV,

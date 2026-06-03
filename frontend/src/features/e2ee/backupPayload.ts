@@ -14,9 +14,11 @@ export type E2eeBackupPayloadV2 = {
   groupSenderKeys: GroupSenderKeyIdbRow[];
 };
 
+import { isPlainObject } from '../../utils/plainObject';
+
 function isKeyMaterialShape(value: unknown): value is E2eeKeyMaterial {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as Record<string, unknown>;
+  if (!isPlainObject(value)) return false;
+  const v = value;
   return (
     typeof v.identityPrivateJwk === 'object' &&
     typeof v.identityPublicSpki === 'string' &&
@@ -47,26 +49,24 @@ export type RestoredBackupPayload = {
 
 /** Parse wrapped backup JSON — supports v2 payload and legacy key-material-only JSON. */
 export function parseBackupPayloadJson(userId: string, json: string): RestoredBackupPayload {
-  const parsed = JSON.parse(json) as Record<string, unknown>;
+  const parsed: unknown = JSON.parse(json);
+  if (!isPlainObject(parsed)) {
+    throw new Error('Unsupported key backup format');
+  }
 
   if (parsed.version === BACKUP_PAYLOAD_VERSION && isKeyMaterialShape(parsed.keyMaterial)) {
-    const material = parsed.keyMaterial as E2eeKeyMaterial;
-    material.userId = userId;
-    return {
-      material,
-      sentPlaintext:
-        parsed.sentPlaintext && typeof parsed.sentPlaintext === 'object'
-          ? (parsed.sentPlaintext as Record<string, SentPlaintextEntry>)
-          : {},
-      groupSenderKeys: Array.isArray(parsed.groupSenderKeys)
-        ? (parsed.groupSenderKeys as GroupSenderKeyIdbRow[])
-        : [],
-    };
+    const material: E2eeKeyMaterial = { ...parsed.keyMaterial, userId };
+    const sentPlaintext = isPlainObject(parsed.sentPlaintext)
+      ? (parsed.sentPlaintext as Record<string, SentPlaintextEntry>)
+      : {};
+    const groupSenderKeys = Array.isArray(parsed.groupSenderKeys)
+      ? (parsed.groupSenderKeys as GroupSenderKeyIdbRow[])
+      : [];
+    return { material, sentPlaintext, groupSenderKeys };
   }
 
   if (isKeyMaterialShape(parsed)) {
-    const material = parsed as E2eeKeyMaterial;
-    material.userId = userId;
+    const material: E2eeKeyMaterial = { ...parsed, userId };
     return { material, sentPlaintext: {}, groupSenderKeys: [] };
   }
 

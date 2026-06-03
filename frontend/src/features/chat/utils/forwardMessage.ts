@@ -81,13 +81,23 @@ export function buildForwardSendPayload(
   if (preview) meta.preview = preview;
 
   const cleanMeta = stripE2eeTransportFields(meta);
+  const fileList = files ?? [];
   const allImages =
-    Boolean(files?.length) &&
-    files!.every((f) => isImageFile(f) || (f.mimetype ?? '').toLowerCase().startsWith('image/'));
+    fileList.length > 0 &&
+    fileList.every((f) => isImageFile(f) || (f.mimetype ?? '').toLowerCase().startsWith('image/'));
 
   return {
     text: caption,
-    kind: isVoiceMessage(displayMsg) ? 'FILE' : allImages ? 'IMAGE' : 'FILE',
+    kind: forwardMediaKind(displayMsg, allImages),
     contentMeta: Object.keys(cleanMeta).length ? cleanMeta : undefined,
   };
+}
+
+function forwardMediaKind(
+  displayMsg: Message,
+  allImages: boolean,
+): ForwardSendPayload['kind'] {
+  if (isVoiceMessage(displayMsg)) return 'FILE';
+  if (allImages) return 'IMAGE';
+  return 'FILE';
 }

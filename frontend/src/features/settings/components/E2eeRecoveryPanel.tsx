@@ -1,12 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Loader2, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
 import * as e2eeRecovery from '../../e2ee/recovery';
 import { ensureE2eeReady } from '../../e2ee/bootstrap';
 import styles from './E2eeRecoveryPanel.module.css';
+import { handler } from '../../../utils/asyncHandler';
+
+function renderBackupStatusLine(status: e2eeRecovery.AccountKeyStatus): React.ReactNode {
+  if (status.hasBackup) {
+    const updated = status.backupUpdatedAt
+      ? ` · backup updated ${new Date(status.backupUpdatedAt).toLocaleString()}`
+      : '';
+    return <>Keys protected{updated}</>;
+  }
+  if (status.hasIdentityKey) {
+    return <>Encryption active but no password backup yet — sign in with password to create one.</>;
+  }
+  return <>No encryption keys registered on this account yet.</>;
+}
 
 const E2eeRecoveryPanel: React.FC = () => {
+  const fieldId = useId();
+  const passphraseId = `${fieldId}-passphrase`;
+  const confirmPassId = `${fieldId}-confirm-pass`;
+  const codeId = `${fieldId}-code`;
+  const restorePassId = `${fieldId}-restore-pass`;
+
   const { user, markE2eeUnlocked } = useAuth();
   const [passphrase, setPassphrase] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -106,26 +126,16 @@ const E2eeRecoveryPanel: React.FC = () => {
 
       {backupStatus ? (
         <p className={styles.statusLine}>
-          {backupStatus.hasBackup ? (
-            <>
-              Keys protected
-              {backupStatus.backupUpdatedAt
-                ? ` · backup updated ${new Date(backupStatus.backupUpdatedAt).toLocaleString()}`
-                : ''}
-            </>
-          ) : backupStatus.hasIdentityKey ? (
-            <>Encryption active but no password backup yet — sign in with password to create one.</>
-          ) : (
-            <>No encryption keys registered on this account yet.</>
-          )}
+          {renderBackupStatusLine(backupStatus)}
         </p>
       ) : null}
 
       <div className={styles.block}>
         <h4>Create backup</h4>
-        <label className={styles.label}>
-          Recovery passphrase
+        <label className={styles.label} htmlFor={passphraseId}>
+          <span>Recovery passphrase</span>
           <input
+            id={passphraseId}
             type="password"
             className={styles.input}
             value={passphrase}
@@ -133,9 +143,10 @@ const E2eeRecoveryPanel: React.FC = () => {
             autoComplete="new-password"
           />
         </label>
-        <label className={styles.label}>
-          Confirm passphrase
+        <label className={styles.label} htmlFor={confirmPassId}>
+          <span>Confirm passphrase</span>
           <input
+            id={confirmPassId}
             type="password"
             className={styles.input}
             value={confirmPass}
@@ -147,7 +158,7 @@ const E2eeRecoveryPanel: React.FC = () => {
           type="button"
           className={styles.primaryBtn}
           disabled={busy === 'backup'}
-          onClick={() => void handleCreateBackup()}
+          onClick={handler(handleCreateBackup)}
         >
           {busy === 'backup' ? <Loader2 size={16} className={styles.spin} /> : null}
           Save backup
@@ -160,14 +171,15 @@ const E2eeRecoveryPanel: React.FC = () => {
           type="button"
           className={styles.secondaryBtn}
           disabled={busy === 'challenge'}
-          onClick={() => void handleRequestCode()}
+          onClick={handler(handleRequestCode)}
         >
           {busy === 'challenge' ? <Loader2 size={16} className={styles.spin} /> : null}
           Email recovery code
         </button>
-        <label className={styles.label}>
-          Verification code
+        <label className={styles.label} htmlFor={codeId}>
+          <span>Verification code</span>
           <input
+            id={codeId}
             type="text"
             className={styles.input}
             value={code}
@@ -180,16 +192,17 @@ const E2eeRecoveryPanel: React.FC = () => {
           type="button"
           className={styles.secondaryBtn}
           disabled={busy === 'verify' || !code.trim()}
-          onClick={() => void handleVerifyCode()}
+          onClick={handler(handleVerifyCode)}
         >
           {busy === 'verify' ? <Loader2 size={16} className={styles.spin} /> : null}
           Verify code
         </button>
         {stepUpToken ? (
           <>
-            <label className={styles.label}>
-              Recovery passphrase
+            <label className={styles.label} htmlFor={restorePassId}>
+              <span>Recovery passphrase</span>
               <input
+                id={restorePassId}
                 type="password"
                 className={styles.input}
                 value={restorePass}
@@ -201,7 +214,7 @@ const E2eeRecoveryPanel: React.FC = () => {
               type="button"
               className={styles.primaryBtn}
               disabled={busy === 'restore' || !restorePass}
-              onClick={() => void handleRestore()}
+              onClick={handler(handleRestore)}
             >
               {busy === 'restore' ? <Loader2 size={16} className={styles.spin} /> : null}
               Restore keys

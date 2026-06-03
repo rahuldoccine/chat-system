@@ -47,8 +47,8 @@
   height: 36px;
   border: none;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
+  background: #334155;
+  color: var(--overlay-muted-foreground);
   cursor: pointer;
   text-decoration: none;
   transition: background 0.15s ease;
@@ -103,7 +103,7 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 2rem;
-  color: #64748b;
+  color: #5c6b7a;
   text-align: center;
   font-size: 0.9rem;
 }
@@ -174,16 +174,16 @@
 }
 
 .sheetTabActive {
-  background: #6366f1;
-  border-color: #6366f1;
-  color: #ffffff;
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: var(--primary-foreground);
 }
 
 .sheetNotice {
   margin: 0;
   padding: 0.5rem 1rem 0;
   font-size: 0.75rem;
-  color: #64748b;
+  color: #5c6b7a;
   flex-shrink: 0;
 }
 
@@ -220,5 +220,5 @@
 .sheetEmpty {
   padding: 2rem;
   text-align: center;
-  color: #94a3b8;
+  color: #5c6b7a;
 }

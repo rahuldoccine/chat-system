@@ -27,8 +27,8 @@
   height: 44px;
   border: none;
   border-radius: 50%;
-  background: #f23f43;
-  color: white;
+  background: #dc2626;
+  color: var(--primary-foreground);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -479,9 +479,9 @@
 
 /* Sent (purple) bubbles: thread header must stay readable */
 .isMe .threadBroadcastHeader {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.14);
-  border-left-color: rgba(255, 255, 255, 0.75);
+  color: var(--primary-foreground);
+  background: #4f46e5;
+  border-left-color: #c7d2fe;
 }
 
 .isMe .threadBroadcastLink {
@@ -510,8 +510,8 @@
 }
 
 .isMe .bubble {
-  background: linear-gradient(135deg, #6366f1 0%, #8a87bb 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 16px 16px 4px 16px;
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
@@ -1012,8 +1012,8 @@
   width: 72px;
   height: 72px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: var(--primary-foreground);
   display: flex;
   align-items: center;
   justify-content: center;

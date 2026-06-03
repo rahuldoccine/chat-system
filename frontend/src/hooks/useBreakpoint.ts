@@ -13,7 +13,7 @@ function getBreakpoint(width: number): Breakpoint {
 
 export function useBreakpoint(): Breakpoint {
   const [bp, setBp] = useState<Breakpoint>(() =>
-    typeof globalThis.window !== 'undefined' ? getBreakpoint(globalThis.innerWidth) : 'desktop',
+    globalThis.window === undefined ? 'desktop' : getBreakpoint(globalThis.innerWidth),
   );
 
   useEffect(() => {

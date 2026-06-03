@@ -4,7 +4,6 @@ import { resetConfigCache } from "../config/index.js";
 import * as notificationContextMemory from "../sockets/notification-context-memory.js";
 
 import * as pushQueue from "./push-queue.js";
-import * as notificationContextRedis from "./notification-context-redis.js";
 import { notifyNewMessage } from "./notification-router.js";
 
 const findMany = vi.fn();

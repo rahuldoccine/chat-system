@@ -21,8 +21,9 @@ import { useAudioSpeaking } from '../useAudioSpeaking';
 import type { CallConnectionUiState } from '../CallManager';
 import type { CallPhase } from '../types';
 import styles from './CallOverlay.module.css';
+import { handler } from '../../../utils/asyncHandler';
 
-type CallOverlayProps = {
+type CallOverlayProps = Readonly<{
   peerUserId?: string;
   peerName: string;
   peerAvatarUrl?: string | null;
@@ -40,7 +41,7 @@ type CallOverlayProps = {
   onToggleCamera: () => void;
   onSwitchCamera: () => Promise<boolean>;
   onEndTranscript?: () => void;
-};
+}>;
 
 function connectionLabel(state: CallConnectionUiState): string {
   switch (state) {
@@ -53,6 +54,155 @@ function connectionLabel(state: CallConnectionUiState): string {
     default:
       return 'Connecting…';
   }
+}
+
+type TranscriptUi = ReturnType<typeof useCallTranscript>;
+
+function CallOverlayCaptions({
+  transcript,
+  myLabel,
+}: Readonly<{
+  transcript: TranscriptUi;
+  myLabel: string;
+}>) {
+  if (!transcript.enabled) return null;
+  return (
+    <div className={styles.captions} aria-live="polite">
+      {transcript.displayRows.map((row) => (
+        <p key={row.key} className={styles.captionLine}>
+          <span className={styles.captionSpeaker}>{row.speaker}:</span> {row.text}
+        </p>
+      ))}
+      {transcript.interimText ? (
+        <p className={styles.captionInterim}>
+          <span className={styles.captionSpeaker}>{myLabel}:</span> {transcript.interimText}
+        </p>
+      ) : null}
+      {transcript.hasCaptions ? null : (
+        <p className={styles.captionsPlaceholder}>Listening for speech…</p>
+      )}
+      {transcript.statusHint ? (
+        <p className={styles.captionHint}>{transcript.statusHint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function CallOverlayControls({
+  muted,
+  cameraOff,
+  isVideo,
+  speakerOn,
+  supportsSink,
+  endLabel,
+  transcript,
+  onToggleMute,
+  onToggleCamera,
+  onSwitchCamera,
+  onToggleSpeaker,
+  onHangUp,
+}: Readonly<{
+  muted: boolean;
+  cameraOff: boolean;
+  isVideo: boolean;
+  speakerOn: boolean;
+  supportsSink: boolean;
+  endLabel: string;
+  transcript: TranscriptUi;
+  onToggleMute: () => void;
+  onToggleCamera: () => void;
+  onSwitchCamera: () => Promise<boolean>;
+  onToggleSpeaker: () => void;
+  onHangUp: () => void;
+}>) {
+  return (
+    <div className={styles.controls}>
+      <div className={styles.controlRow}>
+        <button
+          type="button"
+          className={`${styles.ctrlBtn} ${muted ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
+          onClick={onToggleMute}
+          aria-label={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? <MicOff size={22} /> : <Mic size={22} />}
+        </button>
+        {isVideo && (
+          <>
+            <button
+              type="button"
+              className={`${styles.ctrlBtn} ${cameraOff ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
+              onClick={onToggleCamera}
+              aria-label={cameraOff ? 'Camera on' : 'Camera off'}
+            >
+              {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
+            </button>
+            <button
+              type="button"
+              className={styles.ctrlBtn}
+              onClick={handler(() => {
+                void onSwitchCamera();
+              })}
+              aria-label="Switch camera"
+            >
+              <SwitchCamera size={22} />
+            </button>
+          </>
+        )}
+        {supportsSink && (
+          <button
+            type="button"
+            className={`${styles.ctrlBtn} ${speakerOn ? styles.ctrlBtnActive : styles.ctrlBtnOff}`}
+            onClick={handler(onToggleSpeaker)}
+            aria-label={speakerOn ? 'Speaker on' : 'Speaker off'}
+          >
+            {speakerOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
+          </button>
+        )}
+        {transcript.supported && (
+          <button
+            type="button"
+            className={`${styles.ctrlBtn} ${transcript.enabled ? styles.ctrlBtnCaptionsOn : ''}`}
+            onClick={transcript.toggle}
+            aria-label={transcript.enabled ? 'Captions ON' : 'Captions OFF'}
+            aria-pressed={transcript.enabled}
+            title={transcript.enabled ? 'Captions ON' : 'Captions OFF'}
+          >
+            <Subtitles size={22} strokeWidth={transcript.enabled ? 2.5 : 2} />
+          </button>
+        )}
+        <button
+          type="button"
+          className={`${styles.ctrlBtn} ${styles.endBtn}`}
+          onClick={onHangUp}
+          aria-label={endLabel}
+          title={endLabel}
+        >
+          <PhoneOff size={22} />
+        </button>
+      </div>
+      {transcript.supported && (
+        <div className={styles.captionMeta}>
+          <span className={transcript.enabled ? styles.captionOn : styles.captionOff}>
+            {transcript.enabled ? 'Captions ON' : 'Captions OFF'}
+          </span>
+          <label className={styles.langSelect}>
+            <span className={styles.srOnly}>Caption language</span>
+            <select
+              value={transcript.language}
+              onChange={(e) => transcript.applyLanguage(e.target.value)}
+              aria-label="Caption language"
+            >
+              {CAPTION_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const CallOverlay: React.FC<CallOverlayProps> = ({
@@ -140,9 +290,9 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   return createPortal(
     <div className={styles.backdrop}>
       {connectionUi === 'reconnecting' && (
-        <div className={styles.reconnectBanner} role="status">
+        <output className={styles.reconnectBanner}>
           Reconnecting…
-        </div>
+        </output>
       )}
 
       <div className={styles.header}>
@@ -178,7 +328,9 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
 
       <div className={styles.stage}>
         {showVideo && remoteStream ? (
-          <video ref={remoteRef} className={styles.remoteVideo} autoPlay playsInline />
+          <video ref={remoteRef} className={styles.remoteVideo} autoPlay playsInline>
+            <track kind="captions" />
+          </video>
         ) : (
           <div className={styles.audioOnly}>
             <div className={styles.avatarWrap}>
@@ -198,7 +350,9 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         )}
         {showVideo && localStream && (
           <div className={styles.localPip}>
-            <video ref={localRef} className={styles.localVideo} autoPlay playsInline muted />
+            <video ref={localRef} className={styles.localVideo} autoPlay playsInline muted>
+              <track kind="captions" />
+            </video>
           </div>
         )}
         {localSpeaking && !muted && (
@@ -206,115 +360,26 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
             <span className={styles.waveBar} />
             <span className={styles.waveBar} />
             <span className={styles.waveBar} />
-            You’re speaking
+            <span>{' '}You’re speaking</span>
           </div>
         )}
-        {transcript.enabled && (
-          <div className={styles.captions} aria-live="polite">
-            {transcript.displayRows.map((row) => (
-              <p key={row.key} className={styles.captionLine}>
-                <span className={styles.captionSpeaker}>{row.speaker}:</span> {row.text}
-              </p>
-            ))}
-            {transcript.interimText ? (
-              <p className={styles.captionInterim}>
-                <span className={styles.captionSpeaker}>{myLabel}:</span> {transcript.interimText}
-              </p>
-            ) : null}
-            {!transcript.hasCaptions ? (
-              <p className={styles.captionsPlaceholder}>Listening for speech…</p>
-            ) : null}
-            {transcript.statusHint ? (
-              <p className={styles.captionHint}>{transcript.statusHint}</p>
-            ) : null}
-          </div>
-        )}
+        <CallOverlayCaptions transcript={transcript} myLabel={myLabel} />
       </div>
 
-      <div className={styles.controls}>
-        <div className={styles.controlRow}>
-          <button
-            type="button"
-            className={`${styles.ctrlBtn} ${muted ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
-            onClick={onToggleMute}
-            aria-label={muted ? 'Unmute' : 'Mute'}
-          >
-            {muted ? <MicOff size={22} /> : <Mic size={22} />}
-          </button>
-          {isVideo && (
-            <>
-              <button
-                type="button"
-                className={`${styles.ctrlBtn} ${cameraOff ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
-                onClick={onToggleCamera}
-                aria-label={cameraOff ? 'Camera on' : 'Camera off'}
-              >
-                {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
-              </button>
-              <button
-                type="button"
-                className={styles.ctrlBtn}
-                onClick={() => void onSwitchCamera()}
-                aria-label="Switch camera"
-              >
-                <SwitchCamera size={22} />
-              </button>
-            </>
-          )}
-          {supportsSink && (
-            <button
-              type="button"
-              className={`${styles.ctrlBtn} ${speakerOn ? styles.ctrlBtnActive : styles.ctrlBtnOff}`}
-              onClick={() => void toggleSpeaker()}
-              aria-label={speakerOn ? 'Speaker on' : 'Speaker off'}
-            >
-              {speakerOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
-            </button>
-          )}
-          {transcript.supported && (
-            <button
-              type="button"
-              className={`${styles.ctrlBtn} ${transcript.enabled ? styles.ctrlBtnCaptionsOn : ''}`}
-              onClick={transcript.toggle}
-              aria-label={transcript.enabled ? 'Captions ON' : 'Captions OFF'}
-              aria-pressed={transcript.enabled}
-              title={transcript.enabled ? 'Captions ON' : 'Captions OFF'}
-            >
-              <Subtitles size={22} strokeWidth={transcript.enabled ? 2.5 : 2} />
-            </button>
-          )}
-          <button
-            type="button"
-            className={`${styles.ctrlBtn} ${styles.endBtn}`}
-            onClick={onHangUp}
-            aria-label={endLabel}
-            title={endLabel}
-          >
-            <PhoneOff size={22} />
-          </button>
-        </div>
-        {transcript.supported && (
-          <div className={styles.captionMeta}>
-            <span className={transcript.enabled ? styles.captionOn : styles.captionOff}>
-              {transcript.enabled ? 'Captions ON' : 'Captions OFF'}
-            </span>
-            <label className={styles.langSelect}>
-              <span className={styles.srOnly}>Caption language</span>
-              <select
-                value={transcript.language}
-                onChange={(e) => transcript.setLanguage(e.target.value)}
-                aria-label="Caption language"
-              >
-                {CAPTION_LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
-      </div>
+      <CallOverlayControls
+        muted={muted}
+        cameraOff={cameraOff}
+        isVideo={isVideo}
+        speakerOn={speakerOn}
+        supportsSink={supportsSink}
+        endLabel={endLabel}
+        transcript={transcript}
+        onToggleMute={onToggleMute}
+        onToggleCamera={onToggleCamera}
+        onSwitchCamera={onSwitchCamera}
+        onToggleSpeaker={toggleSpeaker}
+        onHangUp={onHangUp}
+      />
     </div>,
     document.body,
   );

@@ -157,20 +157,20 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const onSignal = (payload: { callId: string; signal: string }) => {
       const meta = callManager.getMeta();
-      if (!meta || meta.callId !== payload.callId) return;
+      if (meta?.callId !== payload.callId) return;
       if (payload.signal === 'mute') setRemotePeerMuted(true);
       if (payload.signal === 'unmute') setRemotePeerMuted(false);
     };
 
     const onRinging = (payload: { callId: string }) => {
       const meta = callManager.getMeta();
-      if (!meta || meta.callId !== payload.callId) return;
+      if (meta?.callId !== payload.callId) return;
       setPeerRinging(true);
     };
 
     const onAnswered = async (payload: { callId: string; sdp: string }) => {
       const meta = callManager.getMeta();
-      if (!meta || meta.callId !== payload.callId) return;
+      if (meta?.callId !== payload.callId) return;
       setPeerRinging(false);
       try {
         await callManager.applyAnswer(payload.sdp);
@@ -187,20 +187,20 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const onIce = (payload: CallIcePayload) => {
       const meta = callManager.getMeta();
-      if (!meta || meta.callId !== payload.callId) return;
+      if (meta?.callId !== payload.callId) return;
       void callManager.handleRemoteIce(payload);
     };
 
     const onRejected = (payload: { callId: string; reason?: string }) => {
       const meta = callManager.getMeta();
-      if (!meta || meta.callId !== payload.callId) return;
+      if (meta?.callId !== payload.callId) return;
       setError(payload.reason === 'rejected' ? 'They declined the call' : 'The call was not accepted');
       handleEnded(payload.reason ?? 'rejected');
     };
 
     const onEnded = (payload: { callId: string; reason?: string }) => {
       const meta = callManager.getMeta();
-      if (!meta || meta.callId !== payload.callId) return;
+      if (meta?.callId !== payload.callId) return;
       if (payload.reason === 'timeout') {
         setError('No one answered. Try again later.');
       }
@@ -272,9 +272,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!ack.ok || !ack.data?.callId) {
           callManager.cleanup();
           setOutgoingPreview(null);
-          const msg = !ack.ok
-            ? friendlySocketAckMessage(ack.code, ack.message, "We couldn't start the call. Please try again.")
-            : "We couldn't start the call. Please try again.";
+          const msg = ack.ok
+            ? "We couldn't start the call. Please try again."
+            : friendlySocketAckMessage(ack.code, ack.message, "We couldn't start the call. Please try again.");
           setError(msg);
           return;
         }
@@ -320,9 +320,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!ack.ok) {
         callManager.cleanup();
         setError(
-          !ack.ok
-            ? friendlySocketAckMessage(ack.code, ack.message, "We couldn't answer the call. Please try again.")
-            : "We couldn't answer the call. Please try again.",
+          friendlySocketAckMessage(ack.code, ack.message, "We couldn't answer the call. Please try again."),
         );
         return;
       }

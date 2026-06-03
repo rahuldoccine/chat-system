@@ -51,7 +51,7 @@ export async function getGroupChatDetails(
       },
     },
   });
-  if (!chat || chat.type !== "GROUP") {
+  if (chat?.type !== "GROUP") {
     throw new AppError(404, "NOT_FOUND", "Group not found");
   }
   const members: GroupMemberPublic[] = chat.members.map((m) => ({

@@ -109,16 +109,18 @@ const ConversationRealtimeSync: React.FC = () => {
       }
     };
 
-    const handleConnect = () => {
+    const runSyncOnReconnect = () => {
       void syncOnReconnect(queryClient, activeId).then(() => {
         broadcastOutboxFlushed();
       });
     };
 
+    const handleConnect = () => {
+      runSyncOnReconnect();
+    };
+
     const handleBrowserOnline = () => {
-      void syncOnReconnect(queryClient, activeId).then(() => {
-        broadcastOutboxFlushed();
-      });
+      runSyncOnReconnect();
     };
 
     const unsubTab = subscribeTabSync((msg) => {

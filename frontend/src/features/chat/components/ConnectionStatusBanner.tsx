@@ -9,11 +9,11 @@ const ConnectionStatusBanner: React.FC = () => {
   if (isConnected) return null;
 
   return (
-    <div className={styles.banner} role="status" aria-live="polite">
+    <output className={styles.banner} aria-live="polite">
       <WifiOff size={16} aria-hidden />
       <span>Connection lost. Reconnecting…</span>
       <Loader2 size={16} className={styles.spinner} aria-hidden />
-    </div>
+    </output>
   );
 };
 

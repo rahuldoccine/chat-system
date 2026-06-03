@@ -16,7 +16,7 @@ import {
 } from './groupSenderKeys';
 
 async function importRawAesKey(bytes: Uint8Array): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  return crypto.subtle.importKey('raw', new Uint8Array(bytes), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
 export async function ensureGroupSenderKey(

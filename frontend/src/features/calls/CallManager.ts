@@ -22,7 +22,7 @@ class CallManager {
   private pendingIce: RTCIceCandidateInit[] = [];
   private pendingIceOutbound: IceEmitPayload[] = [];
   private iceEmit: ((payload: IceEmitPayload) => void) | null = null;
-  private listeners = new Set<StateListener>();
+  private readonly listeners = new Set<StateListener>();
   private endReason: string | null = null;
   /** Set when a video call runs without a camera (audio-only fallback). */
   private videoFallback = false;
@@ -104,8 +104,9 @@ class CallManager {
     this.endReason = null;
     const effectiveVideo = await this.acquireMedia(isVideo);
     this.createPeerConnection();
-    const offer = await this.pc!.createOffer();
-    await this.pc!.setLocalDescription(offer);
+    const pc = this.requirePeerConnection();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
     if (!offer.sdp) throw new Error('Failed to create offer');
     this.setPhase('ringing_out');
     return { sdp: offer.sdp, effectiveVideo };
@@ -119,10 +120,11 @@ class CallManager {
     this.setPhase('connecting');
     const effectiveVideo = await this.acquireMedia(isVideo);
     this.createPeerConnection();
-    await this.pc!.setRemoteDescription({ type: 'offer', sdp: remoteSdp });
+    const pc = this.requirePeerConnection();
+    await pc.setRemoteDescription({ type: 'offer', sdp: remoteSdp });
     await this.flushPendingIce();
-    const answer = await this.pc!.createAnswer();
-    await this.pc!.setLocalDescription(answer);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
     if (!answer.sdp) throw new Error('Failed to create answer');
     return { sdp: answer.sdp, effectiveVideo };
   }
@@ -254,12 +256,20 @@ class CallManager {
     return isVideo && !videoFallback;
   }
 
+  private requirePeerConnection(): RTCPeerConnection {
+    if (!this.pc) throw new Error('Peer connection not initialized');
+    return this.pc;
+  }
+
   private createPeerConnection(): void {
     if (this.pc) return;
     const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
-    this.localStream?.getTracks().forEach((track) => {
-      pc.addTrack(track, this.localStream!);
-    });
+    const stream = this.localStream;
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        pc.addTrack(track, stream);
+      }
+    }
 
     pc.ontrack = (ev) => {
       const [stream] = ev.streams;
@@ -288,23 +298,31 @@ class CallManager {
       this.applyIceConnectionState(pc.iceConnectionState);
     };
 
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') {
-        this.clearDisconnectTimer();
-        this.setConnectionUi('good');
-        this.setPhase('connected');
-      } else if (pc.connectionState === 'connecting') {
-        this.setConnectionUi('connecting');
-      } else if (pc.connectionState === 'disconnected') {
-        this.setConnectionUi('reconnecting');
-        this.scheduleDisconnectEnd();
-      } else if (pc.connectionState === 'failed') {
-        this.onPeerFailed?.();
-        this.endLocally('failed');
-      }
-    };
+    pc.onconnectionstatechange = () => this.handlePeerConnectionState(pc.connectionState);
 
     this.pc = pc;
+  }
+
+  private handlePeerConnectionState(state: RTCPeerConnectionState): void {
+    if (state === 'connected') {
+      this.clearDisconnectTimer();
+      this.setConnectionUi('good');
+      this.setPhase('connected');
+      return;
+    }
+    if (state === 'connecting') {
+      this.setConnectionUi('connecting');
+      return;
+    }
+    if (state === 'disconnected') {
+      this.setConnectionUi('reconnecting');
+      this.scheduleDisconnectEnd();
+      return;
+    }
+    if (state === 'failed') {
+      this.onPeerFailed?.();
+      this.endLocally('failed');
+    }
   }
 
   private setConnectionUi(state: CallConnectionUiState): void {

@@ -179,12 +179,12 @@ export async function patchAdminReportStatus(
     throw new AppError(404, "NOT_FOUND", "Report not found");
   }
 
-  const reviewedAt =
-    status === "OPEN"
-      ? null
-      : existing.status === "OPEN"
-        ? new Date()
-        : (existing.reviewedAt ?? new Date());
+  let reviewedAt: Date | null = existing.reviewedAt ?? new Date();
+  if (status === "OPEN") {
+    reviewedAt = null;
+  } else if (existing.status === "OPEN") {
+    reviewedAt = new Date();
+  }
 
   const row = await prisma.report.update({
     where: { id: reportId },

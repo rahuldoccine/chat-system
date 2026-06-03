@@ -11,7 +11,7 @@ import {
 } from '../../e2ee/attachmentDeps';
 import { isE2eeMessage } from '../../e2ee/directChat';
 import { decryptMessageFile } from '../../e2ee/attachmentCrypto';
-import type { Message } from '../types';
+import type { ContentMeta, Message } from '../types';
 import styles from './VoiceAttachment.module.css';
 import { VOICE_WAVE_BAR_COUNT, VOICE_WAVE_HEIGHTS } from '../utils/voiceWaveform';
 import { formatMediaTimeRange } from '../utils/formatMediaTime';
@@ -19,7 +19,7 @@ import { formatMediaTimeRange } from '../utils/formatMediaTime';
 type VoiceAttachmentProps = {
   contentMeta: Message['contentMeta'];
   e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
   bubbleVariant?: 'sent' | 'received';
   mediaTimestamp?: {
     createdAt: string;
@@ -57,7 +57,7 @@ const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
     filename: meta.filename,
     mimetype: meta.mimetype,
     uploadId: meta.uploadId,
-    attachment: primary?.attachment,
+    attachment: files?.[0]?.attachment,
   };
   const remoteUrl = buildFileUrl(voiceFile, token);
 
@@ -99,12 +99,11 @@ const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
   const timeLabel = useMemo(() => {
     if (!totalDurationMs) return '0:00 / 0:00';
     const totalSec = totalDurationMs / 1000;
-    const elapsedSec =
-      playing || progress > 0
-        ? elapsedMs > 0
-          ? elapsedMs / 1000
-          : (progress * totalDurationMs) / 1000
-        : 0;
+    let elapsedSec = 0;
+    if (playing || progress > 0) {
+      elapsedSec =
+        elapsedMs > 0 ? elapsedMs / 1000 : (progress * totalDurationMs) / 1000;
+    }
     return formatMediaTimeRange(elapsedSec, totalSec);
   }, [playing, progress, elapsedMs, totalDurationMs]);
 
@@ -185,11 +184,10 @@ const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
   }
 
   return (
-    <div
+    <fieldset
       className={`${styles.card} ${isSent ? styles.cardSent : styles.cardReceived}`}
-      role="group"
-      aria-label="Voice message"
     >
+      <legend className={styles.srOnly}>Voice message</legend>
       <button
         type="button"
         className={styles.playBtn}
@@ -233,11 +231,11 @@ const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
           }}
         >
           <div className={styles.waveBars} aria-hidden>
-            {VOICE_WAVE_HEIGHTS.map((heightPct, i) => (
+            {VOICE_WAVE_HEIGHTS.map((heightPct, offset) => (
               <span
-                key={i}
-                className={`${styles.bar} ${i < playedBarCount ? styles.barPlayed : ''} ${
-                  playing && i === playedBarCount ? styles.barActive : ''
+                key={`${offset}:${heightPct}`}
+                className={`${styles.bar} ${offset < playedBarCount ? styles.barPlayed : ''} ${
+                  playing && offset === playedBarCount ? styles.barActive : ''
                 }`}
                 style={{ height: `${heightPct}%` }}
               />
@@ -288,8 +286,10 @@ const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
         onPause={() => {
           if (audioRef.current?.currentTime === 0) setPlaying(false);
         }}
-      />
-    </div>
+      >
+        <track kind="captions" />
+      </audio>
+    </fieldset>
   );
 };
 

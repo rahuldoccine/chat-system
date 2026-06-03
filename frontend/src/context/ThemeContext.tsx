@@ -13,7 +13,7 @@ const STORAGE_KEY = 'chat-theme';
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function systemTheme(): 'light' | 'dark' {
-  if (typeof globalThis.window === 'undefined') return 'light';
+  if (globalThis.window === undefined) return 'light';
   return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
@@ -25,7 +25,7 @@ function readStoredPreference(): ThemePreference {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [preference, setPreferenceState] = useState<ThemePreference>(() => readStoredPreference());
+  const [preference, setPreference] = useState<ThemePreference>(() => readStoredPreference());
   const [resolved, setResolved] = useState<'light' | 'dark'>(() =>
     preference === 'system' ? systemTheme() : preference,
   );
@@ -48,14 +48,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => mq.removeEventListener('change', onChange);
   }, [preference, applyTheme]);
 
-  const setPreference = useCallback((pref: ThemePreference) => {
-    setPreferenceState(pref);
+  const updatePreference = useCallback((pref: ThemePreference) => {
+    setPreference(pref);
     localStorage.setItem(STORAGE_KEY, pref);
   }, []);
 
   const value = useMemo(
-    () => ({ preference, resolved, setPreference }),
-    [preference, resolved, setPreference],
+    () => ({ preference, resolved, setPreference: updatePreference }),
+    [preference, resolved, updatePreference],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

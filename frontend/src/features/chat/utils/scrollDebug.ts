@@ -1,13 +1,8 @@
 import { env } from '../../../config/env';
 
-export function scrollDebug(_event: string, data?: Record<string, unknown>): void {
+export function scrollDebug(_event: string, _data?: Record<string, unknown>): void {
   if (!env.scrollDebug) return;
-  void (typeof performance !== 'undefined' ? Math.round(performance.now()) : 0);
-  if (data && Object.keys(data).length > 0) {
-    // console.log(`[MS:scroll] ${ts}ms | ${event}`, data);
-  } else {
-    // console.log(`[MS:scroll] ${ts}ms | ${event}`);
-  }
+  // Intentionally quiet; enable logging locally when debugging scroll.
 }
 
 export function scrollMetrics(container: HTMLElement | null) {

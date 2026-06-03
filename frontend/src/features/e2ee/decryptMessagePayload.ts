@@ -1,6 +1,5 @@
 import type { Message } from '../chat/types';
-import type { E2eeKeyMaterial } from './keyStore';
-import { getSignedPreKeyPrivate } from './keyStore';
+import { getSignedPreKeyPrivate, type E2eeKeyMaterial } from './keyStore';
 import { aesGcmDecrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
 import { decodeEnvelope, decodePayload, isGroupE2eeMessage, type DmV1Payload } from './protocol';
 import { decryptGroupMessage } from './groupChat';
@@ -12,7 +11,7 @@ export async function resolveSenderFingerprint(
   msg: Message,
   cache: Map<string, string>,
 ): Promise<string | null> {
-  const meta = msg.contentMeta as Record<string, unknown> | undefined;
+  const meta = msg.contentMeta;
   if (typeof meta?.senderFingerprint === 'string') return meta.senderFingerprint;
   const hit = cache.get(msg.senderId);
   if (hit) return hit;
@@ -32,8 +31,7 @@ export async function decryptMessagePayload(
   fingerprintCache: Map<string, string>,
 ): Promise<DmV1Payload | null> {
   if (isGroupE2eeMessage(msg)) {
-    const meta = msg.contentMeta as Record<string, unknown> | undefined;
-    const epoch = typeof meta?.epoch === 'number' ? meta.epoch : 0;
+    const epoch = typeof msg.contentMeta?.epoch === 'number' ? msg.contentMeta.epoch : 0;
     return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch, userId);
   }
 

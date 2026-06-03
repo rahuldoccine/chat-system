@@ -10,6 +10,24 @@ const TABS: Array<{ id: ChatSection; label: string; icon: React.ReactNode }> = [
   { id: 'calls', label: 'Call History', icon: <Phone size={16} strokeWidth={2} /> },
 ];
 
+const GROUP_DETAIL_TABS: Array<{ id: ChatSection; label: string; icon: React.ReactNode }> = [
+  ...TABS,
+  { id: 'members', label: 'Members', icon: <Users size={16} strokeWidth={2} /> },
+  { id: 'settings', label: 'Settings', icon: <Settings size={16} strokeWidth={2} /> },
+];
+
+function resolveChatSubNavTabs(
+  restrictToMessages: boolean,
+  showGroupDetailsTabs: boolean,
+): Array<{ id: ChatSection; label: string; icon: React.ReactNode }> {
+  if (restrictToMessages) {
+    const messagesTab = TABS[0];
+    return messagesTab ? [messagesTab] : [];
+  }
+  if (showGroupDetailsTabs) return GROUP_DETAIL_TABS;
+  return TABS;
+}
+
 type ChatSubNavProps = {
   showGroupDetailsTabs?: boolean;
   restrictToMessages?: boolean;
@@ -20,15 +38,7 @@ const ChatSubNav: React.FC<ChatSubNavProps> = ({
   restrictToMessages = false,
 }) => {
   const { activeSection, setActiveSection } = useChat();
-  const tabs: Array<{ id: ChatSection; label: string; icon: React.ReactNode }> = restrictToMessages
-    ? [TABS[0]!]
-    : showGroupDetailsTabs
-    ? [
-        ...TABS,
-        { id: 'members', label: 'Members', icon: <Users size={16} strokeWidth={2} /> },
-        { id: 'settings', label: 'Settings', icon: <Settings size={16} strokeWidth={2} /> },
-      ]
-    : TABS;
+  const tabs = resolveChatSubNavTabs(restrictToMessages, showGroupDetailsTabs);
 
   return (
     <nav className={styles.nav} aria-label="Chat sections">

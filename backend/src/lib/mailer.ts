@@ -1,37 +1,7 @@
-import nodemailer from "nodemailer";
-import type SMTPTransport from "nodemailer/lib/smtp-transport/index.js";
-
 import type { AppConfig } from "../config/index.js";
 import { buildPasswordResetEmail, buildRecoveryCodeEmail } from "./email/templates.js";
 import type { Logger } from "./logger.js";
-
-const MAIL_FROM_NAME = "Chat System";
-
-function isSmtpConfigured(config: AppConfig): boolean {
-  return Boolean(config.smtp.host && config.smtp.port && config.smtp.from);
-}
-
-function formatFromAddress(from: string): string {
-  if (from.includes("<")) return from;
-  return `"${MAIL_FROM_NAME}" <${from}>`;
-}
-
-function createSmtpTransporter(config: AppConfig) {
-  const port = config.smtp.port!;
-  return nodemailer.createTransport({
-    host: config.smtp.host,
-    port,
-    secure: port === 465,
-    requireTLS: port === 587,
-    auth:
-      config.smtp.user && config.smtp.pass
-        ? { user: config.smtp.user, pass: config.smtp.pass }
-        : undefined,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  } satisfies SMTPTransport.Options);
-}
+import { isSmtpConfigured, sendSmtpEmail } from "./send-smtp-email.js";
 
 export async function sendPasswordResetEmail(
   config: AppConfig,
@@ -47,29 +17,15 @@ export async function sendPasswordResetEmail(
     return;
   }
 
-  const { subject, text, html } = buildPasswordResetEmail({
+  const content = buildPasswordResetEmail({
     resetLink,
     expiresMinutes: config.passwordResetTokenTtlMinutes,
   });
 
-  const transporter = createSmtpTransporter(config);
-
-  try {
-    await transporter.sendMail({
-      from: formatFromAddress(config.smtp.from!),
-      to,
-      subject,
-      text,
-      html,
-    });
-    logger.info({ to }, "Password reset email sent");
-  } catch (err) {
-    const smtpError = err instanceof Error ? err.message : String(err);
-    logger.error({ err, to, smtpError }, "Failed to send password reset email");
-    throw err;
-  } finally {
-    transporter.close();
-  }
+  await sendSmtpEmail(config, logger, to, content, {
+    success: "Password reset email sent",
+    failure: "Failed to send password reset email",
+  });
 }
 
 export async function sendRecoveryEmailChallenge(
@@ -83,26 +39,12 @@ export async function sendRecoveryEmailChallenge(
     return;
   }
 
-  const { subject, text, html } = buildRecoveryCodeEmail({ code });
+  const content = buildRecoveryCodeEmail({ code });
 
-  const transporter = createSmtpTransporter(config);
-
-  try {
-    await transporter.sendMail({
-      from: formatFromAddress(config.smtp.from!),
-      to,
-      subject,
-      text,
-      html,
-    });
-    logger.info({ to }, "Recovery verification email sent");
-  } catch (err) {
-    const smtpError = err instanceof Error ? err.message : String(err);
-    logger.error({ err, to, smtpError }, "Failed to send recovery verification email");
-    throw err;
-  } finally {
-    transporter.close();
-  }
+  await sendSmtpEmail(config, logger, to, content, {
+    success: "Recovery verification email sent",
+    failure: "Failed to send recovery verification email",
+  });
 }
 
 /** Fire-and-forget wrapper so auth endpoints respond before SMTP finishes. */

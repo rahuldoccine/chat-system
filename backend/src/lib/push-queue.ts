@@ -4,6 +4,7 @@ import { loadConfig, type AppConfig } from "../config/index.js";
 import { markDeviceTokenRevokedByFcm } from "../modules/devices/devices.service.js";
 
 import { FcmTokenInvalidError, sendFcmDataMessage } from "./fcm.js";
+import { isPlainObject } from "./plain-object.js";
 import type { Logger } from "./logger.js";
 import { getPrisma } from "./prisma.js";
 
@@ -38,11 +39,11 @@ export function waitForPushQueueIdle(): Promise<void> {
 
 function parseWebPushSubscription(token: string): PushSubscription | null {
   try {
-    const o = JSON.parse(token) as unknown;
-    if (!o || typeof o !== "object") return null;
-    const rec = o as Record<string, unknown>;
-    if (typeof rec.endpoint !== "string" || !rec.keys || typeof rec.keys !== "object") return null;
-    const keys = rec.keys as Record<string, unknown>;
+    const o: unknown = JSON.parse(token);
+    if (!isPlainObject(o)) return null;
+    const rec = o;
+    if (typeof rec.endpoint !== "string" || !isPlainObject(rec.keys)) return null;
+    const keys = rec.keys;
     if (typeof keys.p256dh !== "string" || typeof keys.auth !== "string") return null;
     return { endpoint: rec.endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } };
   } catch {
@@ -64,6 +65,97 @@ export type PushNotificationJob = {
   body?: string;
 };
 
+function configureWebPushVapid(config: AppConfig): void {
+  if (!config.vapidPublicKey || !config.vapidPrivateKey || !config.vapidSubject) return;
+  webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
+}
+
+function webPushStatusCode(err: unknown): number | undefined {
+  if (typeof err !== "object" || err === null || !("statusCode" in err)) return undefined;
+  return (err as { statusCode?: number }).statusCode;
+}
+
+function isInvalidFcmToken(err: unknown): boolean {
+  return (
+    err instanceof FcmTokenInvalidError ||
+    (err instanceof Error && err.name === "FcmTokenInvalidError")
+  );
+}
+
+function pushMessageCopy(job: PushNotificationJob): { title: string; body: string } {
+  return {
+    title: job.title ?? "New message",
+    body: job.body ?? "You have a new message",
+  };
+}
+
+async function deliverWebPushToToken(
+  row: { token: string },
+  sub: PushSubscription,
+  job: PushNotificationJob,
+): Promise<Error | null> {
+  const copy = pushMessageCopy(job);
+  const payload = JSON.stringify({
+    title: copy.title,
+    body: copy.body,
+    chatId: job.chatId,
+    messageId: job.messageId,
+    url: `/?chat=${job.chatId}`,
+  });
+  try {
+    await webpush.sendNotification(sub, payload, { TTL: 3600 });
+    return null;
+  } catch (e: unknown) {
+    const status = webPushStatusCode(e);
+    if (status === 404 || status === 410) {
+      await markDeviceTokenRevokedByFcm(row.token);
+      return null;
+    }
+    return e instanceof Error ? e : new Error(String(e));
+  }
+}
+
+async function deliverFcmToToken(
+  row: { token: string },
+  job: PushNotificationJob,
+  config: AppConfig,
+): Promise<Error | null> {
+  const copy = pushMessageCopy(job);
+  try {
+    await sendFcmDataMessage(config, row.token, {
+      title: copy.title,
+      body: copy.body,
+      data: {
+        kind: "message",
+        chatId: job.chatId,
+        messageId: job.messageId,
+      },
+    });
+    return null;
+  } catch (e: unknown) {
+    if (isInvalidFcmToken(e)) {
+      await markDeviceTokenRevokedByFcm(row.token);
+      return null;
+    }
+    return e instanceof Error ? e : new Error(String(e));
+  }
+}
+
+async function deliverTokenPush(
+  row: { token: string },
+  job: PushNotificationJob,
+  config: AppConfig,
+  fcmOk: boolean,
+  webOk: boolean,
+): Promise<Error | null> {
+  const sub = parseWebPushSubscription(row.token);
+  if (sub && webOk) {
+    return deliverWebPushToToken(row, sub, job);
+  }
+  if (!fcmOk) return null;
+  return deliverFcmToToken(row, job, config);
+}
+
 async function deliverPushOnce(job: PushNotificationJob, config: AppConfig): Promise<void> {
   if (!pushTransportEnabled(config)) {
     return;
@@ -75,82 +167,47 @@ async function deliverPushOnce(job: PushNotificationJob, config: AppConfig): Pro
   const fcmOk = Boolean(config.fcmProjectId && config.fcmServiceAccountPath);
   const webOk = Boolean(config.vapidPublicKey && config.vapidPrivateKey && config.vapidSubject);
   if (webOk) {
-    webpush.setVapidDetails(
-      config.vapidSubject!,
-      config.vapidPublicKey!,
-      config.vapidPrivateKey!,
-    );
+    configureWebPushVapid(config);
   }
 
-  let transientErr: unknown = null;
+  let transientErr: Error | null = null;
   for (const row of tokens) {
-    const sub = parseWebPushSubscription(row.token);
-    if (sub && webOk) {
-      try {
-        const payload = JSON.stringify({
-          title: job.title ?? "New message",
-          body: job.body ?? "You have a new message",
-          chatId: job.chatId,
-          messageId: job.messageId,
-          url: `/?chat=${job.chatId}`,
-        });
-        await webpush.sendNotification(sub, payload, { TTL: 3600 });
-      } catch (e: unknown) {
-        const status =
-          typeof e === "object" && e !== null && "statusCode" in e
-            ? (e as { statusCode?: number }).statusCode
-            : undefined;
-        if (status === 404 || status === 410) {
-          await markDeviceTokenRevokedByFcm(row.token);
-        } else {
-          transientErr = e;
-        }
-      }
-      continue;
-    }
-
-    if (!fcmOk) continue;
-    try {
-      await sendFcmDataMessage(config, row.token, {
-        title: job.title ?? "New message",
-        body: job.body ?? "You have a new message",
-        data: {
-          kind: "message",
-          chatId: job.chatId,
-          messageId: job.messageId,
-        },
-      });
-    } catch (e: unknown) {
-      const invalidToken =
-        e instanceof FcmTokenInvalidError ||
-        (e instanceof Error && e.name === "FcmTokenInvalidError");
-      if (invalidToken) {
-        await markDeviceTokenRevokedByFcm(row.token);
-      } else {
-        transientErr = e;
-      }
-    }
+    const err = await deliverTokenPush(row, job, config, fcmOk, webOk);
+    if (err) transientErr = err;
   }
   if (transientErr) {
     throw transientErr;
   }
 }
 
+function pushRetryDelayMs(attempt: number): number {
+  return Math.min(30_000, 500 * 2 ** attempt);
+}
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function attemptPushDelivery(job: PushNotificationJob, attempt: number): Promise<boolean> {
+  const config = loadConfig();
+  try {
+    await deliverPushOnce(job, config);
+    return true;
+  } catch (e) {
+    workerLogger?.warn({ err: e, attempt, ...job }, "push job failed, will retry");
+    return false;
+  }
+}
+
 async function runPushJobWithRetries(job: PushNotificationJob): Promise<void> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const config = loadConfig();
-    try {
-      await deliverPushOnce(job, config);
+    const delivered = await attemptPushDelivery(job, attempt);
+    if (delivered) return;
+    if (attempt === MAX_ATTEMPTS - 1) {
+      workerLogger?.error({ ...job }, "push job abandoned after max retries");
       return;
-    } catch (e) {
-      workerLogger?.warn({ err: e, attempt, ...job }, "push job failed, will retry");
-      if (attempt === MAX_ATTEMPTS - 1) {
-        workerLogger?.error({ err: e, ...job }, "push job abandoned after max retries");
-        return;
-      }
-      const delayMs = Math.min(30_000, 500 * 2 ** attempt);
-      await new Promise((r) => setTimeout(r, delayMs));
     }
+    await sleepMs(pushRetryDelayMs(attempt));
   }
 }
 

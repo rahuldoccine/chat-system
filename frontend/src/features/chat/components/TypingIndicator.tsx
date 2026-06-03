@@ -24,10 +24,9 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 }) => (
   <AnimatePresence>
     {visible ? (
-      <motion.div
+      <motion.output
         key="typing-bubble"
         className={`${streamStyles.messageWrapper} ${styles.row}`}
-        role="status"
         aria-live="polite"
         aria-label={label}
         initial={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -51,7 +50,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
             </span>
           </div>
         </div>
-      </motion.div>
+      </motion.output>
     ) : null}
   </AnimatePresence>
 );

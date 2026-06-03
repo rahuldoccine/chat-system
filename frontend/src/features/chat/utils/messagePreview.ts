@@ -1,6 +1,5 @@
 import type { Message, ReplyPreview } from '../types';
 import {
-  getAttachmentPreviewLabel,
   getMessageFiles,
   isAudioFile,
   isVideoFile,

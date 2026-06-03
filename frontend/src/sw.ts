@@ -60,8 +60,8 @@ self.addEventListener('push', (event) => {
   try {
     if (event.data) {
       const parsed = event.data.json()
-      if (parsed && typeof parsed === 'object') {
-        payload = { ...payload, ...(parsed as Record<string, unknown>) }
+      if (parsed && typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        payload = { ...payload, ...parsed }
       }
     }
   } catch {
@@ -71,7 +71,7 @@ self.addEventListener('push', (event) => {
   const url = resolveUrl(payload.url)
   const messageId = typeof payload.messageId === 'string' ? payload.messageId : undefined
   const chatId = typeof payload.chatId === 'string' ? payload.chatId : undefined
-  const isIncomingCall = Boolean(messageId && messageId.startsWith('call-incoming-'))
+  const isIncomingCall = Boolean(messageId?.startsWith('call-incoming-'))
   const tag = messageId || (isIncomingCall ? 'incoming-call' : chatId) || undefined
 
   event.waitUntil(
@@ -95,7 +95,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const targetUrl = resolveUrl((event.notification as Notification).data?.url)
+  const targetUrl = resolveUrl(event.notification.data?.url)
 
   event.waitUntil(
     (async () => {

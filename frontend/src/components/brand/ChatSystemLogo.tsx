@@ -14,7 +14,7 @@ const MARK_PX: Record<ChatSystemLogoSize, number> = {
   xl: 72,
 };
 
-export type ChatSystemLogoProps = {
+export type ChatSystemLogoProps = Readonly<{
   variant?: ChatSystemLogoVariant;
   size?: ChatSystemLogoSize;
   theme?: ChatSystemLogoTheme;
@@ -23,7 +23,7 @@ export type ChatSystemLogoProps = {
   glow?: boolean;
   animated?: boolean;
   'aria-label'?: string;
-};
+}>;
 
 const ChatSystemLogo: React.FC<ChatSystemLogoProps> = ({
   variant = 'full',

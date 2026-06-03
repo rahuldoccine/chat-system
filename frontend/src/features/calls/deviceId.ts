@@ -16,8 +16,9 @@ function randomId(): string {
 export function getOrCreateDeviceId(): string {
   if (typeof localStorage === 'undefined') return randomId();
   let id = localStorage.getItem(STORAGE_KEY);
-  if (!id) {
-    id = randomId();
+  const wasMissing = id == null;
+  id ??= randomId();
+  if (wasMissing) {
     localStorage.setItem(STORAGE_KEY, id);
   }
   return id;

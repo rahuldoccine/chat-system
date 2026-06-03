@@ -23,9 +23,11 @@ export function isSafeStorageKey(storageKey: string): boolean {
   return filename === path.basename(filename) && filename.length > 0 && !filename.startsWith(".");
 }
 
+const FILES_PATH_RE = /\/files\/([^?#]+)/;
+
 export function storageKeyFromUrl(url: unknown): string | null {
   if (typeof url !== "string") return null;
-  const match = url.match(/\/files\/([^?#]+)/);
+  const match = FILES_PATH_RE.exec(url);
   if (!match?.[1]) return null;
   try {
     return decodeURIComponent(match[1]);

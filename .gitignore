@@ -8,6 +8,9 @@ node_modules/
 !.env.*.example
 
 # Build outputs
+shared/*.js
+shared/*.js.map
+shared/*.d.ts
 dist/
 dist-ssr/
 build/

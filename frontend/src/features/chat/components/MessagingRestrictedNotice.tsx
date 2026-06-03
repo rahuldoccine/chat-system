@@ -23,7 +23,7 @@ const MessagingRestrictedNotice: React.FC<MessagingRestrictedNoticeProps> = ({
     : `You blocked ${peerName}. Unblock them from the menu above to send messages again.`;
 
   return (
-    <div className={styles.container} role="status" aria-live="polite">
+    <output className={styles.container} aria-live="polite">
       <div className={styles.iconWrap} aria-hidden>
         <Ban size={20} />
       </div>
@@ -31,7 +31,7 @@ const MessagingRestrictedNotice: React.FC<MessagingRestrictedNoticeProps> = ({
         <p className={styles.title}>{title}</p>
         <p className={styles.description}>{description}</p>
       </div>
-    </div>
+    </output>
   );
 };
 

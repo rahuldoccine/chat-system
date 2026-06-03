@@ -1,39 +1,8 @@
-import { createClient } from "redis";
-
 import type { AppConfig } from "../config/index.js";
+import { getRedisClient } from "./redis-lazy-client.js";
 
 const PRESENCE_KEY_PREFIX = "presence:";
 const PRESENCE_TTL_SEC = 120;
-
-type RedisClient = ReturnType<typeof createClient>;
-
-let client: RedisClient | null = null;
-let connectPromise: Promise<RedisClient | null> | null = null;
-
-async function getRedisClient(config: AppConfig): Promise<RedisClient | null> {
-  if (!config.redisUrl) {
-    return null;
-  }
-  if (client?.isOpen) {
-    return client;
-  }
-  if (!connectPromise) {
-    connectPromise = (async () => {
-      try {
-        const c = createClient({ url: config.redisUrl });
-        await c.connect();
-        client = c;
-        return client;
-      } catch {
-        client = null;
-        return null;
-      } finally {
-        connectPromise = null;
-      }
-    })();
-  }
-  return connectPromise;
-}
 
 /** Mark user as having an active socket (cross-node hint for push suppression). */
 export async function markUserPresentRedis(userId: string, config: AppConfig): Promise<void> {

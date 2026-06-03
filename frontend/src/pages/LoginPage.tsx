@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '../utils/userFriendlyErrors';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -81,10 +81,11 @@ const LoginPage: React.FC = () => {
           transition={{ delay: 0.4 }}
           className={styles.inputGroup}
         >
-          <label>Email Address</label>
+          <label htmlFor="login-email">Email Address</label>
           <div className={styles.inputWrapper}>
             <Mail size={18} strokeWidth={2.5} className={styles.icon} />
             <input
+              id="login-email"
               {...register('email')}
               type="email"
               placeholder="name@example.com"
@@ -101,12 +102,13 @@ const LoginPage: React.FC = () => {
           className={styles.inputGroup}
         >
           <div className={styles.labelRow}>
-            <label>Password</label>
+            <label htmlFor="login-password">Password</label>
             <Link to="/forgot-password" className={styles.forgotLink}>Forgot?</Link>
           </div>
           <div className={styles.inputWrapper}>
             <Lock size={18} strokeWidth={2.5} className={styles.icon} />
             <input
+              id="login-password"
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"

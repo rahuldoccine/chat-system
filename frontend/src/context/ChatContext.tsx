@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 
 export type ChatSection = 'messages' | 'files' | 'pins' | 'calls' | 'members' | 'settings';
@@ -49,7 +49,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
-  const [activeId, setActiveIdState] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [chatFocusKey, setChatFocusKey] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -120,7 +120,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (isAuthenticated) return;
     // Ensure a fresh default Home state after logout/login cycles.
-    setActiveIdState(null);
+    setActiveId(null);
     setReplyingTo(null);
     setEditingMessage(null);
     setForwardingMessage(null);
@@ -133,8 +133,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearInChatSearch();
   }, [isAuthenticated, clearInChatSearch]);
 
-  const setActiveId = useCallback((id: string | null) => {
-    setActiveIdState(id);
+  const selectActiveChat = useCallback((id: string | null) => {
+    setActiveId(id);
     setReplyingTo(null);
     setEditingMessage(null);
     setForwardingMessage(null);
@@ -148,11 +148,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (id) setChatFocusKey((k) => k + 1);
   }, [clearInChatSearch]);
 
-  return (
-    <ChatContext.Provider value={{ 
-      activeId, 
+  const value = useMemo(
+    () => ({
+      activeId,
       chatFocusKey,
-      setActiveId,
+      setActiveId: selectActiveChat,
       activeSection,
       setActiveSection,
       groupDetailsTab,
@@ -187,7 +187,38 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setInChatSearchMatchIds,
       inChatSearchActiveIndex,
       setInChatSearchActiveIndex,
-    }}>
+    }),
+    [
+      activeId,
+      chatFocusKey,
+      selectActiveChat,
+      activeSection,
+      groupDetailsTab,
+      pendingScrollToMessageId,
+      requestScrollToMessage,
+      clearPendingScrollToMessage,
+      drafts,
+      replyingTo,
+      editingMessage,
+      forwardingMessage,
+      registerScrollToBottom,
+      scrollToBottom,
+      activeThreadRootId,
+      openThread,
+      closeThread,
+      threadDrafts,
+      setThreadDraft,
+      alsoSendToMain,
+      threadReplyingTo,
+      inChatSearchOpen,
+      inChatSearchQuery,
+      inChatSearchMatchIds,
+      inChatSearchActiveIndex,
+    ],
+  );
+
+  return (
+    <ChatContext.Provider value={value}>
       {children}
     </ChatContext.Provider>
   );

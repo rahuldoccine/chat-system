@@ -1,197 +1,33 @@
 import React, { useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Phone, Video } from 'lucide-react';
+import { Phone, Video } from 'lucide-react';
+import { CallDirectionIcon } from '../../calls/components/CallDirectionIcon';
 import panelStyles from './ChatPanel.module.css';
 import CallHistoryPanel from '../../calls/components/CallHistoryPanel';
 import { useChat } from '../../../context/ChatContext';
 import { useConversations, useMessages } from '../hooks/useChatData';
-import type { Chat, Message } from '../types';
+import type { Chat } from '../types';
+import {
+  buildGroupCallHistoryRows,
+  type GroupCallHistoryRow,
+} from './groupCallHistoryBuilder';
+import {
+  callHistoryDayLabel,
+  formatCallDateTime,
+  formatCallDirection,
+  formatCallDuration,
+  formatGroupCallStatusBadge,
+  groupCallStatusToneClass,
+} from '../../calls/utils/callHistory.helpers';
 import styles from './ChatCallHistoryPanel.module.css';
 import { useAuth } from '../../../context/AuthContext';
 import ChatAvatar from './ChatAvatar';
 import EmptyState from './EmptyState';
 
-type GroupCallEvent = {
-  id: string;
-  type: 'group_call_started' | 'group_call_ended';
-  actorId: string;
-  actor: string;
-  callKind: 'AUDIO' | 'VIDEO';
-  createdAt: string;
-};
-
-type GroupCallHistoryRow = {
-  id: string;
-  actorId: string;
-  actor: string;
-  kind: 'AUDIO' | 'VIDEO';
-  direction: 'dialed' | 'received' | 'missed';
-  startedAt: string | null;
-  endedAt: string | null;
-  durationSec: number | null;
-  status: 'Cancelled' | 'Ended' | 'Missed join';
-};
-
-const CANCELLED_DURATION_SEC = 15;
-
-function formatDuration(totalSec: number | null): string {
-  if (totalSec === null) return '00:00';
-  const sec = Math.max(0, Math.floor(totalSec));
-  const mm = Math.floor(sec / 60)
-    .toString()
-    .padStart(2, '0');
-  const ss = (sec % 60).toString().padStart(2, '0');
-  return `${mm}:${ss}`;
-}
-
-function formatDateTime(value: string | null): string {
-  if (!value) return 'N/A';
-  return new Date(value).toLocaleString();
-}
-
-function toDayKey(value: string | null): string {
-  if (!value) return 'unknown';
-  const d = new Date(value);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function dayLabel(value: string | null): string {
-  if (!value) return 'Unknown';
-  const d = new Date(value);
-  const now = new Date();
-  const y = new Date(now);
-  y.setDate(now.getDate() - 1);
-  if (toDayKey(value) === toDayKey(now.toISOString())) return 'Today';
-  if (toDayKey(value) === toDayKey(y.toISOString())) return 'Yesterday';
-  return d.toLocaleDateString();
-}
-
-function CallDirectionIcon({ direction }: { direction: GroupCallHistoryRow['direction'] }) {
-  if (direction === 'dialed') {
-    return (
-      <span className={styles.arrowOutgoing} aria-label="Outgoing call">
-        <ArrowUpRight size={14} strokeWidth={2.5} />
-      </span>
-    );
-  }
-  if (direction === 'missed') {
-    return (
-      <span className={styles.arrowMissed} aria-label="Missed call">
-        <ArrowDownLeft size={14} strokeWidth={2.5} />
-      </span>
-    );
-  }
-  return (
-    <span className={styles.arrowIncoming} aria-label="Incoming call">
-      <ArrowDownLeft size={14} strokeWidth={2.5} />
-    </span>
-  );
-}
-
-function buildGroupCallHistoryRows(messages: Message[], viewerUserId?: string): GroupCallHistoryRow[] {
-  const events: GroupCallEvent[] = messages
-    .filter((m) => {
-      if (m.kind !== 'SYSTEM') return false;
-      const meta = (m.contentMeta ?? {}) as { groupActivity?: { type?: string } };
-      const t = meta.groupActivity?.type;
-      return t === 'group_call_started' || t === 'group_call_ended';
-    })
-    .map((m) => {
-      const meta = (m.contentMeta ?? {}) as {
-        groupActivity?: {
-          type?: 'group_call_started' | 'group_call_ended';
-          actorId?: string;
-          actorName?: string;
-          kind?: 'AUDIO' | 'VIDEO';
-        };
-      };
-      const text = (m.ciphertext ?? '').toLowerCase();
-      const callKind: 'AUDIO' | 'VIDEO' =
-        meta.groupActivity?.kind === 'VIDEO' || text.includes('video') ? 'VIDEO' : 'AUDIO';
-      return {
-        id: m.id,
-        type: meta.groupActivity?.type ?? 'group_call_started',
-        actorId: meta.groupActivity?.actorId ?? m.senderId,
-        actor: meta.groupActivity?.actorName ?? m.sender.displayName ?? m.sender.email ?? 'Someone',
-        callKind,
-        createdAt: m.createdAt,
-      } as GroupCallEvent;
-    })
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-  const rows: GroupCallHistoryRow[] = [];
-  let openStart: GroupCallEvent | null = null;
-
-  for (const event of events) {
-    if (event.type === 'group_call_started') {
-      if (openStart) {
-        rows.push({
-          id: `missed-${openStart.id}`,
-          actorId: openStart.actorId,
-          actor: openStart.actor,
-          kind: openStart.callKind,
-          direction: openStart.actorId === viewerUserId ? 'dialed' : 'missed',
-          startedAt: openStart.createdAt,
-          endedAt: null,
-          durationSec: null,
-          status: 'Missed join',
-        });
-      }
-      openStart = event;
-      continue;
-    }
-
-    if (openStart) {
-      const startedMs = new Date(openStart.createdAt).getTime();
-      const endedMs = new Date(event.createdAt).getTime();
-      const durationSec = Math.max(0, Math.floor((endedMs - startedMs) / 1000));
-      rows.push({
-        id: `session-${openStart.id}-${event.id}`,
-        actorId: openStart.actorId,
-        actor: openStart.actor,
-        kind: openStart.callKind,
-        direction: openStart.actorId === viewerUserId ? 'dialed' : 'received',
-        startedAt: openStart.createdAt,
-        endedAt: event.createdAt,
-        durationSec,
-        status: durationSec < CANCELLED_DURATION_SEC ? 'Cancelled' : 'Ended',
-      });
-      openStart = null;
-    } else {
-      rows.push({
-        id: `ended-${event.id}`,
-        actorId: event.actorId,
-        actor: event.actor,
-        kind: event.callKind,
-        direction: event.actorId === viewerUserId ? 'dialed' : 'received',
-        startedAt: null,
-        endedAt: event.createdAt,
-        durationSec: 0,
-        status: 'Ended',
-      });
-    }
-  }
-
-  if (openStart) {
-    rows.push({
-      id: `missed-${openStart.id}`,
-      actorId: openStart.actorId,
-      actor: openStart.actor,
-      kind: openStart.callKind,
-      direction: openStart.actorId === viewerUserId ? 'dialed' : 'missed',
-      startedAt: openStart.createdAt,
-      endedAt: null,
-      durationSec: null,
-      status: 'Missed join',
-    });
-  }
-
-  return rows
-    .map((row) => row)
-    .sort((a, b) => {
-      const aTs = new Date(a.startedAt ?? a.endedAt ?? 0).getTime();
-      const bTs = new Date(b.startedAt ?? b.endedAt ?? 0).getTime();
-      return bTs - aTs;
-    });
+function groupCallTitle(kind: GroupCallHistoryRow['kind']): string {
+  const isVideo = kind === 'VIDEO';
+  const emoji = isVideo ? '📹' : '📞';
+  const label = isVideo ? 'Video' : 'Audio';
+  return `${emoji} ${label} Group Call`;
 }
 
 const ChatCallHistoryPanel: React.FC = () => {
@@ -226,7 +62,7 @@ const ChatCallHistoryPanel: React.FC = () => {
     const timeline = (() => {
       const map = new Map<string, typeof filtered>();
       for (const row of filtered) {
-        const key = dayLabel(row.startedAt ?? row.endedAt);
+        const key = callHistoryDayLabel(row.startedAt ?? row.endedAt);
         const list = map.get(key) ?? [];
         list.push(row);
         map.set(key, list);
@@ -264,12 +100,11 @@ const ChatCallHistoryPanel: React.FC = () => {
                 <div className={styles.timelineHeading}>{label}</div>
                 <ul className={styles.groupList}>
                   {rows.map((row) => {
-                    const toneClass =
-                      row.status === 'Ended'
-                        ? styles.groupStatusGood
-                        : row.status === 'Missed join'
-                          ? styles.groupStatusWarn
-                          : styles.groupStatusBad;
+                    const toneClass = groupCallStatusToneClass(row.status, {
+                      good: styles.groupStatusGood,
+                      warn: styles.groupStatusWarn,
+                      bad: styles.groupStatusBad,
+                    });
                     return (
                       <li key={row.id} className={styles.groupItem}>
                         <div className={styles.groupRow}>
@@ -282,24 +117,27 @@ const ChatCallHistoryPanel: React.FC = () => {
                           />
                           <div className={styles.groupBody}>
                             <div className={styles.groupTop}>
-                              <div className={styles.groupTitle}>{row.kind === 'VIDEO' ? '📹' : '📞'} {row.kind === 'VIDEO' ? 'Video' : 'Audio'} Group Call</div>
+                              <div className={styles.groupTitle}>{groupCallTitle(row.kind)}</div>
                               <span className={`${styles.groupStatus} ${toneClass}`}>
-                                {row.status === 'Ended'
-                                  ? '🟢 Completed'
-                                  : row.status === 'Missed join'
-                                    ? '🔴 Missed'
-                                    : '🟡 Cancelled'}
+                                {formatGroupCallStatusBadge(row.status)}
                               </span>
                             </div>
                             <div className={styles.groupMeta}>
-                              <CallDirectionIcon direction={row.direction} />
-                              <span>{row.direction === 'dialed' ? 'Outgoing' : row.direction === 'received' ? 'Incoming' : 'Missed'} • {row.startedAt ? formatDateTime(row.startedAt) : formatDateTime(row.endedAt)}</span>
+                              <CallDirectionIcon
+                                direction={row.direction}
+                                classNames={{
+                                  outgoing: styles.arrowOutgoing,
+                                  missed: styles.arrowMissed,
+                                  incoming: styles.arrowIncoming,
+                                }}
+                              />
+                              <span>{formatCallDirection(row)} • {row.startedAt ? formatCallDateTime(row.startedAt) : formatCallDateTime(row.endedAt)}</span>
                             </div>
                             <div className={styles.groupSubMeta}>Started by {row.actor}</div>
-                            <div className={styles.groupDetail}>Started at: {formatDateTime(row.startedAt)}</div>
-                            <div className={styles.groupDetail}>Ended at: {formatDateTime(row.endedAt)}</div>
+                            <div className={styles.groupDetail}>Started at: {formatCallDateTime(row.startedAt)}</div>
+                            <div className={styles.groupDetail}>Ended at: {formatCallDateTime(row.endedAt)}</div>
                             <div className={styles.groupDetailStrong}>
-                              Duration: {formatDuration(row.durationSec)}
+                              Duration: {formatCallDuration(row.durationSec)}
                             </div>
                           </div>
                           <span className={styles.groupCallType} aria-label={row.kind === 'VIDEO' ? 'Video call' : 'Audio call'}>

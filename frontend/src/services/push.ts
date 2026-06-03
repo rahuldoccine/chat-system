@@ -18,7 +18,7 @@ export type BrowserNotificationPermissionResult = {
 };
 
 export function getBrowserNotificationPermission(): NotificationPermission | 'unsupported' {
-  if (!('Notification' in window)) return 'unsupported';
+  if (!('Notification' in globalThis.window)) return 'unsupported';
   return Notification.permission;
 }
 
@@ -27,7 +27,7 @@ export function getBrowserNotificationPermission(): NotificationPermission | 'un
  * If already denied, returns blocked - user must allow via site settings (lock icon).
  */
 export async function requestBrowserNotificationPermission(): Promise<BrowserNotificationPermissionResult> {
-  if (!('Notification' in window)) {
+  if (!('Notification' in globalThis.window)) {
     return { granted: false, permission: 'denied', blocked: false, unsupported: true };
   }
 
@@ -57,7 +57,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const raw = atob(base64);
   const output = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i += 1) {
-    output[i] = raw.charCodeAt(i);
+    output[i] = raw.codePointAt(i) ?? 0;
   }
   return output;
 }
@@ -80,10 +80,10 @@ function storedTokenFromSubscription(sub: PushSubscription): string {
 
 export function isWebPushSupported(): boolean {
   return (
-    typeof window !== 'undefined' &&
+    globalThis.window !== undefined &&
     'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    'Notification' in window
+    'PushManager' in globalThis.window &&
+    'Notification' in globalThis.window
   );
 }
 
@@ -146,12 +146,10 @@ export async function registerWebPush(): Promise<PushRegisterResult> {
     await navigator.serviceWorker.ready;
 
     let subscription = await registration.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
-      });
-    }
+    subscription ??= await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
+    });
 
     const body = subscriptionToBody(subscription);
     await api.post('/devices/web', body);

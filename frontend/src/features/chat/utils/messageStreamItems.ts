@@ -75,7 +75,7 @@ export function buildMessageStreamItems(
       items.push({
         type: 'unread',
         key: 'unread-divider',
-        count: unreadDivider!.count,
+        count: unreadDivider?.count ?? 0,
       });
       unreadPlaced = true;
     }

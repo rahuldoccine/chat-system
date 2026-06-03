@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { ModalDialog } from '../../../components/ModalDialog';
 import type { PollDetail } from '../types';
 import UserAvatar from './UserAvatar';
 import LiveUserName from './LiveUserName';
+import { useViewerModalLock } from '../hooks/useViewerModalLock';
 import styles from './PollVotesModal.module.css';
 
 type PollVotesModalProps = {
@@ -13,54 +15,24 @@ type PollVotesModalProps = {
 };
 
 const PollVotesModal: React.FC<PollVotesModalProps> = ({ open, poll, onClose }) => {
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-
-    document.addEventListener('keydown', handleKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open]);
+  useViewerModalLock(open && Boolean(poll), onClose);
 
   if (!open || !poll) return null;
 
   const totalVotes = poll.totalVotes ?? poll.options.reduce((sum, o) => sum + o.votes, 0);
 
-  const handleBackdropMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onCloseRef.current();
-    }
-  };
-
   return createPortal(
-    <div
+    <ModalDialog
       className={styles.overlay}
-      role="presentation"
-      onMouseDown={handleBackdropMouseDown}
+      aria-labelledby="poll-votes-title"
+      onClose={onClose}
     >
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="poll-votes-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+      <div className={styles.modal}>
         <div className={styles.header}>
           <h2 id="poll-votes-title" className={styles.title}>
             Poll votes
           </h2>
-          <button type="button" className={styles.closeBtn} onClick={() => onCloseRef.current()} aria-label="Close">
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -103,7 +75,7 @@ const PollVotesModal: React.FC<PollVotesModalProps> = ({ open, poll, onClose }) 
           ))}
         </div>
       </div>
-    </div>,
+    </ModalDialog>,
     document.body,
   );
 };

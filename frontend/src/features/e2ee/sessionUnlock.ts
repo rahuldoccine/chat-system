@@ -11,9 +11,9 @@ const UNLOCK_PREFIX = 'e2ee-session-unlock:';
 
 async function getBrowserSessionAesKey(): Promise<CryptoKey> {
   let rawB64 = sessionStorage.getItem(BROWSER_SESSION_KEY);
-  if (!rawB64) {
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-    rawB64 = bufToB64(bytes.buffer);
+  const wasMissing = rawB64 == null;
+  rawB64 ??= bufToB64(crypto.getRandomValues(new Uint8Array(32)).buffer);
+  if (wasMissing) {
     sessionStorage.setItem(BROWSER_SESSION_KEY, rawB64);
   }
   return crypto.subtle.importKey('raw', b64ToBuf(rawB64), 'AES-GCM', false, ['encrypt', 'decrypt']);

@@ -8,6 +8,8 @@ import {
 } from './keyStore';
 import * as e2eeApi from './e2eeApi';
 import { E2eeKeysLockedError, resolveKeyMaterial } from './accountSync';
+
+export { E2eeKeysLockedError } from './accountSync';
 import { getLocalKeyMaterial } from './keyAccess';
 
 const MIN_ONE_TIME_PREKEYS = 10;
@@ -38,7 +40,8 @@ async function publishKeys(material: E2eeKeyMaterial, deviceId: string): Promise
   }
   await e2eeApi.putDeviceKey(deviceId, material.devicePublicSpki, BOOTSTRAP_LABEL);
 
-  const latestSpk = material.signedPreKeys.at(-1)!;
+  const latestSpk = material.signedPreKeys.at(-1);
+  if (!latestSpk) throw new Error('Missing signed pre-key');
   const signingKey = await getSigningPrivate(material);
   const signature = await signBytes(
     signingKey,
@@ -65,7 +68,7 @@ export async function ensureE2eeReady(
   options: EnsureE2eeOptions = {},
 ): Promise<void> {
   const cacheKey = `${userId}:${options.password ? '1' : '0'}:${options.offline ? 'off' : 'on'}`;
-  if (bootstrapPromise && lastBootstrapKey === cacheKey) return bootstrapPromise;
+  if (bootstrapPromise !== null && lastBootstrapKey === cacheKey) return bootstrapPromise;
 
   lastBootstrapKey = cacheKey;
   bootstrapPromise = (async () => {
@@ -94,5 +97,3 @@ export async function ensureE2eeReady(
     });
   return bootstrapPromise;
 }
-
-export { E2eeKeysLockedError };

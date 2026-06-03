@@ -160,8 +160,8 @@
 }
 
 .statusCompleted {
-  background: rgba(34, 197, 94, 0.14);
-  color: #166534;
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
 }
 
 .statusMissed {

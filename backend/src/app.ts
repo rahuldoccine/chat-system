@@ -29,9 +29,9 @@ export function createApp(deps: { config: AppConfig; logger: Logger }): express.
       customProps: (req) => (config.isDev ? {} : { requestId: req.requestId }),
       serializers: config.isDev
         ? { req: () => undefined, res: () => undefined }
-        : { req: (req) => serializeReqForLog(req as Request) },
+        : { req: (req) => serializeReqForLog(req) },
       autoLogging: {
-        ignore: (req) => shouldSkipHttpAccessLog(req as Request),
+        ignore: (req) => shouldSkipHttpAccessLog(req),
       },
       customSuccessMessage: (req, res, responseTime) =>
         `${req.method} ${req.originalUrl ?? req.url} ${res.statusCode} ${responseTime}ms`,

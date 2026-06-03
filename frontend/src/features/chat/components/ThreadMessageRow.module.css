@@ -55,16 +55,16 @@
 }
 
 .bubbleMe {
-  background: linear-gradient(135deg, #6366f1 0%, #8a87bb 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   border: none;
   border-left: none;
   border-radius: 12px 12px 4px 12px;
-  color: #ffffff;
+  color: var(--primary-foreground);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
 }
 
 .bubbleMe .text {
-  color: #ffffff;
+  color: var(--primary-foreground);
 }
 
 .bubbleHasMedia {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { LogOut, Star, XCircle } from 'lucide-react';
+import { stopPropagationKeyboard } from '../../../utils/a11y';
 import styles from './DmContextMenu.module.css';
 
 export type ChatSidebarMenuProps = {
@@ -30,7 +31,9 @@ const ChatSidebarMenu: React.FC<ChatSidebarMenuProps> = ({
     style={{ top: y, left: x }}
     onMouseDown={(e) => e.stopPropagation()}
     onClick={(e) => e.stopPropagation()}
+    onKeyDown={stopPropagationKeyboard}
     role="menu"
+    tabIndex={-1}
   >
     <button type="button" className={styles.item} onClick={onFavorite} role="menuitem">
       <Star size={16} className={favorited ? styles.starFilled : undefined} />

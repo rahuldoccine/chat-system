@@ -49,14 +49,14 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #b5bac1;
+  color: var(--sidebar-muted);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .closeBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f2f3f5;
+  background: var(--sidebar-hover-bg);
+  color: var(--sidebar-foreground);
 }
 
 .body {
@@ -79,7 +79,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #949ba4;
+  color: var(--sidebar-muted);
 }
 
 .sectionTitle svg {
@@ -153,13 +153,13 @@
   gap: 2px;
   width: 100%;
   height: 100%;
-  color: #949ba4;
+  color: var(--sidebar-muted);
   font-size: 0.62rem;
   font-weight: 600;
 }
 
 .avatarPlaceholder svg {
-  color: #b5bac1;
+  color: var(--sidebar-muted);
 }
 
 .avatarOverlay {
@@ -192,7 +192,7 @@
 .label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #b5bac1;
+  color: var(--sidebar-muted);
 }
 
 .textInput {
@@ -210,7 +210,7 @@
 }
 
 .textInput::placeholder {
-  color: #6d7178;
+  color: var(--text-placeholder-on-dark);
 }
 
 .textInput:focus {
@@ -223,6 +223,9 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem;
+  border: none;
+  margin: 0;
+  padding: 0;
 }
 
 .visibilityCard {
@@ -273,12 +276,12 @@
   margin-bottom: 0.15rem;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
-  color: #b5bac1;
+  color: var(--sidebar-muted);
 }
 
 .visibilityCardSelected .visibilityCardIcon {
-  background: rgba(88, 101, 242, 0.35);
-  color: #eef0ff;
+  background: var(--chip-accent-bg);
+  color: var(--chip-accent-fg);
 }
 
 .visibilityCardTitle {
@@ -290,13 +293,13 @@
 .visibilityCardDesc {
   font-size: 0.72rem;
   line-height: 1.35;
-  color: #949ba4;
+  color: var(--sidebar-muted);
 }
 
 .e2eeNote {
   margin: 0.25rem 0 0;
   font-size: 0.68rem;
-  color: #6d7178;
+  color: var(--text-muted-on-dark);
   line-height: 1.4;
 }
 
@@ -310,7 +313,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   background: #1e1f22;
-  color: #949ba4;
+  color: var(--sidebar-muted);
 }
 
 .searchRow input {
@@ -326,7 +329,7 @@
   margin: 0 0 0.4rem;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #949ba4;
+  color: var(--sidebar-muted);
 }
 
 .chips {
@@ -342,10 +345,10 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.5rem 0.25rem 0.35rem;
-  border: 1px solid rgba(88, 101, 242, 0.35);
+  border: 1px solid var(--chip-accent-bg);
   border-radius: 999px;
-  background: rgba(88, 101, 242, 0.15);
-  color: #eef0ff;
+  background: var(--chip-accent-bg);
+  color: var(--chip-accent-fg);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -373,6 +376,9 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.15);
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .memberRow {
@@ -390,11 +396,11 @@
   transition: background 0.15s ease;
 }
 
-.memberRow:last-child {
+.list li:last-child .memberRow {
   border-bottom: none;
 }
 
-.memberRow:hover:not(:disabled) {
+.memberRow:hover:has(input:not(:disabled)) {
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -402,7 +408,7 @@
   background: rgba(88, 101, 242, 0.12);
 }
 
-.memberRow:disabled {
+.memberRow:has(input:disabled) {
   opacity: 0.6;
   cursor: wait;
 }
@@ -444,7 +450,7 @@
 
 .memberEmail {
   font-size: 0.72rem;
-  color: #949ba4;
+  color: var(--sidebar-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -464,7 +470,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1.5rem 1rem;
-  color: #949ba4;
+  color: var(--sidebar-muted);
   font-size: 0.8rem;
 }
 
@@ -472,7 +478,7 @@
   padding: 0.45rem;
   text-align: center;
   font-size: 0.7rem;
-  color: #6d7178;
+  color: #5c6b7a;
 }
 
 .footer {

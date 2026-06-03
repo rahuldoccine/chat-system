@@ -83,6 +83,30 @@ function ackError(err: unknown): { ok: false; code: string; message: string; det
   return { ok: false, code: "INTERNAL_ERROR", message: "Internal error" };
 }
 
+function onCallOfferMissedTimeout(
+  io: Server,
+  logger: Logger,
+  config: AppConfig,
+  callId: string,
+): void {
+  const c = getActiveCall(callId);
+  if (!c || c.status === "CONNECTED") return;
+  void terminateCall(io, logger, config, {
+    callId,
+    status: "MISSED",
+    endReason: "timeout",
+  }).catch(() => undefined);
+}
+
+function scheduleCallOfferMissedTimeout(
+  io: Server,
+  logger: Logger,
+  config: AppConfig,
+  callId: string,
+): ReturnType<typeof setTimeout> {
+  return setTimeout(onCallOfferMissedTimeout, 30_000, io, logger, config, callId);
+}
+
 const reconnectDeliveryFlushInFlight = new Set<string>();
 
 async function emitReconnectDeliveryBatches(
@@ -294,15 +318,7 @@ export function registerSocketHandlers(io: Server, config: AppConfig, logger: Lo
           },
         });
 
-        const timeoutId = setTimeout(() => {
-          const c = getActiveCall(callId);
-          if (!c || c.status === "CONNECTED") return;
-          void terminateCall(io, logger, config, {
-            callId,
-            status: "MISSED",
-            endReason: "timeout",
-          }).catch(() => {});
-        }, 30_000);
+        const timeoutId = scheduleCallOfferMissedTimeout(io, logger, config, callId);
 
         putActiveCall({
           callId,

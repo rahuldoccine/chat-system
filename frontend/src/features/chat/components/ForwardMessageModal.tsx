@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useMessageBodies } from '../../e2ee/useMessageBodies';
+import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './ForwardMessageModal.module.css';
 import { X, Forward, Loader2 } from 'lucide-react';
 import { useConversations, useSendMessage } from '../hooks/useChatData';
@@ -49,6 +50,30 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
 
   const preview = getMessageCopyText(message, decryptedBodies, user?.id);
 
+  const renderChatList = () => {
+    if (isLoading) {
+      return (
+        <div className={styles.loading}>
+          <Loader2 size={20} className={styles.spinner} />
+        </div>
+      );
+    }
+    if (chats.length === 0) {
+      return <p className={styles.empty}>No other conversations available.</p>;
+    }
+    return chats.map((chat) => (
+      <button
+        key={chat.id}
+        type="button"
+        className={`${styles.chatItem} ${selectedId === chat.id ? styles.selected : ''}`}
+        onClick={() => setSelectedId(chat.id)}
+      >
+        <span className={styles.chatAvatar}>{getChatName(chat).charAt(0).toUpperCase()}</span>
+        <span>{getChatName(chat)}</span>
+      </button>
+    ));
+  };
+
   const handleForward = () => {
     if (!selectedId || !user?.id) return;
     setError(null);
@@ -81,8 +106,8 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <ModalDialog className={styles.overlay} aria-label="Forward message" onClose={onClose}>
+      <div className={styles.modal}>
         <div className={styles.header}>
           <h3>
             <Forward size={18} />
@@ -93,27 +118,7 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
           </button>
         </div>
         <p className={styles.preview}>{preview || 'Attachment'}</p>
-        <div className={styles.list}>
-          {isLoading ? (
-            <div className={styles.loading}>
-              <Loader2 size={20} className={styles.spinner} />
-            </div>
-          ) : chats.length === 0 ? (
-            <p className={styles.empty}>No other conversations available.</p>
-          ) : (
-            chats.map((chat) => (
-              <button
-                key={chat.id}
-                type="button"
-                className={`${styles.chatItem} ${selectedId === chat.id ? styles.selected : ''}`}
-                onClick={() => setSelectedId(chat.id)}
-              >
-                <span className={styles.chatAvatar}>{getChatName(chat).charAt(0).toUpperCase()}</span>
-                <span>{getChatName(chat)}</span>
-              </button>
-            ))
-          )}
-        </div>
+        <div className={styles.list}>{renderChatList()}</div>
         {error && <p className={styles.error}>{error}</p>}
         <button
           type="button"
@@ -124,7 +129,7 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
           {isPending ? <Loader2 size={16} className={styles.spinner} /> : 'Send'}
         </button>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

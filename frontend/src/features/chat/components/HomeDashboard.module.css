@@ -1,6 +1,8 @@
 .root {
   position: relative;
   flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 2rem 2.5rem 2.5rem;
   background: var(--dashboard-gradient);
@@ -10,8 +12,8 @@
 .bgGlow {
   position: absolute;
   top: -120px;
-  right: -80px;
-  width: 420px;
+  right: 0;
+  width: min(420px, 55vw);
   height: 420px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
@@ -195,7 +197,7 @@
 }
 
 .actionIconSlate {
-  background: linear-gradient(135deg, #475569, #64748b);
+  background: linear-gradient(135deg, #475569, var(--muted-foreground));
 }
 
 .actionTitle {
@@ -326,8 +328,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #6366f1;
-  color: #fff;
+  background: var(--primary-hover);
+  color: var(--primary-foreground);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -338,8 +340,8 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 10px;
-  background: #f23f43;
-  color: #fff;
+  background: #dc2626;
+  color: var(--primary-foreground);
   font-size: 0.7rem;
   font-weight: 700;
   display: inline-flex;

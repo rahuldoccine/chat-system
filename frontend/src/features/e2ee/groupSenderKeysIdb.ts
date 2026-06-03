@@ -2,8 +2,12 @@
  * Durable store for group sender keys (survives browser restart).
  */
 
+import {
+  idbCollectCursorValues,
+  idbPutValue,
+} from './e2eeIdb';
+
 const DB_NAME = 'chat-e2ee-group-keys-v1';
-const DB_VERSION = 1;
 const STORE = 'keys';
 
 export type GroupSenderKeyIdbRow = {
@@ -17,56 +21,20 @@ function rowKey(chatId: string, senderId: string, epoch: number): string {
   return `${chatId}:${senderId}:${epoch}`;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve(req.result);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE);
-      }
-    };
-  });
-}
-
 export async function idbPutGroupSenderKey(row: GroupSenderKeyIdbRow): Promise<void> {
   try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).put(row, rowKey(row.chatId, row.senderId, row.epoch));
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    await idbPutValue(DB_NAME, STORE, rowKey(row.chatId, row.senderId, row.epoch), row);
   } catch {
     /* best-effort */
   }
 }
 
 export async function idbLoadGroupSenderKeys(): Promise<GroupSenderKeyIdbRow[]> {
-  const out: GroupSenderKeyIdbRow[] = [];
   try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).openCursor();
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor) return;
-        out.push(cursor.value as GroupSenderKeyIdbRow);
-        cursor.continue();
-      };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    return await idbCollectCursorValues<GroupSenderKeyIdbRow>(DB_NAME, STORE);
   } catch {
-    /* best-effort */
+    return [];
   }
-  return out;
 }
 
 export async function idbImportGroupSenderKeys(rows: GroupSenderKeyIdbRow[]): Promise<void> {

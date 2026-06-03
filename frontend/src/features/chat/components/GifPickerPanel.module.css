@@ -33,7 +33,7 @@
 }
 
 .searchIcon {
-  color: #94a3b8;
+  color: #5c6b7a;
   flex-shrink: 0;
 }
 
@@ -56,7 +56,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #64748b;
+  color: #5c6b7a;
   cursor: pointer;
 }
 
@@ -95,7 +95,7 @@
   margin: 1.5rem 0.75rem;
   text-align: center;
   font-size: 0.8125rem;
-  color: #64748b;
+  color: #5c6b7a;
   line-height: 1.45;
 }
 
@@ -140,13 +140,13 @@
   margin: 0;
   padding: 0.35rem 0.65rem 0.5rem;
   font-size: 0.65rem;
-  color: #94a3b8;
+  color: #5c6b7a;
   text-align: center;
   border-top: 1px solid #f1f5f9;
 }
 
 .attribution a {
-  color: #64748b;
+  color: #5c6b7a;
   font-weight: 600;
   text-decoration: none;
 }

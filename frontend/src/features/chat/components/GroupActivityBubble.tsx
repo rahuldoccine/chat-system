@@ -13,7 +13,6 @@ export type GroupActivityMeta = {
 
 type GroupActivityBubbleProps = {
   ciphertext: string | null;
-  meta?: GroupActivityMeta;
 };
 
 const GroupActivityBubble: React.FC<GroupActivityBubbleProps> = ({ ciphertext }) => (

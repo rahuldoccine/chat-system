@@ -19,7 +19,8 @@ export function useAudioSpeaking(stream: MediaStream | null, threshold = 0.04): 
       try {
         ctx = new AudioContext();
         await ctx.resume();
-        const source = ctx.createMediaStreamSource(stream!);
+        if (!stream) return;
+        const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.85;
@@ -30,7 +31,7 @@ export function useAudioSpeaking(stream: MediaStream | null, threshold = 0.04): 
           if (cancelled) return;
           analyser.getByteFrequencyData(bins);
           let sum = 0;
-          for (let i = 0; i < bins.length; i++) sum += bins[i];
+          for (const value of bins) sum += value;
           const level = sum / bins.length / 255;
           setSpeaking(level > threshold);
           raf = requestAnimationFrame(tick);

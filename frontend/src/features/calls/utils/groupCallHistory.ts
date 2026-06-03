@@ -18,9 +18,9 @@ export function groupCallHistoryRows(rows: CallHistoryRow[]): CallHistoryGroup[]
   for (const row of rows) {
     const prev = groups.at(-1);
     const sameBurst =
-      prev &&
-      prev.direction === row.direction &&
-      prev.kind === row.kind &&
+      prev?.direction === row.direction &&
+      prev?.kind === row.kind &&
+      prev != null &&
       toDateKey(prev.startedAt) === toDateKey(row.startedAt);
 
     if (sameBurst) {

@@ -46,7 +46,7 @@ export type UseCallTranscriptOptions = {
 };
 
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionInstance) | null {
-  const w = window as Window & {
+  const w = globalThis.window as Window & {
     SpeechRecognition?: new () => SpeechRecognitionInstance;
     webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
   };
@@ -101,7 +101,7 @@ export function useCallTranscript(
   const [remoteLines, setRemoteLines] = useState<TranscriptLine[]>([]);
   const [interimText, setInterimText] = useState('');
   const [statusHint, setStatusHint] = useState<string | null>(null);
-  const [language, setLanguageState] = useState(readStoredLang);
+  const [language, setLanguage] = useState(readStoredLang);
 
   const languageRef = useRef(language);
   languageRef.current = language;
@@ -151,7 +151,7 @@ export function useCallTranscript(
       if (!Ctor || !wantedRef.current || muted) return false;
 
       stopRecognition();
-      if (startedRef.current == null) startedRef.current = Date.now();
+      startedRef.current ??= Date.now();
 
       const rec = new Ctor();
       rec.continuous = true;
@@ -191,12 +191,12 @@ export function useCallTranscript(
         }
 
         stopRecognition();
-        const delay =
-          ev.error === 'aborted'
-            ? Math.min(2000, 400 + abortedStreakRef.current * 300)
-            : ev.error === 'network'
-              ? 1000
-              : 300;
+        let delay = 300;
+        if (ev.error === 'aborted') {
+          delay = Math.min(2000, 400 + abortedStreakRef.current * 300);
+        } else if (ev.error === 'network') {
+          delay = 1000;
+        }
         scheduleRestart(delay);
       };
       rec.onend = () => {
@@ -230,7 +230,7 @@ export function useCallTranscript(
     abortedStreakRef.current = 0;
     setEnabled(true);
     setStatusHint(null);
-    if (startedRef.current == null) startedRef.current = Date.now();
+    startedRef.current ??= Date.now();
 
     const scheduleRestart = (delayMs = 300) => {
       if (!wantedRef.current || muted) return;
@@ -327,9 +327,9 @@ export function useCallTranscript(
     startedRef.current = null;
   }, [stop]);
 
-  const setLanguage = useCallback(
+  const applyLanguage = useCallback(
     (code: string) => {
-      setLanguageState(code);
+      setLanguage(code);
       try {
         sessionStorage.setItem(LANG_STORAGE_KEY, code);
       } catch {
@@ -393,7 +393,7 @@ export function useCallTranscript(
     stop,
     upload,
     reset,
-    setLanguage,
+    applyLanguage,
     copyToClipboard,
     downloadText,
   };

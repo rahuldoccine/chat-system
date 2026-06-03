@@ -1,20 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { handler } from '../../../utils/asyncHandler';
 import { Music, Pause, Play } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
 import MessageMeta from './MessageMeta';
-import { buildFileUrl } from '../utils/fileUrl';
-import { getMessageFiles } from '../utils/fileMeta';
 import { truncateFilenameMiddle } from '../utils/formatFilename';
-import { useDecryptedFileUrl } from '../../e2ee/useDecryptedFileUrl';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import type { Message } from '../types';
+import { useMessageFileSource } from '../hooks/useMessageFileSource';
+import type { ContentMeta, Message } from '../types';
 import styles from './AudioFileAttachment.module.css';
 import { formatMediaTimeRange } from '../utils/formatMediaTime';
 
 type AudioFileAttachmentProps = {
   contentMeta: Message['contentMeta'];
   e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
   bubbleVariant?: 'sent' | 'received';
   mediaTimestamp?: {
     createdAt: string;
@@ -33,49 +30,21 @@ const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
   bubbleVariant = 'received',
   mediaTimestamp,
 }) => {
-  const { token } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
 
-  const files = getMessageFiles({ kind: 'FILE', contentMeta });
-  const primary = files?.[0];
-  const meta = contentMeta ?? {};
-  const displayName =
-    meta.originalName || meta.filename || primary?.originalName || primary?.filename || 'Audio';
-
-  const fileRef = useMemo(
-    () => ({
-      filename: meta.filename ?? primary?.filename,
-      url: meta.url ?? primary?.url,
-      mimetype: meta.mimetype ?? primary?.mimetype,
-      uploadId: meta.uploadId ?? primary?.uploadId,
-      originalName: meta.originalName ?? primary?.originalName,
-      attachment: primary?.attachment,
-    }),
-    [
-      meta.filename,
-      meta.url,
-      meta.mimetype,
-      meta.uploadId,
-      meta.originalName,
-      primary?.filename,
-      primary?.url,
-      primary?.mimetype,
-      primary?.uploadId,
-      primary?.originalName,
-      primary?.attachment,
-    ],
+  const { displayName, fullUrl, isE2eeLoading } = useMessageFileSource(
+    contentMeta,
+    e2eeMessage,
+    transportMeta,
+    'Audio',
   );
 
-  const decryptedUrl = useDecryptedFileUrl(e2eeMessage, fileRef, transportMeta);
-  const fullUrl =
-    e2eeMessage && isE2eeMessage(e2eeMessage) ? decryptedUrl : buildFileUrl(fileRef, token);
-
   const isSent = bubbleVariant === 'sent';
-  const isLoading = Boolean(e2eeMessage && isE2eeMessage(e2eeMessage) && !fullUrl);
+  const isLoading = isE2eeLoading;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -151,7 +120,7 @@ const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
       <button
         type="button"
         className={styles.playBtn}
-        onClick={() => void togglePlay()}
+        onClick={handler(togglePlay)}
         disabled={!fullUrl}
         aria-label={playing ? 'Pause' : 'Play'}
       >
@@ -184,7 +153,9 @@ const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
         </div>
       </div>
       {fullUrl ? (
-        <audio ref={audioRef} src={fullUrl} preload="metadata" className={styles.hiddenAudio} />
+        <audio ref={audioRef} src={fullUrl} preload="metadata" className={styles.hiddenAudio}>
+          <track kind="captions" />
+        </audio>
       ) : null}
     </div>
   );

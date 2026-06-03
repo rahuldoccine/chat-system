@@ -1,42 +1,29 @@
+import {
+  diffInLocalDays,
+  formatRelativeDaysAgo,
+  formatRelativeHoursAgo,
+  formatRelativeMinutesAgo,
+  formatRelativeMonthsAgo,
+  formatRelativeSecondsAgo,
+  formatRelativeWeeksAgo,
+  formatRelativeYearsAgo,
+} from './timeFormat.helpers';
+
 export function formatLastSeen(dateInput: string | Date): string {
   const date = new Date(dateInput);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) {
-    return 'a few seconds ago';
-  }
+  const relative =
+    formatRelativeSecondsAgo(diffInSeconds) ??
+    formatRelativeMinutesAgo(diffInSeconds) ??
+    formatRelativeHoursAgo(diffInSeconds) ??
+    formatRelativeDaysAgo(diffInSeconds) ??
+    formatRelativeWeeksAgo(diffInSeconds) ??
+    formatRelativeMonthsAgo(diffInSeconds);
 
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
-  }
-
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
-  }
-
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays === 1) {
-    return 'yesterday';
-  }
-  if (diffInDays < 7) {
-    return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
-  }
-
-  const diffInWeeks = Math.floor(diffInDays / 7);
-  if (diffInWeeks < 4) {
-    return `${diffInWeeks} week${diffInWeeks === 1 ? '' : 's'} ago`;
-  }
-
-  const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) {
-    return `${diffInMonths} month${diffInMonths === 1 ? '' : 's'} ago`;
-  }
-
-  const diffInYears = Math.floor(diffInDays / 365);
-  return `${diffInYears} year${diffInYears === 1 ? '' : 's'} ago`;
+  if (relative) return relative;
+  return formatRelativeYearsAgo(diffInSeconds);
 }
 
 const ordinal = (n: number) => {
@@ -44,10 +31,6 @@ const ordinal = (n: number) => {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
-
-function startOfLocalDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 export function toDateKey(dateInput: string | Date): string {
   const d = new Date(dateInput);
@@ -61,9 +44,7 @@ export function toDateKey(dateInput: string | Date): string {
 export function formatMessageDateDividerLabel(dateInput: string | Date): string {
   const date = new Date(dateInput);
   const now = new Date();
-  const todayStart = startOfLocalDay(now).getTime();
-  const msgStart = startOfLocalDay(date).getTime();
-  const diffDays = Math.round((todayStart - msgStart) / 86_400_000);
+  const diffDays = diffInLocalDays(date, now);
 
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
@@ -77,9 +58,7 @@ export function formatMessageDateDividerLabel(dateInput: string | Date): string 
 export function formatCallHistoryTimestamp(dateInput: string | Date): string {
   const date = new Date(dateInput);
   const now = new Date();
-  const todayStart = startOfLocalDay(now).getTime();
-  const msgStart = startOfLocalDay(date).getTime();
-  const diffDays = Math.round((todayStart - msgStart) / 86_400_000);
+  const diffDays = diffInLocalDays(date, now);
   const time = date
     .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     .toLowerCase();

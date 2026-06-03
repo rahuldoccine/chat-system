@@ -1,11 +1,12 @@
 import { expandAvatarUrl } from "../../lib/avatar-urls.js";
+import { isPlainObject } from "../../lib/plain-object.js";
 import { AppError } from "../../errors/index.js";
 import { requireActiveMember } from "../../lib/chat-access.js";
 import { getPrisma } from "../../lib/prisma.js";
 
 function isE2eePollMessage(contentMeta: unknown): boolean {
-  if (!contentMeta || typeof contentMeta !== "object") return false;
-  const v = (contentMeta as Record<string, unknown>).e2eeVersion;
+  if (!isPlainObject(contentMeta)) return false;
+  const v = contentMeta.e2eeVersion;
   return typeof v === "string" && v.length > 0;
 }
 

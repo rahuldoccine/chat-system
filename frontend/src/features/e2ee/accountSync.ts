@@ -6,7 +6,9 @@ import {
   saveKeyMaterial,
   type E2eeKeyMaterial,
 } from './keyStore';
-import { clearSessionUnlock, persistSessionUnlock, restoreSessionUnlock } from './sessionUnlock';
+import { persistSessionUnlock, restoreSessionUnlock } from './sessionUnlock';
+
+export { clearSessionUnlock } from './sessionUnlock';
 
 export class E2eeKeysLockedError extends Error {
   constructor(
@@ -86,9 +88,7 @@ export async function resolveKeyMaterial(
 ): Promise<E2eeKeyMaterial> {
   let material = await loadKeyMaterial(userId);
 
-  if (!material) {
-    material = await restoreSessionUnlock(userId);
-  }
+  material ??= await restoreSessionUnlock(userId);
 
   if (!material && password) {
     material = await restoreKeyMaterialFromServer(userId, password);
@@ -120,9 +120,7 @@ export async function unlockKeyMaterialWithPassword(
   password: string,
 ): Promise<E2eeKeyMaterial> {
   let material = await restoreKeyMaterialFromServer(userId, password);
-  if (!material) {
-    material = await loadKeyMaterial(userId);
-  }
+  material ??= await loadKeyMaterial(userId);
   if (!material) {
     throw new E2eeKeysLockedError(
       'Could not unlock encryption keys. Check your password and try again.',
@@ -142,15 +140,11 @@ export async function rewrapAccountKeyBackup(
 ): Promise<void> {
   let material = await loadKeyMaterial(userId);
 
-  if (!material) {
-    material = await restoreSessionUnlock(userId);
-  }
+  material ??= await restoreSessionUnlock(userId);
 
-  if (!material) {
-    material = await restoreKeyMaterialFromServer(userId, currentPassword);
-    if (material) {
-      await saveKeyMaterial(material);
-    }
+  material ??= await restoreKeyMaterialFromServer(userId, currentPassword);
+  if (material) {
+    await saveKeyMaterial(material);
   }
 
   if (!material) {
@@ -162,5 +156,3 @@ export async function rewrapAccountKeyBackup(
   await uploadKeyMaterialToServer(material, newPassword, userId);
   await persistSessionUnlock(userId, material);
 }
-
-export { clearSessionUnlock };

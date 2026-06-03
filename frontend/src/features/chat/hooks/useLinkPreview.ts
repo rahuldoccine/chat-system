@@ -31,7 +31,7 @@ export function useLinkPreview(url: string | null, enabled: boolean) {
 
   return useQuery<{ preview: LinkPreviewMeta }>({
     queryKey: linkPreviewQueryKey(url ?? ''),
-    queryFn: () => fetchLinkPreviewWithFallback(url!),
+    queryFn: () => fetchLinkPreviewWithFallback(url ?? ''),
     enabled: enabled && Boolean(url),
     staleTime: 60_000,
     placeholderData: instant ? { preview: instant } : undefined,

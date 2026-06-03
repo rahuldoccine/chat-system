@@ -38,16 +38,43 @@ const FILTER_TABS: { id: AdminReportsFilter; label: string }[] = [
   { id: 'ACTIONED', label: 'Actioned' },
 ];
 
-type ReportRowProps = {
+const STATUS_BADGE_CLASS: Record<ReportStatus, string> = {
+  OPEN: styles.badge_OPEN,
+  REVIEWED: styles.badge_REVIEWED,
+  DISMISSED: styles.badge_DISMISSED,
+  ACTIONED: styles.badge_ACTIONED,
+};
+
+function statusBadgeClassName(status: ReportStatus): string {
+  return `${styles.badge} ${STATUS_BADGE_CLASS[status]}`;
+}
+
+function emptyReportsMessage(filter: AdminReportsFilter): string {
+  if (filter === 'all') return 'No reports yet.';
+  return `No ${STATUS_LABELS[filter].toLowerCase()} reports.`;
+}
+
+function formatReportsPageInfo(
+  hasReports: boolean,
+  pageStart: number,
+  pageEnd: number,
+  hasNext: boolean,
+): string {
+  if (!hasReports) return 'No results';
+  const suffix = hasNext ? '+' : '';
+  return `${pageStart}–${pageEnd}${suffix}`;
+}
+
+type ReportRowProps = Readonly<{
   report: AdminReport;
   onEdit: (report: AdminReport) => void;
-};
+}>;
 
 const ReportRow: React.FC<ReportRowProps> = ({ report, onEdit }) => (
   <article className={styles.row}>
     <div className={styles.rowTop}>
       <div className={styles.rowHeader}>
-        <span className={`${styles.badge} ${styles[`badge_${report.status}`]}`}>
+        <span className={statusBadgeClassName(report.status)}>
           {STATUS_LABELS[report.status]}
         </span>
         <time className={styles.date} dateTime={report.createdAt}>
@@ -142,10 +169,7 @@ const AdminReportsPanel: React.FC = () => {
   const pageEnd = pageIndex * REPORTS_PAGE_SIZE + reports.length;
   const showPagination = reports.length > 0 || hasPrev || hasNext;
 
-  const emptyMessage =
-    filter === 'all'
-      ? 'No reports yet.'
-      : `No ${STATUS_LABELS[filter as ReportStatus].toLowerCase()} reports.`;
+  const emptyMessage = emptyReportsMessage(filter);
 
   return (
     <div className={styles.panel}>
@@ -208,9 +232,7 @@ const AdminReportsPanel: React.FC = () => {
                 Previous
               </button>
               <span className={styles.pageInfo}>
-                {reports.length > 0
-                  ? `${pageStart}–${pageEnd}${hasNext ? '+' : ''}`
-                  : 'No results'}
+                {formatReportsPageInfo(reports.length > 0, pageStart, pageEnd, hasNext)}
                 {isFetching && (
                   <Loader2 size={14} className={styles.spinnerInline} aria-hidden />
                 )}

@@ -51,7 +51,7 @@ function tx<T>(
         transaction.oncomplete = () => {
           db.close();
           if (result instanceof IDBRequest) {
-            resolve(result.result as T);
+            resolve(result.result);
           } else {
             resolve();
           }

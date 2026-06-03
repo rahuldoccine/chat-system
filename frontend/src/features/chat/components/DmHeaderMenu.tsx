@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { handler } from '../../../utils/asyncHandler';
 import { MoreVertical, Ban, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmModal from './ConfirmModal';
@@ -81,14 +82,14 @@ const DmHeaderMenu: React.FC<DmHeaderMenuProps> = ({ peerId, peerName, chatId })
           <MoreVertical size={20} />
         </button>
         {open && (
-          <div className={styles.menu} role="menu">
+          <div className={styles.menu} role="menu" tabIndex={-1}>
             {isBlocked ? (
               <button
                 type="button"
                 className={styles.item}
                 role="menuitem"
                 disabled={unblocking}
-                onClick={() => void handleUnblock()}
+                onClick={handler(handleUnblock)}
               >
                 <Ban size={16} />
                 <span>Unblock user</span>
@@ -130,7 +131,7 @@ const DmHeaderMenu: React.FC<DmHeaderMenuProps> = ({ peerId, peerName, chatId })
         confirmLabel="Block"
         variant="danger"
         isLoading={blocking}
-        onConfirm={() => void handleBlockConfirm()}
+        onConfirm={handler(handleBlockConfirm)}
         onCancel={() => {
           if (!blocking) setShowBlockConfirm(false);
         }}

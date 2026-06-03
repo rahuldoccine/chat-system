@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { handler } from '../../../utils/asyncHandler';
 import { Copy, Download, Subtitles } from 'lucide-react';
 import styles from './CallTranscriptBubble.module.css';
 
@@ -50,7 +51,7 @@ const CallTranscriptBubble: React.FC<CallTranscriptBubbleProps> = ({ transcript,
         </div>
         <p className={styles.preview}>{preview ?? fullText.slice(0, 280)}</p>
         <div className={styles.actions}>
-          <button type="button" className={styles.actionBtn} onClick={() => void handleCopy()}>
+          <button type="button" className={styles.actionBtn} onClick={handler(handleCopy)}>
             <Copy size={14} />
             {copied ? 'Copied' : 'Copy'}
           </button>

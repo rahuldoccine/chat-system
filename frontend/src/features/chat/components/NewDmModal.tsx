@@ -6,6 +6,7 @@ import { useCreateDirectChat, useSearchUsers, type DiscoverableUser } from '../h
 import { invalidateUsersSearch } from '../utils/invalidateChatCaches';
 import UserAvatar from './UserAvatar';
 import EmptyState from './EmptyState';
+import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './NewDmModal.module.css';
 
 interface NewDmModalProps {
@@ -39,9 +40,55 @@ const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
     }
   };
 
+  const renderUserList = () => {
+    if (showSpinner && users.length === 0) {
+      return (
+        <div className={styles.loading}>
+          <Loader2 size={20} className={styles.spinner} />
+          <span>Loading people...</span>
+        </div>
+      );
+    }
+    if (users.length === 0) {
+      return (
+        <EmptyState
+          compact
+          title={query.trim() ? 'No users found' : 'No other users yet'}
+          hint={
+            query.trim()
+              ? 'Try a different name or email.'
+              : 'Register another account in a second browser to chat.'
+          }
+        />
+      );
+    }
+    return users.map((user) => (
+      <button
+        key={user.id}
+        type="button"
+        className={styles.userRow}
+        disabled={createChat.isPending}
+        onClick={() => handleSelect(user)}
+      >
+        <UserAvatar
+          userId={user.id}
+          avatarUrl={user.avatarUrl}
+          displayName={user.displayName}
+          email={user.email}
+          className={styles.avatar}
+          fallbackFontSize="0.95rem"
+        />
+        <div className={styles.userMeta}>
+          <span className={styles.name}>{getUserLabel(user)}</span>
+          <span className={styles.email}>{user.email}</span>
+        </div>
+      </button>
+    ));
+  };
+
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
+    <ModalDialog className={styles.overlay} aria-label="Start a direct message" onClose={onClose}>
+      <div className={styles.panel}>
         <div className={styles.header}>
           <h3>Start a direct message</h3>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
@@ -58,49 +105,9 @@ const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
             autoFocus
           />
         </div>
-        <div className={styles.list}>
-          {showSpinner && users.length === 0 ? (
-            <div className={styles.loading}>
-              <Loader2 size={20} className={styles.spinner} />
-              <span>Loading people...</span>
-            </div>
-          ) : users.length === 0 ? (
-            <EmptyState
-              compact
-              title={query.trim() ? 'No users found' : 'No other users yet'}
-              hint={
-                query.trim()
-                  ? 'Try a different name or email.'
-                  : 'Register another account in a second browser to chat.'
-              }
-            />
-          ) : (
-            users.map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                className={styles.userRow}
-                disabled={createChat.isPending}
-                onClick={() => handleSelect(user)}
-              >
-                <UserAvatar
-                  userId={user.id}
-                  avatarUrl={user.avatarUrl}
-                  displayName={user.displayName}
-                  email={user.email}
-                  className={styles.avatar}
-                  fallbackFontSize="0.95rem"
-                />
-                <div className={styles.userMeta}>
-                  <span className={styles.name}>{getUserLabel(user)}</span>
-                  <span className={styles.email}>{user.email}</span>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
+        <div className={styles.list}>{renderUserList()}</div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

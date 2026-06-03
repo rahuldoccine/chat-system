@@ -24,6 +24,10 @@ import { emitToChatMembers } from "../../sockets/chat-broadcast.js";
 import { emitMessageNewToMembers } from "../../sockets/message-broadcast.js";
 import { getSocketIo } from "../../sockets/socket-holder.js";
 import * as chatsService from "./chats.service.js";
+import {
+  emitDeliveredReceiptIfNeeded,
+  emitReadReceiptIfNeeded,
+} from "./chats.controller.helpers.js";
 
 export async function listChats(req: Request, res: Response): Promise<void> {
   const q = parseQuery(listChatsQuerySchema, req.query);
@@ -96,15 +100,7 @@ export async function markChatRead(req: Request, res: Response): Promise<void> {
   const chatId = req.params.chatId as string;
   const out = await chatsService.markChatAsRead(userId, chatId);
   const io = getSocketIo();
-  if (io && out.messageIds.length > 0 && out.shareReadReceipts) {
-    await emitToChatMembers(io, out.chatId, "receipt:read", {
-      v: SOCKET_PROTOCOL_VERSION,
-      chatId: out.chatId,
-      userId,
-      messageIds: out.messageIds,
-      readAt: out.readAt?.toISOString() ?? null,
-    });
-  }
+  await emitReadReceiptIfNeeded(io, userId, out);
   res.setHeader("Cache-Control", "no-store");
   const unread = await chatsService.getChatUnreadBoundary(userId, chatId);
   res.json({ ...out, unread });
@@ -116,15 +112,7 @@ export async function markMessagesRead(req: Request, res: Response): Promise<voi
   const body = parseBody(markMessagesReadBodySchema, req.body);
   const out = await chatsService.markMessagesRead(userId, chatId, body.messageIds);
   const io = getSocketIo();
-  if (io && out.messageIds.length > 0 && out.shareReadReceipts) {
-    await emitToChatMembers(io, out.chatId, "receipt:read", {
-      v: SOCKET_PROTOCOL_VERSION,
-      chatId: out.chatId,
-      userId,
-      messageIds: out.messageIds,
-      readAt: out.readAt?.toISOString() ?? null,
-    });
-  }
+  await emitReadReceiptIfNeeded(io, userId, out);
   res.setHeader("Cache-Control", "no-store");
   const unread = await chatsService.getChatUnreadBoundary(userId, chatId);
   res.json({ ...out, unread });
@@ -137,15 +125,7 @@ export async function markMessagesDelivered(req: Request, res: Response): Promis
   const body = parseBody(markMessagesDeliveredBodySchema, req.body);
   const out = await chatsService.markMessagesDelivered(userId, chatId, body.messageIds);
   const io = getSocketIo();
-  if (io && out.messageIds.length > 0) {
-    await emitToChatMembers(io, out.chatId, "receipt:delivered", {
-      v: SOCKET_PROTOCOL_VERSION,
-      chatId: out.chatId,
-      userId,
-      messageIds: out.messageIds,
-      deliveredAt: out.deliveredAt?.toISOString() ?? null,
-    });
-  }
+  await emitDeliveredReceiptIfNeeded(io, userId, out);
   res.setHeader("Cache-Control", "no-store");
   res.status(204).end();
 }
@@ -176,15 +156,7 @@ export async function markThreadRead(req: Request, res: Response): Promise<void>
   const rootMessageId = req.params.rootMessageId as string;
   const out = await chatsService.markThreadAsRead(userId, chatId, rootMessageId);
   const io = getSocketIo();
-  if (io && out.messageIds.length > 0 && out.shareReadReceipts) {
-    await emitToChatMembers(io, out.chatId, "receipt:read", {
-      v: SOCKET_PROTOCOL_VERSION,
-      chatId: out.chatId,
-      userId,
-      messageIds: out.messageIds,
-      readAt: out.readAt?.toISOString() ?? null,
-    });
-  }
+  await emitReadReceiptIfNeeded(io, userId, out);
   res.setHeader("Cache-Control", "no-store");
   res.json(out);
 }

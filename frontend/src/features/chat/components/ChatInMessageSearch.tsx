@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { ChevronDown, ChevronUp, Loader2, Search, X } from 'lucide-react';
 import styles from './ChatInMessageSearch.module.css';
 import { useChat } from '../../../context/ChatContext';
 import { useChatMessageSearch, useE2eeChatMessageSearch } from '../hooks/useChatMessageSearch';
+import { formatInChatSearchStatus } from './chatInMessageSearchStatus';
 
 const SEARCH_LIMIT = 50;
 
@@ -15,6 +16,7 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
   chatId,
   e2eeSearch = false,
 }) => {
+  const searchInputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const {
     inChatSearchOpen,
@@ -65,7 +67,8 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
       if (!matchIds.length) return;
       const next = Math.max(0, Math.min(matchIds.length - 1, index));
       setInChatSearchActiveIndex(next);
-      requestScrollToMessage(matchIds[next]!);
+      const messageId = matchIds[next];
+      if (messageId) requestScrollToMessage(messageId);
     },
     [matchIds, requestScrollToMessage, setInChatSearchActiveIndex],
   );
@@ -124,17 +127,7 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
 
   if (!inChatSearchOpen) return null;
 
-  const statusLabel = serverUnavailable
-    ? 'Unavailable'
-    : showLoading
-      ? 'Searching…'
-      : total === 0
-        ? query
-          ? '0 results'
-          : ''
-        : total === 1
-          ? '1 result'
-          : `${total} results`;
+  const statusLabel = formatInChatSearchStatus(serverUnavailable, showLoading, total, query);
 
   const positionLabel =
     total > 0 ? `${inChatSearchActiveIndex + 1} of ${total}` : '';
@@ -142,9 +135,13 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
   return (
     <div className={styles.bar} role="search">
       <div className={styles.inputWrap}>
+        <label className={styles.srOnly} htmlFor={searchInputId}>
+          Search in chat
+        </label>
         <Search size={16} className={styles.searchIcon} aria-hidden />
         <input
           ref={inputRef}
+          id={searchInputId}
           className={styles.input}
           type="search"
           placeholder='Search messages…'
@@ -153,7 +150,6 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
           onKeyDown={onInputKeyDown}
           autoComplete="off"
           spellCheck={false}
-          aria-label="Search in chat"
         />
       </div>
 

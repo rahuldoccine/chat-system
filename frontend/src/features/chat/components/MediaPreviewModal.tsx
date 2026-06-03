@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useViewerModalLock } from '../hooks/useViewerModalLock';
 import { createPortal } from 'react-dom';
 import { Download, Loader2, Mic, Pause, Play, X } from 'lucide-react';
 import styles from './ImageViewerModal.module.css';
@@ -6,8 +7,10 @@ import mediaStyles from './MediaPreviewModal.module.css';
 import { downloadFileFromUrl } from '../utils/downloadFile';
 import { VOICE_WAVE_BAR_COUNT, VOICE_WAVE_HEIGHTS } from '../utils/voiceWaveform';
 import { formatMediaTimeRange } from '../utils/formatMediaTime';
+import { handler } from '../../../utils/asyncHandler';
+import { ModalDialog } from '../../../components/ModalDialog';
 
-export type MediaPreviewModalProps = {
+export type MediaPreviewModalProps = Readonly<{
   open: boolean;
   kind: 'video' | 'audio';
   src: string;
@@ -15,13 +18,13 @@ export type MediaPreviewModalProps = {
   /** Known length from voice note / recording metadata when the blob has no duration yet. */
   durationMs?: number;
   onClose: () => void;
-};
+}>;
 
-type ModalAudioPlayerProps = {
+type ModalAudioPlayerProps = Readonly<{
   src: string;
   title: string;
   durationMs?: number;
-};
+}>;
 
 const ModalAudioPlayer: React.FC<ModalAudioPlayerProps> = ({ src, title, durationMs }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -185,17 +188,21 @@ const ModalAudioPlayer: React.FC<ModalAudioPlayerProps> = ({ src, title, duratio
         <button
           type="button"
           className={mediaStyles.audioPlayBtn}
-          onClick={() => void togglePlay()}
+          onClick={handler(togglePlay)}
           disabled={!ready && !totalSec}
           aria-label={playing ? 'Pause voice message' : 'Play voice message'}
         >
-          {!ready && !totalSec ? (
-            <Loader2 size={22} className={mediaStyles.audioSpinner} />
-          ) : playing ? (
-            <Pause size={22} fill="currentColor" strokeWidth={0} />
-          ) : (
-            <Play size={22} fill="currentColor" strokeWidth={0} className={mediaStyles.audioPlayIcon} />
-          )}
+          {(() => {
+            if (!ready && !totalSec) {
+              return <Loader2 size={22} className={mediaStyles.audioSpinner} />;
+            }
+            if (playing) {
+              return <Pause size={22} fill="currentColor" strokeWidth={0} />;
+            }
+            return (
+              <Play size={22} fill="currentColor" strokeWidth={0} className={mediaStyles.audioPlayIcon} />
+            );
+          })()}
         </button>
 
         <div className={mediaStyles.audioBody}>
@@ -228,11 +235,11 @@ const ModalAudioPlayer: React.FC<ModalAudioPlayerProps> = ({ src, title, duratio
             }}
           >
             <div className={mediaStyles.waveBars} aria-hidden>
-              {VOICE_WAVE_HEIGHTS.map((heightPct, i) => (
+              {VOICE_WAVE_HEIGHTS.map((heightPct, offset) => (
                 <span
-                  key={i}
-                  className={`${mediaStyles.waveBar} ${i < playedBarCount ? mediaStyles.waveBarPlayed : ''} ${
-                    playing && i === playedBarCount ? mediaStyles.waveBarActive : ''
+                  key={`${offset}:${heightPct}`}
+                  className={`${mediaStyles.waveBar} ${offset < playedBarCount ? mediaStyles.waveBarPlayed : ''} ${
+                    playing && offset === playedBarCount ? mediaStyles.waveBarActive : ''
                   }`}
                   style={{ height: `${heightPct}%` }}
                 />
@@ -257,7 +264,9 @@ const ModalAudioPlayer: React.FC<ModalAudioPlayerProps> = ({ src, title, duratio
         </div>
       </div>
 
-      <audio ref={audioRef} src={src} preload="auto" className={mediaStyles.hiddenAudio} />
+      <audio ref={audioRef} src={src} preload="auto" className={mediaStyles.hiddenAudio}>
+        <track kind="captions" />
+      </audio>
     </div>
   );
 };
@@ -270,26 +279,9 @@ const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
   durationMs,
   onClose,
 }) => {
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-
-    document.addEventListener('keydown', handleKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open]);
+  useViewerModalLock(open, onClose);
 
   const handleDownload = useCallback(async () => {
     if (downloading) return;
@@ -303,19 +295,9 @@ const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
 
   if (!open) return null;
 
-  const handleBackdropMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onCloseRef.current();
-  };
-
   return createPortal(
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onMouseDown={handleBackdropMouseDown}
-    >
-      <div className={styles.panel} onMouseDown={(e) => e.stopPropagation()}>
+    <ModalDialog className={styles.overlay} aria-label={title} onClose={onClose}>
+      <div className={styles.panel}>
         <div
           className={`${styles.stage} ${mediaStyles.stage} ${
             kind === 'audio' ? mediaStyles.stageAudio : mediaStyles.stageVideo
@@ -325,7 +307,7 @@ const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
             <button
               type="button"
               className={styles.iconBtn}
-              onClick={() => void handleDownload()}
+              onClick={handler(handleDownload)}
               disabled={downloading}
               aria-label="Download"
             >
@@ -334,7 +316,7 @@ const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
             <button
               type="button"
               className={styles.iconBtn}
-              onClick={() => onCloseRef.current()}
+              onClick={onClose}
               aria-label="Close"
             >
               <X size={22} />
@@ -348,13 +330,15 @@ const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
               controls
               playsInline
               aria-label={title}
-            />
+            >
+              <track kind="captions" />
+            </video>
           ) : (
             <ModalAudioPlayer src={src} title={title} durationMs={durationMs} />
           )}
         </div>
       </div>
-    </div>,
+    </ModalDialog>,
     document.body,
   );
 };

@@ -18,6 +18,18 @@ type MessageMetaProps = {
 const formatMessageTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+function receiptTickClass(status: NonNullable<MessageMetaProps['receiptStatus']>): string {
+  if (status === 'read') return styles.ticksRead;
+  if (status === 'delivered') return styles.ticksDelivered;
+  return '';
+}
+
+function receiptAriaLabel(status: NonNullable<MessageMetaProps['receiptStatus']>): string {
+  if (status === 'read') return 'Read';
+  if (status === 'delivered') return 'Delivered';
+  return 'Sent';
+}
+
 const MessageMeta: React.FC<MessageMetaProps> = ({
   createdAt,
   editedAt,
@@ -46,20 +58,8 @@ const MessageMeta: React.FC<MessageMetaProps> = ({
     )}
     {isMe && !sendStatus && receiptStatus && (
       <span
-        className={`${styles.ticks} ${
-          receiptStatus === 'read'
-            ? styles.ticksRead
-            : receiptStatus === 'delivered'
-              ? styles.ticksDelivered
-              : ''
-        }`}
-        aria-label={
-          receiptStatus === 'read'
-            ? 'Read'
-            : receiptStatus === 'delivered'
-              ? 'Delivered'
-              : 'Sent'
-        }
+        className={`${styles.ticks} ${receiptTickClass(receiptStatus)}`}
+        aria-label={receiptAriaLabel(receiptStatus)}
       >
         {receiptStatus === 'sent' ? (
           <Check size={14} strokeWidth={2.5} />

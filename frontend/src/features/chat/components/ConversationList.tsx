@@ -71,7 +71,7 @@ const ConversationList: React.FC = () => {
                     />
                   )}
                 </div>
-                {chat.type === 'DIRECT' && chat.dmPeer && (chat.dmPeer.isOnline || onlineUsers.has(chat.dmPeer.id)) && (
+                {chat.type === 'DIRECT' && chat.dmPeer?.id != null && (chat.dmPeer.isOnline || onlineUsers.has(chat.dmPeer.id)) && (
                   <div className={styles.onlineIndicator} />
                 )}
               </div>

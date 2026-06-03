@@ -36,7 +36,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #64748b;
+  color: #5c6b7a;
   padding: 4px;
   border-radius: 6px;
 }
@@ -117,7 +117,7 @@
 
 .submitBtn {
   background: var(--primary, #6366f1);
-  color: white;
+  color: var(--primary-foreground);
 }
 
 .submitBtn:disabled,

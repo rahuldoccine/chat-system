@@ -32,14 +32,16 @@ export function isVoiceMessage(message: Pick<Message, 'kind' | 'contentMeta'>): 
   return message.contentMeta?.voiceNote === true;
 }
 
-export function isVideoFile(file: Pick<FileAttachmentMeta, 'mimetype' | 'originalName' | 'filename'>): boolean {
+type FileMimeFields = Pick<FileAttachmentMeta, 'mimetype' | 'originalName' | 'filename'>;
+
+export function isVideoFile(file: FileMimeFields): boolean {
   const mime = (file.mimetype ?? '').toLowerCase();
   if (isVideoMime(mime)) return true;
   const name = (file.originalName ?? file.filename ?? '').toLowerCase();
   return /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(name);
 }
 
-export function isAudioFile(file: Pick<FileAttachmentMeta, 'mimetype' | 'originalName' | 'filename'>): boolean {
+export function isAudioFile(file: FileMimeFields): boolean {
   const mime = (file.mimetype ?? '').toLowerCase();
   if (mime.startsWith('audio/')) return true;
   const name = (file.originalName ?? file.filename ?? '').toLowerCase();
@@ -104,7 +106,7 @@ export function getMessageFiles(message: Pick<Message, 'kind' | 'contentMeta'>):
     return bundled;
   }
 
-  const refs = (meta as Record<string, unknown>).attachmentRefs as { files?: unknown } | undefined;
+  const refs = meta.attachmentRefs;
   if (Array.isArray(refs?.files) && refs.files.length > 0) {
     return refs.files as FileAttachmentMeta[];
   }

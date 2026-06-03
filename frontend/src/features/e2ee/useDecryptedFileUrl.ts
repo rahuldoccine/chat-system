@@ -64,15 +64,15 @@ export function useDecryptedFileUrl(
 
     let cancelled = false;
     let run = inflightDecrypt.get(key);
-    if (!run) {
-      run = decryptMessageFile(
-        user.id,
-        e2eeMessage,
-        file,
-        user.id,
-        token,
-        transportMetaRef.current,
-      );
+    run ??= decryptMessageFile(
+      user.id,
+      e2eeMessage,
+      file,
+      user.id,
+      token,
+      transportMetaRef.current,
+    );
+    if (!inflightDecrypt.has(key)) {
       inflightDecrypt.set(key, run);
       void run.finally(() => {
         inflightDecrypt.delete(key);

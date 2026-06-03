@@ -4,13 +4,12 @@ import { decryptDirectMessage, decryptDirectPayload } from './directChat';
 import { decryptMessagePayload, resolveSenderFingerprint } from './decryptMessagePayload';
 import { decryptGroupMessage } from './groupChat';
 import { fetchGroupSenderKeys } from './groupSenderKeys';
-import { isGroupE2eeMessage } from './protocol';
+import { isGroupE2eeMessage, type DmV1Payload } from './protocol';
 import {
   ensureSentPlaintextHydrated,
   getSentPlaintext,
   getSentPlaintextAsync,
 } from './sentPlaintextCache';
-import type { DmV1Payload } from './protocol';
 
 export type DecryptFailReason =
   | 'keys_locked'
@@ -24,64 +23,59 @@ export type DecryptRetryResult = {
   reason?: DecryptFailReason;
 };
 
-export async function retryDecryptMessage(
+function groupMessageEpoch(msg: Message): number {
+  return typeof msg.contentMeta?.epoch === 'number' ? msg.contentMeta.epoch : 0;
+}
+
+async function decryptGroupPayload(userId: string, msg: Message): Promise<DmV1Payload | null> {
+  const epoch = groupMessageEpoch(msg);
+  await fetchGroupSenderKeys(msg.chatId, userId);
+  return decryptGroupMessage(
+    msg.chatId,
+    msg.senderId,
+    msg.ciphertext ?? '',
+    epoch,
+    userId,
+  );
+}
+
+async function retryOwnSenderMessage(
   userId: string,
   msg: Message,
-  material: E2eeKeyMaterial | null,
+): Promise<DecryptRetryResult | null> {
+  await ensureSentPlaintextHydrated(userId);
+  const sent = getSentPlaintext(userId, msg) ?? (await getSentPlaintextAsync(userId, msg));
+  if (sent !== undefined) {
+    return { payload: { text: sent } };
+  }
+  if (!isGroupE2eeMessage(msg)) {
+    return null;
+  }
+  const groupPayload = await decryptGroupPayload(userId, msg);
+  if (groupPayload) return { payload: groupPayload };
+  return null;
+}
+
+async function retryIncomingGroupMessage(
+  userId: string,
+  msg: Message,
   fingerprintCache: Map<string, string>,
 ): Promise<DecryptRetryResult> {
-  if (!material) {
-    return { payload: null, reason: 'no_material' };
-  }
+  let groupPayload = await decryptGroupPayload(userId, msg);
+  if (groupPayload) return { payload: groupPayload };
 
-  if (msg.senderId === userId) {
-    await ensureSentPlaintextHydrated(userId);
-    const sent =
-      getSentPlaintext(userId, msg) ?? (await getSentPlaintextAsync(userId, msg));
-    if (sent !== undefined) {
-      return { payload: { text: sent } };
-    }
-    if (isGroupE2eeMessage(msg)) {
-      const meta = msg.contentMeta as Record<string, unknown> | undefined;
-      const epoch = typeof meta?.epoch === 'number' ? meta.epoch : 0;
-      await fetchGroupSenderKeys(msg.chatId, userId);
-      const groupPayload = await decryptGroupMessage(
-        msg.chatId,
-        msg.senderId,
-        msg.ciphertext ?? '',
-        epoch,
-        userId,
-      );
-      if (groupPayload) return { payload: groupPayload };
-    }
-    return { payload: null, reason: 'sent_plaintext_missing' };
-  }
+  fingerprintCache.delete(msg.senderId);
+  groupPayload = await decryptGroupPayload(userId, msg);
+  if (groupPayload) return { payload: groupPayload };
+  return { payload: null, reason: 'group_decrypt_failed' };
+}
 
-  if (isGroupE2eeMessage(msg)) {
-    const meta = msg.contentMeta as Record<string, unknown> | undefined;
-    const epoch = typeof meta?.epoch === 'number' ? meta.epoch : 0;
-    await fetchGroupSenderKeys(msg.chatId, userId);
-    let groupPayload = await decryptGroupMessage(
-      msg.chatId,
-      msg.senderId,
-      msg.ciphertext ?? '',
-      epoch,
-      userId,
-    );
-    if (groupPayload) return { payload: groupPayload };
-
-    fingerprintCache.delete(msg.senderId);
-    groupPayload = await decryptGroupMessage(
-      msg.chatId,
-      msg.senderId,
-      msg.ciphertext ?? '',
-      epoch,
-      userId,
-    );
-    if (groupPayload) return { payload: groupPayload };
-    return { payload: null, reason: 'group_decrypt_failed' };
-  }
-
+async function retryIncomingDmMessage(
+  userId: string,
+  msg: Message,
+  material: E2eeKeyMaterial,
+  fingerprintCache: Map<string, string>,
+): Promise<DecryptRetryResult> {
   fingerprintCache.delete(msg.senderId);
   await resolveSenderFingerprint(msg, fingerprintCache);
 
@@ -95,6 +89,29 @@ export async function retryDecryptMessage(
   if (plain !== null) return { payload: { text: plain } };
 
   return { payload: null, reason: 'dm_decrypt_failed' };
+}
+
+export async function retryDecryptMessage(
+  userId: string,
+  msg: Message,
+  material: E2eeKeyMaterial | null,
+  fingerprintCache: Map<string, string>,
+): Promise<DecryptRetryResult> {
+  if (!material) {
+    return { payload: null, reason: 'no_material' };
+  }
+
+  if (msg.senderId === userId) {
+    const own = await retryOwnSenderMessage(userId, msg);
+    if (own) return own;
+    return { payload: null, reason: 'sent_plaintext_missing' };
+  }
+
+  if (isGroupE2eeMessage(msg)) {
+    return retryIncomingGroupMessage(userId, msg, fingerprintCache);
+  }
+
+  return retryIncomingDmMessage(userId, msg, material, fingerprintCache);
 }
 
 export function logDecryptFailure(

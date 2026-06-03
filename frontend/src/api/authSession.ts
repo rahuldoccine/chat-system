@@ -41,11 +41,7 @@ let refreshPromise: Promise<RefreshResult> | null = null;
  * Uses a bare axios instance (no interceptors) to avoid refresh loops.
  */
 export async function refreshAccessToken(): Promise<RefreshResult> {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  refreshPromise = axios
+  refreshPromise ??= axios
     .post<{ accessToken: string; expiresIn: number }>(
       `${env.apiUrl}/auth/refresh`,
       {},

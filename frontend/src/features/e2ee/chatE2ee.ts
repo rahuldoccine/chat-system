@@ -18,7 +18,7 @@ export function buildE2eeContentMeta(
   encrypted: { contentMeta: Record<string, unknown> },
 ): Record<string, unknown> {
   return {
-    ...(base ?? {}),
+    ...base,
     ...encrypted.contentMeta,
     e2eeVersion: E2EE_VERSION,
   };

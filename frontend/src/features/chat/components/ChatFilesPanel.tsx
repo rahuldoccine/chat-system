@@ -1,18 +1,18 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { handler } from '../../../utils/asyncHandler';
 import panelStyles from './ChatPanel.module.css';
 import styles from './ChatFilesPanel.module.css';
 import { Search, Image as ImageIcon, Loader2, ExternalLink, Eye, Download } from 'lucide-react';
 import { useMessages } from '../hooks/useChatData';
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
-import type { Message } from '../types';
+import type { ContentMeta, Message } from '../types';
 import { formatChatTimestamp } from '../../../utils/timeFormat';
 import ImageViewerModal from './ImageViewerModal';
 import DocumentViewerModal from './DocumentViewerModal';
 import MediaPreviewModal from './MediaPreviewModal';
 import { truncateFilenameMiddle } from '../utils/formatFilename';
-import { getDocumentViewerKind } from '../utils/documentViewer';
-import type { DocumentViewerKind } from '../utils/documentViewer';
+import { getDocumentViewerKind, type DocumentViewerKind } from '../utils/documentViewer';
 import {
   getMessageFiles,
   getFileTypeBadge,
@@ -33,7 +33,7 @@ type MediaListItem = {
   message: Message;
   file: FileAttachmentMeta;
   category: 'image' | 'document';
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
 };
 
 function expandMessagesToMediaItems(
@@ -48,7 +48,7 @@ function expandMessagesToMediaItems(
     const files = getMessageFiles(message);
     if (!files?.length) continue;
 
-    const transportMeta = message.contentMeta as Record<string, unknown> | undefined;
+    const transportMeta = message.contentMeta;
 
     files.forEach((file, index) => {
       const key = `${message.id}-${file.uploadId ?? file.filename ?? file.originalName ?? index}`;
@@ -91,7 +91,7 @@ function fileBadgeClass(className: string): string {
 type FilesPanelImageCardProps = {
   message: Message;
   file: FileAttachmentMeta;
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
   onOpen: (src: string, alt: string) => void;
 };
 
@@ -138,7 +138,7 @@ const FilesPanelImageCard: React.FC<FilesPanelImageCardProps> = ({
 type FilesPanelDocumentRowProps = {
   message: Message;
   file: FileAttachmentMeta;
-  transportMeta?: Record<string, unknown>;
+  transportMeta?: ContentMeta;
   metaLine: string;
   onDocView: (payload: { src: string; title: string; kind: DocumentViewerKind }) => void;
   onMediaView: (payload: {
@@ -178,7 +178,7 @@ const FilesPanelDocumentRow: React.FC<FilesPanelDocumentRowProps> = ({
         const kind = isVideoFile(file) ? 'video' : 'audio';
         const durationMs =
           getVoiceDurationMs(message.contentMeta) ??
-          getVoiceDurationMs(transportMeta as Message['contentMeta']);
+          getVoiceDurationMs(transportMeta);
         onMediaView({ kind, src: url, title: name, durationMs });
         return;
       }
@@ -228,7 +228,7 @@ const FilesPanelDocumentRow: React.FC<FilesPanelDocumentRowProps> = ({
           <button
             type="button"
             className={styles.fileActionBtn}
-            onClick={() => void openFile()}
+            onClick={handler(openFile)}
             disabled={opening}
             aria-label={`View ${name}`}
             title={`View ${name}`}
@@ -239,7 +239,7 @@ const FilesPanelDocumentRow: React.FC<FilesPanelDocumentRowProps> = ({
           <button
             type="button"
             className={styles.fileActionBtn}
-            onClick={() => void openFile()}
+            onClick={handler(openFile)}
             disabled={opening}
             aria-label={`Open ${name}`}
             title={`Open ${name}`}
@@ -254,7 +254,7 @@ const FilesPanelDocumentRow: React.FC<FilesPanelDocumentRowProps> = ({
         <button
           type="button"
           className={styles.fileActionBtn}
-          onClick={() => void handleDownload()}
+          onClick={handler(handleDownload)}
           disabled={downloading}
           aria-label={`Download ${name}`}
           title={`Download ${name}`}
@@ -305,7 +305,7 @@ const ChatFilesPanel: React.FC = () => {
   }, [activeId, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const mediaItems = useMemo(() => {
-    const list = expandMessagesToMediaItems((messages ?? []) as Message[], decryptedBodies);
+    const list = expandMessagesToMediaItems(messages ?? [], decryptedBodies);
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter(({ file, message }) => {

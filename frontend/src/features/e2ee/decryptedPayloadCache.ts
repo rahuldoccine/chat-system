@@ -1,4 +1,4 @@
-import type { LinkPreviewMeta } from '../chat/types';
+import { idbKeyToString } from '../../utils/plainObject';
 import type { DecryptedBody } from './useMessageBodies';
 
 const DB_NAME = 'chat-e2ee-payload-v1';
@@ -20,10 +20,9 @@ function cacheKey(userId: string, messageId: string): string {
 }
 
 /** Cheap fingerprint — must change when envelope bytes change. */
-export function ciphertextFingerprint(ciphertext: string | null | undefined): string {
-  const ct = ciphertext ?? '';
-  if (!ct) return '0';
-  return `${ct.length}:${ct.slice(0, 48)}:${ct.slice(-16)}`;
+export function ciphertextFingerprint(ciphertext: string | null | undefined = ''): string {
+  if (!ciphertext) return '0';
+  return `${ciphertext.length}:${ciphertext.slice(0, 48)}:${ciphertext.slice(-16)}`;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -44,9 +43,8 @@ export function getPayloadFromMemory(
   ctFingerprint: string,
 ): DecryptedBody | null {
   const hit = memory.get(cacheKey(userId, messageId));
-  if (!hit || hit.ctFingerprint !== ctFingerprint) return null;
-  const { ctFingerprint: _fp, ...body } = hit;
-  return body;
+  if (hit?.ctFingerprint !== ctFingerprint) return null;
+  return { text: hit.text, meta: hit.meta };
 }
 
 export function setPayloadMemory(
@@ -77,6 +75,28 @@ async function idbPut(
   }
 }
 
+async function idbForEachEntry(
+  mode: IDBTransactionMode,
+  onEntry: (key: string, value: unknown) => void | 'delete',
+): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, mode);
+    const req = tx.objectStore(STORE).openCursor();
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) return;
+      const key = idbKeyToString(cursor.key);
+      const action = onEntry(key, cursor.value);
+      if (action === 'delete') cursor.delete();
+      cursor.continue();
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
 async function idbGet(userId: string, messageId: string): Promise<CachedPayloadEntry | null> {
   try {
     const db = await openDb();
@@ -102,10 +122,10 @@ export async function getPayloadCached(
   if (mem) return mem;
 
   const fromIdb = await idbGet(userId, messageId);
-  if (!fromIdb || fromIdb.ctFingerprint !== ctFingerprint) return null;
+  if (fromIdb?.ctFingerprint !== ctFingerprint) return null;
 
-  const { ctFingerprint: _fp, ...body } = fromIdb;
-  setPayloadMemory(userId, messageId, ctFingerprint, body);
+  const { ctFingerprint: storedFingerprint, ...body } = fromIdb;
+  setPayloadMemory(userId, messageId, storedFingerprint, body);
   return body;
 }
 
@@ -123,36 +143,22 @@ export async function rememberPayload(
 
 export function ensureDecryptedPayloadHydrated(userId: string): Promise<void> {
   if (hydratedUserId === userId) return Promise.resolve();
-  if (hydratePromise) return hydratePromise;
 
-  hydratePromise = (async () => {
+  hydratePromise ??= (async () => {
     const prefix = `${userId}:m:`;
     try {
-      const db = await openDb();
       const keys: string[] = [];
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readonly');
-        const req = tx.objectStore(STORE).openCursor();
-        req.onsuccess = () => {
-          const cursor = req.result;
-          if (!cursor) return;
-          const key = String(cursor.key);
-          if (key.startsWith(prefix)) {
-            memory.set(key, cursor.value as CachedPayloadEntry);
-            keys.push(key);
-          }
-          cursor.continue();
-        };
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+      await idbForEachEntry('readonly', (key, value) => {
+        if (!key.startsWith(prefix)) return;
+        memory.set(key, value as CachedPayloadEntry);
+        keys.push(key);
       });
       if (keys.length > MAX_ENTRIES) {
-        keys.sort();
-        for (const key of keys.slice(0, keys.length - MAX_ENTRIES)) {
+        const sortedKeys = keys.toSorted((a, b) => a.localeCompare(b));
+        for (const key of sortedKeys.slice(0, sortedKeys.length - MAX_ENTRIES)) {
           memory.delete(key);
         }
       }
-      db.close();
     } catch {
       /* ignore */
     }
@@ -165,26 +171,15 @@ export function ensureDecryptedPayloadHydrated(userId: string): Promise<void> {
 
 export async function clearDecryptedPayloadForUser(userId: string): Promise<void> {
   const prefix = `${userId}:m:`;
-  for (const key of [...memory.keys()]) {
+  for (const key of memory.keys()) {
     if (key.startsWith(prefix)) memory.delete(key);
   }
   hydratedUserId = null;
   hydratePromise = null;
   try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const req = tx.objectStore(STORE).openCursor();
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor) return;
-        if (String(cursor.key).startsWith(prefix)) cursor.delete();
-        cursor.continue();
-      };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+    await idbForEachEntry('readwrite', (key) => {
+      if (key.startsWith(prefix)) return 'delete';
     });
-    db.close();
   } catch {
     /* ignore */
   }

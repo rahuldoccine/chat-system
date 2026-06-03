@@ -2,8 +2,13 @@ import type { CallKind, CallLog, CallStatus, Prisma } from "@prisma/client";
 
 import { AppError } from "../../errors/index.js";
 import { expandAvatarUrl } from "../avatar-urls.js";
+import { isPlainObject } from "../plain-object.js";
 import { getPrisma } from "../prisma.js";
 import { getCallDirection } from "./call-helpers.js";
+
+function callMetaRecord(metadata: Prisma.JsonValue | null): Record<string, unknown> {
+  return isPlainObject(metadata) ? metadata : {};
+}
 
 export type CallMeta = {
   callId: string;
@@ -46,7 +51,7 @@ export async function setCallStatus(
   const prisma = getPrisma();
   const row = await prisma.callLog.findUnique({ where: { id: callId } });
   if (!row) throw new AppError(404, "NOT_FOUND", "Call not found");
-  const prevMeta = (row.metadata ?? {}) as unknown as Record<string, unknown>;
+  const prevMeta = callMetaRecord(row.metadata);
   return prisma.callLog.update({
     where: { id: callId },
     data: {
@@ -91,7 +96,7 @@ export async function patchCallTranscript(
   if (row.initiatorId !== userId && row.peerId !== userId) {
     throw new AppError(403, "FORBIDDEN", "Not in call");
   }
-  const prevMeta = (row.metadata ?? {}) as unknown as Record<string, unknown>;
+  const prevMeta = callMetaRecord(row.metadata);
   const updated = await prisma.callLog.update({
     where: { id: callId },
     data: {

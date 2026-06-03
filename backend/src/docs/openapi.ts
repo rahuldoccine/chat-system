@@ -1,4 +1,21 @@
 import type { AppConfig } from "../config/index.js";
+import {
+  authTokensResponse,
+  bearerAuthSecurity,
+  bearerJsonResponses,
+  chatIdPathParameter,
+  createdOrExistingResponses,
+  cursorListResponse,
+  deviceTokenListJsonResponse,
+  e2eeOp,
+  emailPasswordRequestSchema,
+  jsonRequestBody,
+  refreshTokenOptionalBody,
+  stringPathParameter,
+  unauthorizedResponse,
+  uuidPathParameter,
+  withUnauthorized,
+} from "./openapi.helpers.js";
 
 /** OpenAPI 3.0 document for Swagger UI and `/api/v1/openapi.json`. */
 export function buildOpenApiDocument(config: AppConfig): Record<string, unknown> {
@@ -140,26 +157,15 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         post: {
           tags: ["Auth"],
           summary: "Register",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["email", "password"],
-                  properties: {
-                    email: { type: "string", format: "email" },
-                    password: { type: "string", minLength: 12, maxLength: 128 },
-                  },
-                },
-              },
+          requestBody: jsonRequestBody({
+            ...emailPasswordRequestSchema,
+            properties: {
+              ...emailPasswordRequestSchema.properties,
+              password: { type: "string", minLength: 12, maxLength: 128 },
             },
-          },
+          }),
           responses: {
-            "201": {
-              description: "Created",
-              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthTokens" } } },
-            },
+            ...authTokensResponse("201", "Created"),
             "400": { description: "Validation error" },
             "409": { description: "Email already registered" },
             "429": { description: "Rate limited" },
@@ -170,26 +176,9 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         post: {
           tags: ["Auth"],
           summary: "Login",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["email", "password"],
-                  properties: {
-                    email: { type: "string", format: "email" },
-                    password: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
+          requestBody: jsonRequestBody(emailPasswordRequestSchema),
           responses: {
-            "200": {
-              description: "OK",
-              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthTokens" } } },
-            },
+            ...authTokensResponse("200", "OK"),
             "401": { description: "Invalid credentials" },
             "429": { description: "Rate limited" },
           },
@@ -200,18 +189,7 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
           tags: ["Auth"],
           summary: "Refresh tokens (rotation)",
           security: [{ refreshCookie: [] }, {}],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    refreshToken: { type: "string", description: "Required if refresh cookie not sent." },
-                  },
-                },
-              },
-            },
-          },
+          requestBody: refreshTokenOptionalBody,
           responses: {
             "200": {
               description: "New pair",
@@ -227,16 +205,7 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
           tags: ["Auth"],
           summary: "Logout current session",
           security: [{ refreshCookie: [] }, {}],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: { refreshToken: { type: "string" } },
-                },
-              },
-            },
-          },
+          requestBody: refreshTokenOptionalBody,
           responses: {
             "204": { description: "Cookie cleared; session removed when refresh was provided" },
           },
@@ -246,10 +215,10 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         post: {
           tags: ["Auth"],
           summary: "Logout all devices",
-          security: [{ bearerAuth: [] }],
+          security: bearerAuthSecurity,
           responses: {
             "204": { description: "All refresh sessions revoked" },
-            "401": { description: "Missing or invalid access token" },
+            ...unauthorizedResponse,
           },
         },
       },
@@ -257,13 +226,13 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         get: {
           tags: ["Auth"],
           summary: "Current user from access JWT",
-          security: [{ bearerAuth: [] }],
+          security: bearerAuthSecurity,
           responses: {
             "200": {
               description: "OK",
               content: { "application/json": { schema: { $ref: "#/components/schemas/MeResponse" } } },
             },
-            "401": { description: "Unauthorized" },
+            ...unauthorizedResponse,
           },
         },
       },
@@ -271,18 +240,11 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         post: {
           tags: ["Auth"],
           summary: "Request password reset email",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["email"],
-                  properties: { email: { type: "string", format: "email" } },
-                },
-              },
-            },
-          },
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["email"],
+            properties: { email: { type: "string", format: "email" } },
+          }),
           responses: {
             "200": {
               description: "Generic response (no user enumeration)",
@@ -306,21 +268,14 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         post: {
           tags: ["Auth"],
           summary: "Reset password with email token",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["token", "newPassword"],
-                  properties: {
-                    token: { type: "string", description: "From email query `token`" },
-                    newPassword: { type: "string", minLength: 12, maxLength: 128 },
-                  },
-                },
-              },
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["token", "newPassword"],
+            properties: {
+              token: { type: "string", description: "From email query `token`" },
+              newPassword: { type: "string", minLength: 12, maxLength: 128 },
             },
-          },
+          }),
           responses: {
             "204": { description: "Password updated; all refresh sessions cleared" },
             "400": { description: "Invalid or expired token" },
@@ -332,60 +287,60 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         get: {
           tags: ["Users"],
           summary: "Current user profile",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "User object" }, "401": { description: "Unauthorized" } },
+          security: bearerAuthSecurity,
+          responses: bearerJsonResponses("User object"),
         },
         patch: {
           tags: ["Users"],
           summary: "Update current user",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Updated user" }, "401": { description: "Unauthorized" } },
+          security: bearerAuthSecurity,
+          responses: bearerJsonResponses("Updated user"),
         },
       },
       "/chats": {
         get: {
           tags: ["Chats"],
           summary: "List chats (cursor pagination)",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "data + nextCursor" } },
+          security: bearerAuthSecurity,
+          responses: cursorListResponse,
         },
         post: {
           tags: ["Chats"],
           summary: "Create DIRECT or GROUP chat",
-          security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Chat created" }, "200": { description: "Existing DM" } },
+          security: bearerAuthSecurity,
+          responses: createdOrExistingResponses,
         },
       },
       "/chats/{chatId}/messages": {
         get: {
           tags: ["Chats"],
           summary: "Message history (cursor)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "chatId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "200": { description: "data + nextCursor" } },
+          security: bearerAuthSecurity,
+          parameters: chatIdPathParameter,
+          responses: cursorListResponse,
         },
         post: {
           tags: ["Chats"],
           summary: "Send message (clientMessageId idempotent)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "chatId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "201": { description: "Created" }, "200": { description: "Idempotent replay" } },
+          security: bearerAuthSecurity,
+          parameters: chatIdPathParameter,
+          responses: createdOrExistingResponses,
         },
       },
       "/friends/request": {
         post: {
           tags: ["Friends"],
           summary: "Send friend request",
-          security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Created" }, "200": { description: "Already pending or accepted" } },
+          security: bearerAuthSecurity,
+          responses: createdOrExistingResponses,
         },
       },
       "/files/{key}": {
         get: {
           tags: ["Files"],
           summary: "Download own upload by storage key",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "key", in: "path", required: true, schema: { type: "string" } }],
+          security: bearerAuthSecurity,
+          parameters: stringPathParameter("key"),
           responses: { "200": { description: "Binary stream" }, "404": { description: "Not found" } },
         },
       },
@@ -393,7 +348,7 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         post: {
           tags: ["Uploads"],
           summary: "Upload a file (field name: file)",
-          security: [{ bearerAuth: [] }],
+          security: bearerAuthSecurity,
           requestBody: {
             required: true,
             content: {
@@ -441,7 +396,7 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
               },
             },
             "400": { description: "No file or validation error" },
-            "401": { description: "Unauthorized" },
+            ...unauthorizedResponse,
             "413": { description: "File too large" },
             "415": { description: "MIME not allowed or content mismatch" },
           },
@@ -451,258 +406,178 @@ export function buildOpenApiDocument(config: AppConfig): Record<string, unknown>
         get: {
           tags: ["Devices"],
           summary: "List active device tokens (metadata only)",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            "200": {
-              description: "OK",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string", format: "uuid" },
-                        platform: { type: "string", enum: ["IOS", "ANDROID", "WEB", "UNKNOWN"] },
-                        createdAt: { type: "string", format: "date-time" },
-                        lastUsedAt: { type: "string", format: "date-time", nullable: true },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            "401": { description: "Unauthorized" },
-          },
+          security: bearerAuthSecurity,
+          responses: { ...deviceTokenListJsonResponse, ...unauthorizedResponse },
         },
         post: {
           tags: ["Devices"],
           summary: "Register or refresh a device push token",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["token", "platform"],
-                  properties: {
-                    token: { type: "string", minLength: 1 },
-                    platform: { type: "string", enum: ["IOS", "ANDROID", "WEB", "UNKNOWN"] },
-                  },
-                },
-              },
+          security: bearerAuthSecurity,
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["token", "platform"],
+            properties: {
+              token: { type: "string", minLength: 1 },
+              platform: { type: "string", enum: ["IOS", "ANDROID", "WEB", "UNKNOWN"] },
             },
-          },
-          responses: {
+          }),
+          responses: withUnauthorized({
             "200": { description: "Upserted" },
             "400": { description: "Validation error" },
-            "401": { description: "Unauthorized" },
-          },
+          }),
         },
       },
       "/devices/tokens/revoke": {
         post: {
           tags: ["Devices"],
           summary: "Revoke a device token",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["token"],
-                  properties: {
-                    token: { type: "string", minLength: 1 },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
+          security: bearerAuthSecurity,
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["token"],
+            properties: { token: { type: "string", minLength: 1 } },
+          }),
+          responses: withUnauthorized({
             "200": { description: "Revoked" },
             "404": { description: "Token not found for this user" },
-            "401": { description: "Unauthorized" },
-          },
+          }),
         },
       },
       "/e2ee/identity": {
-        put: {
-          tags: ["E2EE"],
-          summary: "Upsert your public identity key (E2EE)",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["publicKey", "fingerprint"],
-                  properties: {
-                    publicKey: { type: "string" },
-                    fingerprint: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Upserted" }, "401": { description: "Unauthorized" } },
-        },
+        put: e2eeOp("Upsert your public identity key (E2EE)", {
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["publicKey", "fingerprint"],
+            properties: { publicKey: { type: "string" }, fingerprint: { type: "string" } },
+          }),
+          responses: withUnauthorized({ "200": { description: "Upserted" } }),
+        }),
       },
       "/e2ee/identity/{userId}": {
-        get: {
-          tags: ["E2EE"],
-          summary: "Fetch a user's public identity key (E2EE)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" }, "404": { description: "Not found" } },
-        },
+        get: e2eeOp("Fetch a user's public identity key (E2EE)", {
+          parameters: uuidPathParameter("userId"),
+          responses: withUnauthorized({
+            "200": { description: "OK" },
+            "404": { description: "Not found" },
+          }),
+        }),
       },
       "/e2ee/devices/{deviceId}": {
-        put: {
-          tags: ["E2EE"],
-          summary: "Upsert your device public key (E2EE)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "deviceId", in: "path", required: true, schema: { type: "string" } }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["publicKey"],
-                  properties: { publicKey: { type: "string" }, label: { type: "string" } },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Upserted" }, "401": { description: "Unauthorized" } },
-        },
+        put: e2eeOp("Upsert your device public key (E2EE)", {
+          parameters: stringPathParameter("deviceId"),
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["publicKey"],
+            properties: { publicKey: { type: "string" }, label: { type: "string" } },
+          }),
+          responses: withUnauthorized({ "200": { description: "Upserted" } }),
+        }),
       },
       "/e2ee/devices/{userId}": {
-        get: {
-          tags: ["E2EE"],
-          summary: "List a user's active devices (E2EE)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" } },
-        },
+        get: e2eeOp("List a user's active devices (E2EE)", {
+          parameters: uuidPathParameter("userId"),
+          responses: bearerJsonResponses("OK"),
+        }),
       },
       "/e2ee/prekeys/{deviceId}": {
-        post: {
-          tags: ["E2EE"],
-          summary: "Publish signed + one-time prekeys for your device (E2EE)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ name: "deviceId", in: "path", required: true, schema: { type: "string" } }],
-          responses: { "201": { description: "Created" }, "401": { description: "Unauthorized" } },
-        },
+        post: e2eeOp("Publish signed + one-time prekeys for your device (E2EE)", {
+          parameters: stringPathParameter("deviceId"),
+          responses: withUnauthorized({ "201": { description: "Created" } }),
+        }),
       },
       "/e2ee/prekeys/{userId}/{deviceId}": {
-        get: {
-          tags: ["E2EE"],
-          summary: "Fetch a prekey bundle (consumes one-time key if available)",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { name: "userId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-            { name: "deviceId", in: "path", required: true, schema: { type: "string" } },
-          ],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" }, "404": { description: "Not found" } },
-        },
+        get: e2eeOp("Fetch a prekey bundle (consumes one-time key if available)", {
+          parameters: [...uuidPathParameter("userId"), ...stringPathParameter("deviceId")],
+          responses: withUnauthorized({
+            "200": { description: "OK" },
+            "404": { description: "Not found" },
+          }),
+        }),
       },
       "/e2ee/backup": {
-        put: {
-          tags: ["E2EE"],
-          summary: "Upsert wrapped key backup (server-blind)",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Upserted" }, "401": { description: "Unauthorized" } },
-        },
-        get: {
-          tags: ["E2EE"],
-          summary: "Get wrapped key backup (requires step-up token)",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" }, "403": { description: "Step-up required" } },
-        },
+        put: e2eeOp("Upsert wrapped key backup (server-blind)", {
+          responses: withUnauthorized({ "200": { description: "Upserted" } }),
+        }),
+        get: e2eeOp("Get wrapped key backup (requires step-up token)", {
+          responses: withUnauthorized({
+            "200": { description: "OK" },
+            "403": { description: "Step-up required" },
+          }),
+        }),
       },
       "/e2ee/recovery/challenge/email": {
-        post: {
-          tags: ["E2EE"],
-          summary: "Send email verification code for recovery (step-up)",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Sent" }, "401": { description: "Unauthorized" }, "403": { description: "Email not verified" } },
-        },
+        post: e2eeOp("Send email verification code for recovery (step-up)", {
+          responses: withUnauthorized({
+            "200": { description: "Sent" },
+            "403": { description: "Email not verified" },
+          }),
+        }),
       },
       "/e2ee/recovery/verify/email": {
-        post: {
-          tags: ["E2EE"],
-          summary: "Verify email code and obtain step-up token",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" }, "400": { description: "Invalid code" } },
-        },
+        post: e2eeOp("Verify email code and obtain step-up token", {
+          responses: withUnauthorized({
+            "200": { description: "OK" },
+            "400": { description: "Invalid code" },
+          }),
+        }),
       },
       "/calls/history": {
         get: {
           tags: ["Calls"],
           summary: "List recent call history for current user",
-          security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" } },
+          security: bearerAuthSecurity,
+          responses: bearerJsonResponses("OK"),
         },
       },
       "/moderation/blocks": {
         post: {
           tags: ["Moderation"],
           summary: "Block a user",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["blockedUserId"],
-                  properties: { blockedUserId: { type: "string", format: "uuid" } },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" }, "429": { description: "Rate limited" } },
+          security: bearerAuthSecurity,
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["blockedUserId"],
+            properties: { blockedUserId: { type: "string", format: "uuid" } },
+          }),
+          responses: withUnauthorized({
+            "200": { description: "OK" },
+            "429": { description: "Rate limited" },
+          }),
         },
       },
       "/moderation/blocks/{blockedUserId}": {
         delete: {
           tags: ["Moderation"],
           summary: "Unblock a user",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { name: "blockedUserId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          ],
-          responses: { "200": { description: "OK" }, "401": { description: "Unauthorized" }, "429": { description: "Rate limited" } },
+          security: bearerAuthSecurity,
+          parameters: uuidPathParameter("blockedUserId"),
+          responses: withUnauthorized({
+            "200": { description: "OK" },
+            "429": { description: "Rate limited" },
+          }),
         },
       },
       "/moderation/reports": {
         post: {
           tags: ["Moderation"],
           summary: "Create a report (user/message/chat)",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["reason"],
-                  properties: {
-                    targetUserId: { type: "string", format: "uuid", nullable: true },
-                    targetMessageId: { type: "string", format: "uuid", nullable: true },
-                    chatId: { type: "string", format: "uuid", nullable: true },
-                    reason: { type: "string" },
-                    details: { type: "string", nullable: true },
-                  },
-                },
-              },
+          security: bearerAuthSecurity,
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["reason"],
+            properties: {
+              targetUserId: { type: "string", format: "uuid", nullable: true },
+              targetMessageId: { type: "string", format: "uuid", nullable: true },
+              chatId: { type: "string", format: "uuid", nullable: true },
+              reason: { type: "string" },
+              details: { type: "string", nullable: true },
             },
-          },
-          responses: { "201": { description: "Created" }, "401": { description: "Unauthorized" }, "403": { description: "Not member" }, "429": { description: "Rate limited" } },
+          }),
+          responses: withUnauthorized({
+            "201": { description: "Created" },
+            "403": { description: "Not member" },
+            "429": { description: "Rate limited" },
+          }),
         },
       },
     },

@@ -1,7 +1,7 @@
-import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { getPrisma } from "../prisma.js";
 import { publicMessage } from "../../modules/chats/chats.service.js";
+import { createSystemMessageWithReceipts } from "../system-message-persist.js";
 import { notifyNewMessage } from "../notification-router.js";
 import { getSocketIo } from "../../sockets/socket-holder.js";
 import { emitMessageNewToMembers } from "../../sockets/message-broadcast.js";
@@ -28,31 +28,6 @@ export type GroupActivityMeta = {
   newRole?: string;
   title?: string;
 };
-
-const messageWithSenderInclude = {
-  sender: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      username: true,
-      avatarUrl: true,
-    },
-  },
-  replyTo: {
-    include: {
-      sender: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          username: true,
-          avatarUrl: true,
-        },
-      },
-    },
-  },
-} as const;
 
 function formatActivityText(meta: GroupActivityMeta): string {
   const actor = meta.actorName ?? "Someone";
@@ -89,40 +64,18 @@ export async function publishGroupActivityMessage(input: {
   meta: GroupActivityMeta;
   clientMessageId?: string;
 }): Promise<ReturnType<typeof publicMessage> | null> {
-  const prisma = getPrisma();
   const ciphertext = formatActivityText(input.meta);
   const contentMeta = { groupActivity: input.meta };
   const clientMessageId =
     input.clientMessageId ??
     `grp-${input.meta.type}-${Date.now()}-${randomUUID()}`;
 
-  const members = await prisma.chatMember.findMany({
-    where: { chatId: input.chatId, leftAt: null },
-  });
-
-  const message = await prisma.$transaction(async (tx) => {
-    const msg = await tx.message.create({
-      data: {
-        chatId: input.chatId,
-        senderId: input.senderId,
-        clientMessageId,
-        kind: "SYSTEM",
-        ciphertext,
-        contentMeta: contentMeta as Prisma.InputJsonValue,
-      },
-      include: messageWithSenderInclude,
-    });
-    const receipts = members
-      .filter((m) => m.userId !== input.senderId)
-      .map((m) => ({ messageId: msg.id, userId: m.userId }));
-    if (receipts.length) {
-      await tx.receipt.createMany({ data: receipts });
-    }
-    await tx.chat.update({
-      where: { id: input.chatId },
-      data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
-    });
-    return msg;
+  const message = await createSystemMessageWithReceipts({
+    chatId: input.chatId,
+    senderId: input.senderId,
+    clientMessageId,
+    ciphertext,
+    contentMeta,
   });
 
   const published = publicMessage(message, [], "sent", null);

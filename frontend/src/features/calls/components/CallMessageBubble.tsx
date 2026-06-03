@@ -1,15 +1,21 @@
 import React from 'react';
-import { Phone, PhoneIncoming, PhoneMissed, Video } from 'lucide-react';
+import { Phone, PhoneIncoming, PhoneMissed, Video, type LucideIcon } from 'lucide-react';
 import type { CallContentMeta } from '../types';
 import styles from './CallMessageBubble.module.css';
 
-type CallMessageBubbleProps = {
+type CallMessageBubbleProps = Readonly<{
   call: CallContentMeta;
   ciphertext: string | null;
   isMe: boolean;
   myUserId: string;
   onRedial?: () => void;
-};
+}>;
+
+function callMessageIcon(missed: boolean, isVideo: boolean, outgoing: boolean): LucideIcon {
+  if (missed) return PhoneMissed;
+  if (isVideo) return Video;
+  return outgoing ? Phone : PhoneIncoming;
+}
 
 const CallMessageBubble: React.FC<CallMessageBubbleProps> = ({
   call,
@@ -21,7 +27,7 @@ const CallMessageBubble: React.FC<CallMessageBubbleProps> = ({
   const outgoing = call.initiatorId === myUserId;
   const missed = call.status === 'missed';
   const isVideo = call.kind === 'VIDEO';
-  const Icon = missed ? PhoneMissed : isVideo ? Video : outgoing ? Phone : PhoneIncoming;
+  const Icon = callMessageIcon(missed, isVideo, outgoing);
   const canRedial =
     call.status === 'completed' || call.status === 'cancelled' || call.status === 'missed';
 

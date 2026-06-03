@@ -7,8 +7,6 @@ const envSchema = z
     HOST: z.string().default("0.0.0.0"),
     DATABASE_URL: z.string().url(),
     JWT_ACCESS_SECRET: z.string().min(16).optional(),
-    /** @deprecated Use JWT_ACCESS_SECRET */
-    JWT_SECRET: z.string().min(16).optional(),
     JWT_REFRESH_SECRET: z.string().min(16, "JWT_REFRESH_SECRET must be at least 16 characters"),
     JWT_EXPIRES_IN: z.string().default("1h"),
     REFRESH_TOKEN_EXPIRES_DAYS: z.coerce.number().int().positive().default(30),
@@ -92,22 +90,6 @@ const envSchema = z
       .string()
       .optional()
       .transform((s) => s !== "false" && s !== "0"),
-  })
-  .superRefine((val, ctx) => {
-    if (!val.JWT_ACCESS_SECRET && !val.JWT_SECRET) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Set JWT_ACCESS_SECRET or JWT_SECRET (min 16 characters)",
-        path: ["JWT_ACCESS_SECRET"],
-      });
-    }
-    if (val.SMTP_HOST && !val.SMTP_FROM) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "SMTP_FROM is required when SMTP_HOST is set",
-        path: ["SMTP_FROM"],
-      });
-    }
   });
 
 export type EnvSchemaIn = z.infer<typeof envSchema>;
@@ -116,14 +98,39 @@ export type EnvSchema = EnvSchemaIn & {
   jwtAccessSecret: string;
 };
 
+/** Legacy env key; read from process.env instead of the parsed schema object. */
+function readLegacyJwtSecretFromEnv(raw: NodeJS.ProcessEnv): string | undefined {
+  const v = raw.JWT_SECRET;
+  if (typeof v !== "string" || v.length < 16) return undefined;
+  return v;
+}
+
 export function parseEnv(raw: NodeJS.ProcessEnv): EnvSchema {
-  const parsed = envSchema.safeParse(raw);
+  const legacyJwt = readLegacyJwtSecretFromEnv(raw);
+  const parsed = envSchema
+    .superRefine((val, ctx) => {
+      if (!val.JWT_ACCESS_SECRET && !legacyJwt) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Set JWT_ACCESS_SECRET or JWT_SECRET (min 16 characters)",
+          path: ["JWT_ACCESS_SECRET"],
+        });
+      }
+      if (val.SMTP_HOST && !val.SMTP_FROM) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SMTP_FROM is required when SMTP_HOST is set",
+          path: ["SMTP_FROM"],
+        });
+      }
+    })
+    .safeParse(raw);
   if (!parsed.success) {
     const msg = parsed.error.flatten().fieldErrors;
     throw new Error(`Invalid environment: ${JSON.stringify(msg)}`);
   }
   const data = parsed.data;
-  const jwtAccessSecret = data.JWT_ACCESS_SECRET ?? data.JWT_SECRET;
+  const jwtAccessSecret = data.JWT_ACCESS_SECRET ?? legacyJwt;
   if (!jwtAccessSecret) {
     throw new Error("Invalid environment: JWT_ACCESS_SECRET or JWT_SECRET is required");
   }

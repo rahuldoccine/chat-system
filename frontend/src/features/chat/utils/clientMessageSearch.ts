@@ -25,6 +25,32 @@ export function buildSearchSnippet(text: string, q: string, maxLen = 120): strin
   return snippet;
 }
 
+function collectFileSearchParts(displayMsg: Message): string[] {
+  const files = getMessageFiles(displayMsg);
+  if (!files?.length) return [];
+  const parts: string[] = [];
+  for (const f of files) {
+    if (f.originalName) parts.push(f.originalName);
+    if (f.filename) parts.push(f.filename);
+  }
+  return parts;
+}
+
+function collectPollSearchParts(
+  msg: Message,
+  bodies: Record<string, DecryptedBody>,
+  userId: string,
+): string[] {
+  const poll = getDecryptedPollMeta(msg, bodies, userId);
+  if (!poll) return [];
+  const parts: string[] = [];
+  if (poll.question) parts.push(poll.question);
+  for (const opt of poll.options ?? []) {
+    if (opt.label) parts.push(opt.label);
+  }
+  return parts;
+}
+
 /** Plaintext and labels to match against for in-chat search (E2EE client-side). */
 export function getSearchableMessageText(
   msg: Message,
@@ -41,19 +67,7 @@ export function getSearchableMessageText(
   const preview = getMessagePreviewText(msg, bodies, userId);
   if (preview && preview !== 'Decrypting…') parts.push(preview);
 
-  const files = getMessageFiles(displayMsg);
-  if (files?.length) {
-    for (const f of files) {
-      if (f.originalName) parts.push(f.originalName);
-      if (f.filename) parts.push(f.filename);
-    }
-  }
-
-  const poll = getDecryptedPollMeta(msg, bodies, userId);
-  if (poll?.question) parts.push(poll.question);
-  for (const opt of poll?.options ?? []) {
-    if (opt.label) parts.push(opt.label);
-  }
+  parts.push(...collectFileSearchParts(displayMsg), ...collectPollSearchParts(msg, bodies, userId));
 
   return parts.join(' ').trim();
 }
@@ -81,7 +95,7 @@ export function searchMessagesLocally(
   for (const msg of messages) {
     if (msg.deletedAt || msg.kind === 'SYSTEM') continue;
     const searchable = getSearchableMessageText(msg, bodies, userId);
-    if (!searchable || !searchable.toLowerCase().includes(needle)) continue;
+    if (!searchable?.toLowerCase().includes(needle)) continue;
 
     hits.push({
       messageId: msg.id,
@@ -97,7 +111,8 @@ export function searchMessagesLocally(
     });
   }
 
-  return hits
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, limit);
+  const sorted = hits.toSorted(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  return sorted.slice(0, limit);
 }

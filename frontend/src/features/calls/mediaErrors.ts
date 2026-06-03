@@ -70,15 +70,15 @@ export async function acquireUserMedia(wantsVideo: boolean): Promise<AcquireMedi
       video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
     });
     return { stream, videoFallback: false };
-  } catch (first) {
+  } catch (error_) {
     const notFound =
-      first instanceof DOMException &&
-      (first.name === 'NotFoundError' || first.name === 'DevicesNotFoundError');
+      error_ instanceof DOMException &&
+      (error_.name === 'NotFoundError' || error_.name === 'DevicesNotFoundError');
     const overconstrained =
-      first instanceof DOMException &&
-      (first.name === 'OverconstrainedError' || first.name === 'ConstraintNotSatisfiedError');
+      error_ instanceof DOMException &&
+      (error_.name === 'OverconstrainedError' || error_.name === 'ConstraintNotSatisfiedError');
 
-    if (!notFound && !overconstrained) throw first;
+    if (!notFound && !overconstrained) throw error_;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -86,8 +86,8 @@ export async function acquireUserMedia(wantsVideo: boolean): Promise<AcquireMedi
         video: false,
       });
       return { stream, videoFallback: true };
-    } catch (second) {
-      throw first;
+    } catch {
+      throw error_;
     }
   }
 }

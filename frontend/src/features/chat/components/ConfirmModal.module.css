@@ -34,7 +34,7 @@
   margin: 0 0 1.25rem;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: #64748b;
+  color: #5c6b7a;
 }
 
 .actions {
@@ -70,7 +70,7 @@
 
 .confirmBtn {
   background: var(--primary, #6366f1);
-  color: white;
+  color: var(--primary-foreground);
 }
 
 .confirmBtn:hover:not(:disabled) {
@@ -78,8 +78,8 @@
 }
 
 .dangerBtn {
-  background: #dc2626;
-  color: white;
+  background: var(--destructive-btn-bg);
+  color: var(--primary-foreground);
 }
 
 .dangerBtn:hover:not(:disabled) {

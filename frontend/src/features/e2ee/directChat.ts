@@ -8,7 +8,12 @@ import {
   exportPublicKeySpki,
   generateEcdhKeyPair,
 } from './crypto';
-import * as e2eeApi from './e2eeApi';
+import {
+  fetchPreKeyBundle,
+  getIdentityKey,
+  listPeerDevices,
+  type PreKeyBundle,
+} from './e2eeApi';
 import {
   decodeEnvelope,
   decodePayload,
@@ -23,7 +28,6 @@ import { getSignedPreKeyPrivate } from './keyStore';
 import { getLocalKeyMaterial } from './keyAccess';
 import { orderedPeerDeviceIds, rememberPeerDevice } from './peerDevice';
 import { cachePeerPreKeyBundle, getCachedPeerPreKeyBundle } from './peerBundleCache';
-import type { PreKeyBundle } from './e2eeApi';
 import {
   getSentPlaintext,
   rememberSentPlaintext,
@@ -42,7 +46,7 @@ const identityFingerprintCache = new Map<string, string>();
 async function getSenderFingerprint(senderUserId: string): Promise<string> {
   const cached = identityFingerprintCache.get(senderUserId);
   if (cached) return cached;
-  const row = await e2eeApi.getIdentityKey(senderUserId);
+  const row = await getIdentityKey(senderUserId);
   identityFingerprintCache.set(senderUserId, row.fingerprint);
   return row.fingerprint;
 }
@@ -51,33 +55,34 @@ function hkdfSalt(identityFingerprint: string, spkId: string): string {
   return `${identityFingerprint}:${spkId}`;
 }
 
-async function fetchPeerPreKeyBundle(
+function fetchOfflinePeerPreKeyBundle(
+  peerUserId: string,
+  preferDeviceId: string | null = null,
+): { deviceId: string; bundle: PreKeyBundle } {
+  if (preferDeviceId) {
+    const cached = getCachedPeerPreKeyBundle(peerUserId, preferDeviceId);
+    if (cached) return { deviceId: preferDeviceId, bundle: cached };
+  }
+  if (globalThis.sessionStorage !== undefined) {
+    const prefix = `e2ee-peer-bundle:${peerUserId}:`;
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith(prefix)) continue;
+      const deviceId = key.slice(prefix.length);
+      const cached = getCachedPeerPreKeyBundle(peerUserId, deviceId);
+      if (cached) return { deviceId, bundle: cached };
+    }
+  }
+  throw new E2eePeerNotReadyError(
+    'Connect once while online to set up encrypted messaging with this contact, then you can send offline.',
+  );
+}
+
+async function fetchOnlinePeerPreKeyBundle(
   peerUserId: string,
   preferDeviceId?: string | null,
-  offline = false,
 ): Promise<{ deviceId: string; bundle: PreKeyBundle }> {
-  if (offline) {
-    const remembered = preferDeviceId ?? null;
-    if (remembered) {
-      const cached = getCachedPeerPreKeyBundle(peerUserId, remembered);
-      if (cached) return { deviceId: remembered, bundle: cached };
-    }
-    if (typeof sessionStorage !== 'undefined') {
-      const prefix = `e2ee-peer-bundle:${peerUserId}:`;
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (!key?.startsWith(prefix)) continue;
-        const deviceId = key.slice(prefix.length);
-        const cached = getCachedPeerPreKeyBundle(peerUserId, deviceId);
-        if (cached) return { deviceId, bundle: cached };
-      }
-    }
-    throw new E2eePeerNotReadyError(
-      'Connect once while online to set up encrypted messaging with this contact, then you can send offline.',
-    );
-  }
-
-  const devices = await e2eeApi.listPeerDevices(peerUserId);
+  const devices = await listPeerDevices(peerUserId);
   const deviceIds = orderedPeerDeviceIds(peerUserId, devices, preferDeviceId);
   if (!deviceIds.length) {
     throw new E2eePeerNotReadyError();
@@ -86,7 +91,7 @@ async function fetchPeerPreKeyBundle(
   let lastErr: unknown;
   for (const deviceId of deviceIds) {
     try {
-      const bundle = await e2eeApi.fetchPreKeyBundle(peerUserId, deviceId);
+      const bundle = await fetchPreKeyBundle(peerUserId, deviceId);
       cachePeerPreKeyBundle(peerUserId, deviceId, bundle);
       return { deviceId, bundle };
     } catch (err) {
@@ -97,6 +102,17 @@ async function fetchPeerPreKeyBundle(
   }
   if (lastErr instanceof Error) throw lastErr;
   throw new E2eePeerNotReadyError();
+}
+
+async function fetchPeerPreKeyBundle(
+  peerUserId: string,
+  preferDeviceId?: string | null,
+  offline = false,
+): Promise<{ deviceId: string; bundle: PreKeyBundle }> {
+  if (offline) {
+    return fetchOfflinePeerPreKeyBundle(peerUserId, preferDeviceId);
+  }
+  return fetchOnlinePeerPreKeyBundle(peerUserId, preferDeviceId);
 }
 
 export type EncryptDirectInput = {
@@ -143,7 +159,7 @@ export async function encryptDirectMessage(
     hkdfSalt(senderFingerprint, bundle.signedPreKey.keyId),
   );
 
-  const innerMeta = { ...(input.contentMeta ?? {}) };
+  const innerMeta = input.contentMeta ? { ...input.contentMeta } : {};
   delete innerMeta.e2eeVersion;
   delete innerMeta.preview;
 
@@ -182,6 +198,43 @@ export async function encryptDirectMessage(
   };
 }
 
+async function tryDecryptEnvelopeWithSpk(
+  envelope: NonNullable<ReturnType<typeof decodeEnvelope>>,
+  material: Awaited<ReturnType<typeof getLocalKeyMaterial>>,
+  fingerprint: string,
+  meta: Message['contentMeta'],
+  senderId: string,
+): Promise<DmV1Payload | null> {
+  if (!material) return null;
+
+  const spkIdsToTry = [
+    envelope.spkId,
+    ...material.signedPreKeys.map((k) => k.keyId).filter((id) => id !== envelope.spkId),
+  ];
+
+  for (const spkId of spkIdsToTry) {
+    const spkPrivate = await getSignedPreKeyPrivate(material, spkId);
+    if (!spkPrivate) continue;
+    try {
+      const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
+      const aesKey = await deriveAesGcmKey(shared, hkdfSalt(fingerprint, envelope.spkId));
+      const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
+      const payload = decodePayload(plainBuf);
+      if (!payload) continue;
+
+      const senderDeviceId = meta?.senderDeviceId;
+      if (typeof senderDeviceId === 'string') {
+        rememberPeerDevice(senderId, senderDeviceId);
+      }
+      return payload;
+    } catch {
+      /* try next local signed pre-key */
+    }
+  }
+
+  return null;
+}
+
 export async function decryptDirectPayload(
   userId: string,
   msg: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId' | 'clientMessageId'>,
@@ -203,43 +256,16 @@ export async function decryptDirectPayload(
   const material = await getLocalKeyMaterial(userId);
   if (!material) return null;
 
-  const meta = msg.contentMeta as Record<string, unknown> | undefined;
+  const meta = msg.contentMeta;
   let fingerprint =
     typeof meta?.senderFingerprint === 'string' ? meta.senderFingerprint : null;
-  if (!fingerprint) {
-    try {
-      fingerprint = await getSenderFingerprint(msg.senderId);
-    } catch {
-      return null;
-    }
+  try {
+    fingerprint ??= await getSenderFingerprint(msg.senderId);
+  } catch {
+    return null;
   }
 
-  const spkIdsToTry = [
-    envelope.spkId,
-    ...material.signedPreKeys.map((k) => k.keyId).filter((id) => id !== envelope.spkId),
-  ];
-
-  for (const spkId of spkIdsToTry) {
-    const spkPrivate = await getSignedPreKeyPrivate(material, spkId);
-    if (!spkPrivate) continue;
-    try {
-      const shared = await ecdhSharedSecret(spkPrivate, envelope.ephemPub);
-      const aesKey = await deriveAesGcmKey(shared, hkdfSalt(fingerprint, envelope.spkId));
-      const plainBuf = await aesGcmDecrypt(aesKey, envelope.iv, envelope.ct);
-      const payload = decodePayload(plainBuf);
-      if (!payload) continue;
-
-      const senderDeviceId = meta?.senderDeviceId;
-      if (typeof senderDeviceId === 'string') {
-        rememberPeerDevice(msg.senderId, senderDeviceId);
-      }
-      return payload;
-    } catch {
-      /* try next local signed pre-key */
-    }
-  }
-
-  return null;
+  return tryDecryptEnvelopeWithSpk(envelope, material, fingerprint, meta, msg.senderId);
 }
 
 export async function decryptDirectMessage(
@@ -263,7 +289,7 @@ export async function decryptDirectMessage(
   if (!payload) return null;
 
   if (payload.meta && typeof payload.meta === 'object') {
-    const mediaBlob = (payload.meta as Record<string, unknown>).mediaBlob;
+    const mediaBlob = payload.meta?.mediaBlob;
     if (typeof mediaBlob === 'string' && payload.text === '[encrypted-media]') {
       return payload.text;
     }
@@ -271,4 +297,4 @@ export async function decryptDirectMessage(
   return payload.text;
 }
 
-export { isE2eeMessage };
+export { isE2eeMessage } from './protocol';

@@ -1,7 +1,41 @@
 import type { Message } from '../types';
-import type { ThreadMessagesCache } from './messageQueryCache';
+import type { InfiniteData } from '@tanstack/react-query';
+import type { MessagePage, ThreadMessagesCache } from './messageQueryCache';
 
-type MessagesCache = { pages: Array<{ data: Message[] }> };
+export type MessagesInfiniteCache = InfiniteData<MessagePage>;
+
+function addReactionRow(
+  summary: NonNullable<Message['reactionsSummary']>,
+  emoji: string,
+  isMine: boolean,
+): NonNullable<Message['reactionsSummary']> {
+  const idx = summary.findIndex((r) => r.emoji === emoji);
+  if (idx < 0) {
+    return [...summary, { emoji, count: 1, byMe: isMine }];
+  }
+  const row = summary[idx];
+  if (isMine && row.byMe) return summary;
+  const next = [...summary];
+  next[idx] = { emoji, count: row.count + 1, byMe: isMine || row.byMe };
+  return next;
+}
+
+function removeReactionRow(
+  summary: NonNullable<Message['reactionsSummary']>,
+  emoji: string,
+  isMine: boolean,
+): NonNullable<Message['reactionsSummary']> {
+  const idx = summary.findIndex((r) => r.emoji === emoji);
+  if (idx < 0) return summary;
+  const row = summary[idx];
+  if (isMine && !row.byMe) return summary;
+  if (row.count <= 1) {
+    return summary.filter((_, i) => i !== idx);
+  }
+  const next = [...summary];
+  next[idx] = { emoji, count: row.count - 1, byMe: isMine ? false : row.byMe };
+  return next;
+}
 
 function patchReactionsOnMessage(
   m: Message,
@@ -11,35 +45,8 @@ function patchReactionsOnMessage(
   isMine: boolean,
 ): Message {
   if (m.id !== messageId) return m;
-  const summary = [...(m.reactionsSummary ?? [])];
-  const idx = summary.findIndex((r) => r.emoji === emoji);
-
-  if (mode === 'add') {
-    if (idx >= 0) {
-      const row = summary[idx];
-      if (isMine && row.byMe) return m;
-      summary[idx] = {
-        emoji,
-        count: row.count + 1,
-        byMe: isMine || row.byMe,
-      };
-    } else {
-      summary.push({ emoji, count: 1, byMe: isMine });
-    }
-  } else if (idx >= 0) {
-    const row = summary[idx];
-    if (isMine && !row.byMe) return m;
-    if (row.count <= 1) {
-      summary.splice(idx, 1);
-    } else {
-      summary[idx] = {
-        emoji,
-        count: row.count - 1,
-        byMe: isMine ? false : row.byMe,
-      };
-    }
-  }
-
+  const base = m.reactionsSummary ?? [];
+  const summary = mode === 'add' ? addReactionRow(base, emoji, isMine) : removeReactionRow(base, emoji, isMine);
   return { ...m, reactionsSummary: summary };
 }
 
@@ -61,13 +68,13 @@ export function patchReactionOnThreadCache(
 }
 
 export function patchReactionOnMessage(
-  old: MessagesCache | undefined,
+  old: MessagesInfiniteCache | undefined,
   messageId: string,
   emoji: string,
   mode: 'add' | 'remove',
   actorUserId: string,
   viewerId: string,
-): MessagesCache | undefined {
+): MessagesInfiniteCache | undefined {
   if (!old) return old;
 
   const isMine = actorUserId === viewerId;

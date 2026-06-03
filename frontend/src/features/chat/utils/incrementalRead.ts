@@ -4,7 +4,7 @@ import type { ChatUnreadBoundary } from '../hooks/useChatData';
 /** Sort unread ids by server snapshot order (chronological), not loaded-message lookup. */
 export function sortUnreadIdsByOrder(ids: string[], chronologicalOrder: string[]): string[] {
   if (chronologicalOrder.length === 0) {
-    return [...ids].sort();
+    return [...ids].sort((a, b) => a.localeCompare(b));
   }
   const rank = new Map(chronologicalOrder.map((id, index) => [id, index]));
   return [...ids].sort((a, b) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER));

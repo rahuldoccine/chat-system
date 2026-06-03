@@ -1,3 +1,5 @@
+import { isPlainObject } from '../../utils/plainObject';
+
 export type E2eePollPayload = {
   question: string;
   closesAt?: string | null;
@@ -7,25 +9,23 @@ export type E2eePollPayload = {
 export function parseE2eePollMeta(meta: Record<string, unknown> | undefined): E2eePollPayload | null {
   if (!meta) return null;
   const raw = meta.poll;
-  if (!raw || typeof raw !== 'object') return null;
-  const rec = raw as Record<string, unknown>;
+  if (!isPlainObject(raw)) return null;
+  const rec = raw;
   const question = typeof rec.question === 'string' ? rec.question : '';
   if (!question.trim()) return null;
 
-  const closesAt =
-    rec.closesAt === null || rec.closesAt === undefined
-      ? null
-      : typeof rec.closesAt === 'string'
-        ? rec.closesAt
-        : null;
+  let closesAt: string | null = null;
+  if (typeof rec.closesAt === 'string') {
+    closesAt = rec.closesAt;
+  }
 
   const optionsRaw = rec.options;
   if (!Array.isArray(optionsRaw)) return null;
   const options: Array<{ label: string; sortOrder: number }> = [];
   for (let i = 0; i < optionsRaw.length; i++) {
     const entry = optionsRaw[i];
-    if (!entry || typeof entry !== 'object') continue;
-    const label = (entry as Record<string, unknown>).label;
+    if (!isPlainObject(entry)) continue;
+    const label = entry.label;
     if (typeof label === 'string' && label.trim()) {
       options.push({ label: label.trim(), sortOrder: i });
     }

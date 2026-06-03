@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './MainLayout.module.css';
+import { handler } from '../utils/asyncHandler';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import { useConversations } from '../features/chat/hooks/useChatData';
@@ -16,15 +17,11 @@ import {
   LogOut,
   Settings,
   Search,
-  BellOff,
   Plus,
   Users,
   Hash,
-  MoreHorizontal,
-  Star,
 } from 'lucide-react';
 import GroupChannelIcon from '../features/chat/components/GroupChannelIcon';
-import { isChatMuted } from '../features/chat/utils/mute';
 import UserAvatar from '../features/chat/components/UserAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConnectionStatus from '../features/chat/components/ConnectionStatus';
@@ -34,6 +31,10 @@ import NewDmModal from '../features/chat/components/NewDmModal';
 import CreateGroupModal from '../features/chat/components/CreateGroupModal';
 import JumpToSearch from '../features/chat/components/JumpToSearch';
 import ChatListSkeleton from '../features/chat/components/ChatListSkeleton';
+import { overlayPanelEventProps } from '../utils/a11y';
+import { GroupActionsModal } from './GroupActionsModal';
+import { SidebarChatRow } from './SidebarChatRow';
+import { useDismissOnDocumentClick } from './useDismissOnDocumentClick';
 import ChatSystemLogo from '../components/brand/ChatSystemLogo';
 import EmptyState from '../features/chat/components/EmptyState';
 import type { Chat } from '../features/chat/types';
@@ -49,25 +50,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { onlineUsers } = useSocket();
   const queryClient = useQueryClient();
   const { data: response, isLoading: conversationsLoading } = useConversations();
+  const invalidateConversations = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  }, [queryClient]);
+
   const pinMutation = useMutation({
     mutationFn: ({ chatId, pinned }: { chatId: string; pinned: boolean }) =>
       patchChatPin(chatId, pinned),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-    },
+    onSuccess: invalidateConversations,
   });
   const favoriteMutation = useMutation({
     mutationFn: ({ chatId, favorited }: { chatId: string; favorited: boolean }) =>
       patchChatFavorite(chatId, favorited),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-    },
+    onSuccess: invalidateConversations,
   });
   const closeDmMutation = useMutation({
     mutationFn: ({ chatId, closed }: { chatId: string; closed: boolean }) =>
       patchChatClose(chatId, closed),
     onSuccess: (_data, { chatId, closed }) => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      invalidateConversations();
       if (closed && activeId === chatId) setActiveId(null);
     },
   });
@@ -83,10 +84,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [showPublicGroupsPicker, setShowPublicGroupsPicker] = useState(false);
   const [showJumpTo, setShowJumpTo] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const openJumpTo = useCallback(() => setShowJumpTo(true), []);
   const closeJumpTo = useCallback(() => setShowJumpTo(false), []);
+
+  const goHome = useCallback(() => {
+    setActiveId(null);
+    navigate({ pathname: '/', search: '' }, { replace: true });
+  }, [navigate, setActiveId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -144,44 +149,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const formatUnread = (count: number) => (count > 99 ? '99+' : String(count));
 
-  const openPinMenu = (e: React.MouseEvent, chat: Chat) => {
-    e.preventDefault();
-    setPinMenu({
-      chatId: chat.id,
-      x: e.clientX,
-      y: e.clientY,
-      pinned: Boolean(chat.pinnedAt),
-    });
-  };
-
   const handlePinToggle = (chatId: string, pinned: boolean) => {
     setPinMenu(null);
     void pinMutation.mutateAsync({ chatId, pinned });
   };
 
-  useEffect(() => {
-    if (!pinMenu) return;
-    const close = () => setPinMenu(null);
-    const timer = globalThis.setTimeout(() => {
-      document.addEventListener('click', close);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('click', close);
-    };
-  }, [pinMenu]);
-
-  useEffect(() => {
-    if (!chatMenu) return;
-    const close = () => setChatMenu(null);
-    const timer = globalThis.setTimeout(() => {
-      document.addEventListener('click', close);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('click', close);
-    };
-  }, [chatMenu]);
+  useDismissOnDocumentClick(Boolean(pinMenu), () => setPinMenu(null));
+  useDismissOnDocumentClick(Boolean(chatMenu), () => setChatMenu(null));
 
   const findChatById = (chatId: string) => conversations.find((c) => c.id === chatId);
 
@@ -194,22 +168,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         ? null
         : { chatId: chat.id, x: e.clientX, y: e.clientY },
     );
-  };
-
-  const openDmSettingsForActive = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const activeDm = activeId ? dms.find((c) => c.id === activeId) : null;
-    if (!activeDm) return;
-    openChatMenu(e, activeDm);
-  };
-
-  const openGroupSettingsForActive = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const activeGroup = activeId
-      ? conversations.find((c) => c.id === activeId && c.type === 'GROUP')
-      : null;
-    if (!activeGroup) return;
-    openChatMenu(e, activeGroup);
   };
 
   const chatMenuChat = chatMenu?.chatId ? findChatById(chatMenu.chatId) : null;
@@ -235,7 +193,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     try {
       await leaveGroup(leaveGroupChat.id, user.id);
       if (activeId === leaveGroupChat.id) setActiveId(null);
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      invalidateConversations();
       setLeaveGroupChat(null);
     } catch {
       toast.error('Could not leave group');
@@ -244,111 +202,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   };
 
-  const renderDmRow = (chat: Chat) => {
-    const isOnline = chat.dmPeer && onlineUsers.has(chat.dmPeer.id);
+  const renderSidebarRow = (chat: Chat, variant: 'dm' | 'group') => {
+    const chatName = getChatName(chat);
+    const isOnline =
+      variant === 'dm' && chat.dmPeer?.id != null && onlineUsers.has(chat.dmPeer.id);
     return (
-      <div
+      <SidebarChatRow
         key={chat.id}
-        className={`${styles.dmRowWrap} ${chatMenu?.chatId === chat.id ? styles.dmRowMenuOpen : ''}`}
-      >
-        <button
-          type="button"
-          onClick={() => setActiveId(chat.id)}
-          onContextMenu={(e) => openChatMenu(e, chat)}
-          className={`${styles.navItem} ${activeId === chat.id ? styles.active : ''}`}
-        >
-          <UserAvatar
-            userId={chat.dmPeer?.id}
-            avatarUrl={chat.dmPeer?.avatarUrl}
-            displayName={chat.dmPeer?.displayName}
-            email={chat.dmPeer?.email}
-            className={styles.miniAvatar}
-          />
-          <span className={styles.navLabel}>{getChatName(chat)}</span>
-          {chat.favoritedAt && (
-            <Star size={12} className={styles.favoriteStar} aria-label="Favorite" />
-          )}
-          {isChatMuted(chat.mutedUntil) && (
-            <BellOff size={14} className={styles.mutedIcon} aria-label="Muted" />
-          )}
-          {isOnline && <span className={styles.onlineDot} />}
-          {chat.unreadMentionCount != null && chat.unreadMentionCount > 0 && (
-            <span className={styles.mentionBadge} aria-label="Unread mentions">@</span>
-          )}
-          {chat.unreadCount > 0 && (
-            <span className={styles.unreadBadge}>{formatUnread(chat.unreadCount)}</span>
-          )}
-          {chat.unreadCount > 0 && <span className={styles.unreadDot} aria-hidden />}
-          {chat.pinnedAt && <span className={styles.pinIcon} aria-label="Pinned">📌</span>}
-        </button>
-        <button
-          type="button"
-          className={styles.dmMoreBtn}
-          aria-label={`DM settings for ${getChatName(chat)}`}
-          onClick={(e) => openChatMenu(e, chat)}
-        >
-          <MoreHorizontal size={16} />
-        </button>
-      </div>
+        chat={chat}
+        variant={variant}
+        active={activeId === chat.id}
+        menuOpen={chatMenu?.chatId === chat.id}
+        isOnline={isOnline}
+        chatName={chatName}
+        groupVisibilityLabel={variant === 'group' ? groupVisibilityLabel(chat) : undefined}
+        formatUnread={formatUnread}
+        onSelect={() => setActiveId(chat.id)}
+        onOpenMenu={(e) => openChatMenu(e, chat)}
+      />
     );
   };
 
-  const renderGroupRow = (chat: Chat) => (
-    <div
-      key={chat.id}
-      className={`${styles.dmRowWrap} ${chatMenu?.chatId === chat.id ? styles.dmRowMenuOpen : ''}`}
-    >
-      <button
-        type="button"
-        onClick={() => setActiveId(chat.id)}
-        onContextMenu={(e) => openChatMenu(e, chat)}
-        className={`${styles.navItem} ${activeId === chat.id ? styles.active : ''}`}
-        aria-label={`${getChatName(chat)} — ${groupVisibilityLabel(chat)}`}
-        title={groupVisibilityLabel(chat)}
-      >
-        <GroupChannelIcon
-          visibility={chat.groupVisibility}
-          size={18}
-          strokeWidth={2.5}
-          className={styles.channelAvatar}
-        />
-        <span className={styles.navLabel}>{getChatName(chat)}</span>
-        {chat.favoritedAt && (
-          <Star size={12} className={styles.favoriteStar} aria-label="Favorite" />
-        )}
-        {chat.unreadMentionCount != null && chat.unreadMentionCount > 0 && (
-          <span className={styles.mentionBadge} aria-label="Unread mentions">@</span>
-        )}
-        {chat.unreadCount > 0 && (
-          <span className={styles.unreadBadge}>{formatUnread(chat.unreadCount)}</span>
-        )}
-        {chat.unreadCount > 0 && <span className={styles.unreadDot} aria-hidden />}
-        {chat.pinnedAt && <span className={styles.pinIcon} aria-label="Pinned">📌</span>}
-      </button>
-      <button
-        type="button"
-        className={styles.dmMoreBtn}
-        aria-label={`Channel settings for ${getChatName(chat)}`}
-        onClick={(e) => openChatMenu(e, chat)}
-      >
-        <MoreHorizontal size={16} />
-      </button>
-    </div>
-  );
-
   const renderFavoriteRow = (chat: Chat) =>
-    chat.type === 'GROUP' ? renderGroupRow(chat) : renderDmRow(chat);
+    renderSidebarRow(chat, chat.type === 'GROUP' ? 'group' : 'dm');
 
   return (
-    <>
     <div className={`${styles.container} ${activeId ? styles.hasActiveChat : ''}`}>
       <ConnectionStatus />
       
       {/* 1. Slim Workspace Bar */}
       <nav className={styles.workspaceBar}>
-        <div className={`${styles.workspaceIcon} ${styles.activeWorkspace}`} title="Chat System">
+        <button
+          type="button"
+          className={`${styles.workspaceIcon} ${styles.activeWorkspace}`}
+          title="Home"
+          aria-label="Go to home"
+          onClick={goHome}
+        >
           <ChatSystemLogo variant="mark" size="xs" />
-        </div>
+        </button>
         <div className={styles.workspaceDivider}></div>
         <div className={styles.workspaceIcon}>
           <div className={styles.workspaceLetter}>D</div>
@@ -367,35 +259,27 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         animate={{ x: 0, opacity: 1 }}
         className={styles.sidebar}
       >
-        <div className={styles.sidebarHeader}>
+        <button
+          type="button"
+          className={styles.sidebarHeader}
+          onClick={goHome}
+          aria-label="Go to home"
+        >
           <ChatSystemLogo variant="full" size="sm" theme="dark" className={styles.sidebarBrandFull} />
           <ChatSystemLogo variant="mark" size="xs" className={styles.sidebarBrandMark} />
-        </div>
+        </button>
         
         <div className={styles.searchContainer}>
-          <div
+          <button
+            type="button"
             className={styles.searchBar}
             onClick={() => openJumpTo()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                openJumpTo();
-              }
-            }}
-            role="button"
-            tabIndex={0}
             aria-label="Jump to conversation (Ctrl+K)"
           >
             <Search size={14} strokeWidth={3} />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Jump to..."
-              readOnly
-              onFocus={() => openJumpTo()}
-            />
+            <span className={styles.searchPlaceholder}>Jump to...</span>
             <kbd className={styles.searchKbd}>⌘K</kbd>
-          </div>
+          </button>
         </div>
 
         <nav className={styles.nav}>
@@ -418,32 +302,34 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <div className={styles.sectionHeader}>
               <span className={styles.sectionLabel}>Channels</span>
               <div className={styles.sectionActions}>
-                <Plus
-                  size={14}
-                  className={styles.addIcon}
+                <button
+                  type="button"
+                  className={styles.sectionIconBtn}
                   onClick={() => setShowGroupActions(true)}
-                  role="button"
                   aria-label="Create group"
-                />
+                >
+                  <Plus size={14} />
+                </button>
               </div>
             </div>
             {openChannels.length === 0 && (
               <p className={styles.emptyHint}>No channels yet. Click + to create one.</p>
             )}
-            {openChannels.map((chat) => renderGroupRow(chat))}
+            {openChannels.map((chat) => renderSidebarRow(chat, 'group'))}
           </div>
 
           <div className={styles.navSection}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionLabel}>Direct Messages</span>
               <div className={styles.sectionActions}>
-                <Plus
-                  size={14}
-                  className={styles.addIcon}
+                <button
+                  type="button"
+                  className={styles.sectionIconBtn}
                   onClick={() => setShowNewDm(true)}
-                  role="button"
                   aria-label="Start direct message"
-                />
+                >
+                  <Plus size={14} />
+                </button>
               </div>
             </div>
             {openDms.length === 0 && favorites.length === 0 && (
@@ -451,7 +337,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 No conversations yet. Click + to message someone.
               </p>
             )}
-            {openDms.map((chat) => renderDmRow(chat))}
+            {openDms.map((chat) => renderSidebarRow(chat, 'dm'))}
           </div>
           </>
           )}
@@ -500,29 +386,39 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             )}
           </AnimatePresence>
 
-          <div className={styles.userCard} onClick={() => setShowUserMenu(!showUserMenu)}>
-            <div className={styles.avatarContainer}>
-              <UserAvatar
-                userId={user?.id}
-                avatarUrl={user?.avatar}
-                displayName={user?.name}
-                email={user?.email}
-                className={styles.avatarImg}
-              />
-              <div className={styles.onlineBadge}></div>
-            </div>
-            <div className={styles.userInfo}>
-              <span className={styles.userName}>{user?.name}</span>
-              <span className={styles.userStatus}>Online</span>
-            </div>
+          <div className={styles.userCard}>
+            <button
+              type="button"
+              className={styles.userCardMain}
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              aria-expanded={showUserMenu}
+              aria-haspopup="menu"
+            >
+              <div className={styles.avatarContainer}>
+                <UserAvatar
+                  userId={user?.id}
+                  avatarUrl={user?.avatar}
+                  displayName={user?.name}
+                  email={user?.email}
+                  className={styles.avatarImg}
+                />
+                <div className={styles.onlineBadge}></div>
+              </div>
+              <div className={styles.userInfo}>
+                <span className={styles.userName}>{user?.name}</span>
+                <span className={styles.userStatus}>Online</span>
+              </div>
+            </button>
             <div className={styles.userActions}>
-              <button 
+              <button
+                type="button"
                 className={styles.actionIcon}
                 style={{ background: showUserMenu ? 'rgba(255,255,255,0.1)' : 'none' }}
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowUserMenu(!showUserMenu);
                 }}
+                aria-label="Open account menu"
               >
                 <Settings size={18} />
               </button>
@@ -546,100 +442,74 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           onChatCreated={(chatId) => setActiveId(chatId)}
         />
       )}
-      <AnimatePresence>
-        {showGroupActions && (
-          <motion.div
-            className={styles.groupActionsOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowGroupActions(false)}
-          >
-            <motion.div
-              className={styles.groupActionsModal}
-              initial={{ opacity: 0, y: 14, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 14, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className={styles.groupActionsTitle}>Group actions</h3>
-              <p className={styles.groupActionsHint}>Choose what you want to do next.</p>
+      <GroupActionsModal
+        open={showGroupActions}
+        modalKey="group-actions"
+        ariaLabel="Group actions"
+        panelClassName={styles.groupActionsModal}
+        onClose={() => setShowGroupActions(false)}
+      >
+        <h3 className={styles.groupActionsTitle}>Group actions</h3>
+        <p className={styles.groupActionsHint}>Choose what you want to do next.</p>
 
+        <button
+          type="button"
+          className={styles.groupActionBtn}
+          onClick={() => {
+            setShowGroupActions(false);
+            setShowNewGroup(true);
+          }}
+        >
+          <Users size={16} />
+          <span>Create Group</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.groupActionBtn}
+          onClick={() => {
+            setShowGroupActions(false);
+            setShowPublicGroupsPicker(true);
+          }}
+        >
+          <Hash size={16} />
+          <span>Join Public Channels/Groups</span>
+        </button>
+      </GroupActionsModal>
+      <GroupActionsModal
+        open={showPublicGroupsPicker}
+        modalKey="public-groups"
+        ariaLabel="Join public channels and groups"
+        panelClassName={styles.groupActionsModal}
+        onClose={() => setShowPublicGroupsPicker(false)}
+      >
+        <h3 className={styles.groupActionsTitle}>Join Public Channels/Groups</h3>
+        <p className={styles.groupActionsHint}>Select a public channel to join.</p>
+        {joinablePublicGroups.length === 0 ? (
+          <EmptyState
+            compact
+            title="No public channels"
+            hint="Check back later or create your own group."
+          />
+        ) : (
+          <div className={styles.publicGroupsList}>
+            {joinablePublicGroups.map((chat) => (
               <button
+                key={chat.id}
                 type="button"
-                className={styles.groupActionBtn}
+                className={styles.publicGroupItem}
                 onClick={() => {
-                  setShowGroupActions(false);
-                  setShowNewGroup(true);
+                  setShowPublicGroupsPicker(false);
+                  setActiveId(chat.id);
                 }}
               >
-                <Users size={16} />
-                <span>Create Group</span>
+                <GroupChannelIcon visibility={chat.groupVisibility} size={16} strokeWidth={2.4} />
+                <span className={styles.publicGroupName}>{getChatName(chat)}</span>
               </button>
-
-              <button
-                type="button"
-                className={styles.groupActionBtn}
-                onClick={() => {
-                  setShowGroupActions(false);
-                  setShowPublicGroupsPicker(true);
-                }}
-              >
-                <Hash size={16} />
-                <span>Join Public Channels/Groups</span>
-              </button>
-            </motion.div>
-          </motion.div>
+            ))}
+          </div>
         )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showPublicGroupsPicker && (
-          <motion.div
-            className={styles.groupActionsOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowPublicGroupsPicker(false)}
-          >
-            <motion.div
-              className={styles.groupActionsModal}
-              initial={{ opacity: 0, y: 14, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 14, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className={styles.groupActionsTitle}>Join Public Channels/Groups</h3>
-              <p className={styles.groupActionsHint}>Select a public channel to join.</p>
-              {joinablePublicGroups.length === 0 ? (
-                <EmptyState
-                  compact
-                  title="No public channels"
-                  hint="Check back later or create your own group."
-                />
-              ) : (
-                <div className={styles.publicGroupsList}>
-                  {joinablePublicGroups.map((chat: any) => (
-                    <button
-                      key={chat.id}
-                      type="button"
-                      className={styles.publicGroupItem}
-                      onClick={() => {
-                        setShowPublicGroupsPicker(false);
-                        setActiveId(chat.id);
-                      }}
-                    >
-                      <GroupChannelIcon visibility={chat.groupVisibility} size={16} strokeWidth={2.4} />
-                      <span className={styles.publicGroupName}>{getChatName(chat)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </GroupActionsModal>
       <AnimatePresence>
         {showNewGroup && (
           <CreateGroupModal
@@ -658,8 +528,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       {pinMenu && (
         <div
           className={styles.pinMenu}
+          role="menu"
+          tabIndex={-1}
           style={{ top: pinMenu.y, left: pinMenu.x }}
-          onClick={(e) => e.stopPropagation()}
+          {...overlayPanelEventProps}
         >
           <button
             type="button"
@@ -700,11 +572,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         cancelLabel="Cancel"
         variant="danger"
         isLoading={leaveGroupPending}
-        onConfirm={() => void handleLeaveGroupConfirm()}
+        onConfirm={handler(handleLeaveGroupConfirm)}
         onCancel={() => setLeaveGroupChat(null)}
       />
     </div>
-    </>
   );
 };
 

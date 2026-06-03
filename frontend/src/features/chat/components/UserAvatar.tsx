@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { getAvatarImageSrc } from '../../settings/utils/avatarUrl';
+import { getAvatarImageSrc, resolveLiveAvatarUrl } from '../../settings/utils/avatarUrl';
 import { useLiveDisplayName } from '../../settings/hooks/useLiveDisplayName';
 import styles from './UserAvatar.module.css';
 
-export type UserAvatarProps = {
+export type UserAvatarProps = Readonly<{
   userId?: string;
   avatarUrl?: string | null;
   displayName?: string | null;
@@ -14,7 +14,7 @@ export type UserAvatarProps = {
   style?: React.CSSProperties;
   /** Font size for initials fallback (e.g. "1rem" in headers, "0.65rem" in compact lists). */
   fallbackFontSize?: string;
-};
+}>;
 
 /**
  * Renders profile image or initials fallback. For the signed-in user, prefers live AuthContext avatar.
@@ -33,8 +33,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const { user, token } = useAuth();
   const [imageFailed, setImageFailed] = useState(false);
 
-  const resolvedUrl =
-    userId && user?.id === userId ? (user.avatar ?? avatarUrl) : avatarUrl;
+  const resolvedUrl = resolveLiveAvatarUrl(userId, user?.id, user?.avatar, avatarUrl);
 
   const src = getAvatarImageSrc(resolvedUrl, token);
   const label = useLiveDisplayName(userId, displayName, email);
@@ -48,11 +47,11 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const rootClass = [styles.root, className].filter(Boolean).join(' ');
   const fallbackInnerClass = [styles.fallback, fallbackClassName].filter(Boolean).join(' ');
 
-  if (showImage) {
+  if (showImage && src) {
     return (
       <span className={rootClass} style={style} aria-hidden>
         <img
-          src={src!}
+          src={src}
           alt=""
           className={styles.image}
           onError={() => setImageFailed(true)}

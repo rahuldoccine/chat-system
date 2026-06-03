@@ -19,7 +19,7 @@
   --popover-foreground: #0f172a;
 
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted-foreground: #5c6778;
 
   --accent: #f1f5f9;
   --accent-foreground: #0f172a;
@@ -47,7 +47,21 @@
   --sidebar-tertiary: #313338;
   --sidebar-accent: #35373c;
   --sidebar-foreground: #dbdee1;
-  --sidebar-muted: #949ba4;
+  --sidebar-muted: #b8bcc4;
+  --sidebar-placeholder: #9da3ae;
+  --sidebar-hover-bg: #3f4147;
+
+  /* Muted text on dark call/overlay surfaces */
+  --overlay-muted-foreground: #cbd5e1;
+
+  /* WCAG-friendly pairs (avoid semi-transparent bg + text in the same rule) */
+  --text-muted-on-dark: #b8bcc4;
+  --text-placeholder-on-dark: #9da3ae;
+  --chip-accent-bg: #5865f2;
+  --chip-accent-fg: #ffffff;
+  --status-success-bg: #dcfce7;
+  --status-success-fg: #166534;
+  --destructive-btn-bg: #dc2626;
 
   /* Semantic surfaces */
   --surface-page: #f8fafc;
@@ -76,7 +90,7 @@
   --popover-foreground: #f8fafc;
 
   --muted: #1e293b;
-  --muted-foreground: #94a3b8;
+  --muted-foreground: #a1aebf;
 
   --accent: #334155;
   --accent-foreground: #f8fafc;
@@ -113,11 +127,35 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+#root {
+  height: var(--app-height);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+dialog {
+  border: none;
+  color: inherit;
+  max-width: none;
+  max-height: none;
+}
+
+dialog::backdrop {
+  background: transparent;
 }
 
 button {

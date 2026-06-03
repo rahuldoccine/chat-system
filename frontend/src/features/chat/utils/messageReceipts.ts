@@ -229,3 +229,33 @@ export function patchReceiptStatusInCache(
   };
   return { data: next, matchedCount };
 }
+
+export type ReceiptSocketPayload = {
+  chatId: string;
+  messageIds: string[];
+  userId: string;
+};
+
+export function patchReceiptFromSocket(
+  queryClient: QueryClient,
+  currentUserId: string,
+  data: ReceiptSocketPayload,
+  status: 'delivered' | 'read',
+  activeChatId?: string | null,
+): void {
+  if (data.userId === currentUserId) return;
+  if (activeChatId != null && data.chatId !== activeChatId) return;
+  const qk = ['messages', data.chatId] as const;
+  const old = queryClient.getQueryData<Parameters<typeof patchReceiptStatusInCache>[0]>(qk);
+  const { data: next, matchedCount } = patchReceiptStatusInCache(
+    old,
+    data.chatId,
+    data.messageIds,
+    status,
+    currentUserId,
+  );
+  queryClient.setQueryData(qk, next);
+  if (matchedCount === 0 && data.messageIds.length > 0) {
+    void queryClient.invalidateQueries({ queryKey: qk });
+  }
+}

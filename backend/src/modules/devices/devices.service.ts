@@ -29,7 +29,7 @@ export async function registerDeviceToken(userId: string, token: string, platfor
 export async function revokeDeviceToken(userId: string, token: string) {
   const prisma = getPrisma();
   const row = await prisma.deviceToken.findUnique({ where: { token } });
-  if (!row || row.userId !== userId) {
+  if (row?.userId !== userId) {
     throw new AppError(404, "NOT_FOUND", "Device token not found");
   }
   return prisma.deviceToken.update({

@@ -10,7 +10,7 @@ const ConnectionStatus: React.FC = () => {
   const [showConnected, setShowConnected] = useState(false);
   const [showOffline, setShowOffline] = useState(false);
   const [browserOffline, setBrowserOffline] = useState(
-    typeof navigator !== 'undefined' ? !navigator.onLine : false,
+    typeof navigator === 'undefined' ? false : !navigator.onLine,
   );
   const wasConnectedRef = useRef(false);
 

@@ -1,10 +1,10 @@
 import React from 'react';
 
-export type TextPart = { text: string; match: boolean };
+export type TextPart = { text: string; match: boolean; offset: number };
 
 export function splitTextByQuery(text: string, query: string): TextPart[] {
   const q = query.trim();
-  if (!q) return [{ text, match: false }];
+  if (!q) return [{ text, match: false, offset: 0 }];
 
   const parts: TextPart[] = [];
   const lower = text.toLowerCase();
@@ -14,15 +14,17 @@ export function splitTextByQuery(text: string, query: string): TextPart[] {
   while (start < text.length) {
     const idx = lower.indexOf(needle, start);
     if (idx === -1) {
-      parts.push({ text: text.slice(start), match: false });
+      parts.push({ text: text.slice(start), match: false, offset: start });
       break;
     }
-    if (idx > start) parts.push({ text: text.slice(start, idx), match: false });
-    parts.push({ text: text.slice(idx, idx + needle.length), match: true });
+    if (idx > start) {
+      parts.push({ text: text.slice(start, idx), match: false, offset: start });
+    }
+    parts.push({ text: text.slice(idx, idx + needle.length), match: true, offset: idx });
     start = idx + needle.length;
   }
 
-  return parts.length ? parts : [{ text, match: false }];
+  return parts.length ? parts : [{ text, match: false, offset: 0 }];
 }
 
 type HighlightedMessageTextProps = {
@@ -47,13 +49,13 @@ export const MentionHighlightedText: React.FC<MentionHighlightedTextProps> = ({
   const parts = splitMentionSegments(text);
   return (
     <>
-      {parts.map((part, i) =>
+      {parts.map((part) =>
         part.type === 'mention' ? (
-          <mark key={i} className={mentionClassName}>
+          <mark key={`${part.offset}:${part.value}`} className={mentionClassName}>
             {part.value}
           </mark>
         ) : (
-          <React.Fragment key={i}>{part.value}</React.Fragment>
+          <React.Fragment key={`${part.offset}:${part.value}`}>{part.value}</React.Fragment>
         ),
       )}
     </>
@@ -72,16 +74,16 @@ export const HighlightedMessageText: React.FC<HighlightedMessageTextProps> = ({
 
   return (
     <>
-      {parts.map((part, i) =>
+      {parts.map((part) =>
         part.match ? (
           <mark
-            key={i}
+            key={`${part.offset}:${part.text}`}
             className={isActiveMessage ? markActiveClassName : markClassName}
           >
             {part.text}
           </mark>
         ) : (
-          <React.Fragment key={i}>{part.text}</React.Fragment>
+          <React.Fragment key={`${part.offset}:${part.text}`}>{part.text}</React.Fragment>
         ),
       )}
     </>

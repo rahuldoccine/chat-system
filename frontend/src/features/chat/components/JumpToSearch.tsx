@@ -11,13 +11,15 @@ import {
 import type { Chat } from '../types';
 import UserAvatar from './UserAvatar';
 import GroupChannelIcon from './GroupChannelIcon';
+import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './JumpToSearch.module.css';
+import { handler } from '../../../utils/asyncHandler';
 
-type JumpToSearchProps = {
+type JumpToSearchProps = Readonly<{
   open: boolean;
   onClose: () => void;
   onSelectChat: (chatId: string) => void;
-};
+}>;
 
 type JumpItem =
   | { kind: 'chat'; id: string; chat: Chat; label: string }
@@ -30,6 +32,62 @@ function getChatLabel(chat: Chat): string {
 
 function normalizeQuery(q: string): string {
   return q.trim().toLowerCase();
+}
+
+function renderPeopleResults(
+  showUserLoading: boolean,
+  matchingUsers: DiscoverableUser[],
+  creating: boolean,
+  flatItems: JumpItem[],
+  activeIndex: number,
+  setActiveIndex: (index: number) => void,
+  handleSelectUser: (user: DiscoverableUser) => Promise<void>,
+): React.ReactNode {
+  if (showUserLoading) {
+    return (
+      <div className={styles.loading}>
+        <Loader2 size={18} className={styles.spinner} />
+        Searching…
+      </div>
+    );
+  }
+  if (matchingUsers.length === 0) {
+    return <p className={styles.hintSmall}>No new people match.</p>;
+  }
+  return (
+    <ul className={styles.list}>
+      {matchingUsers.map((user) => {
+        const idx = flatItems.findIndex(
+          (it) => it.kind === 'user' && it.user.id === user.id,
+        );
+        const active = idx === activeIndex;
+        const label = user.displayName || user.username || user.email;
+        return (
+          <li key={user.id}>
+            <button
+              type="button"
+              className={`${styles.item} ${active ? styles.itemActive : ''}`}
+              disabled={creating}
+              onMouseEnter={() => setActiveIndex(idx)}
+              onClick={handler(() => handleSelectUser(user))}
+            >
+              <UserAvatar
+                userId={user.id}
+                avatarUrl={user.avatarUrl}
+                displayName={user.displayName}
+                email={user.email}
+                className={styles.itemAvatar}
+              />
+              <span className={styles.itemLabel}>{label}</span>
+              <span className={styles.itemMeta}>
+                <User size={12} /> Start DM
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat }) => {
@@ -69,7 +127,8 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
     const existingPeerIds = new Set(
       memberChats
         .filter((c) => c.type === 'DIRECT' && c.dmPeer?.id)
-        .map((c) => c.dmPeer!.id),
+        .map((c) => c.dmPeer?.id)
+        .filter((id): id is string => Boolean(id)),
     );
     return users.filter((u) => !existingPeerIds.has(u.id));
   }, [userData?.data, memberChats, normalized]);
@@ -159,7 +218,8 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
       }
       if (e.key === 'Enter' && flatItems.length > 0) {
         e.preventDefault();
-        activateItem(flatItems[activeIndex]!);
+        const item = flatItems[activeIndex];
+        if (item) activateItem(item);
       }
     };
     globalThis.addEventListener('keydown', onKey);
@@ -171,14 +231,8 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
   const showUserLoading = userSearchEnabled && (usersLoading || usersFetching) && matchingUsers.length === 0;
 
   return (
-    <div className={styles.overlay} role="presentation" onClick={onClose}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="jump-to-title"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalDialog className={styles.overlay} aria-labelledby="jump-to-title" onClose={onClose}>
+      <div className={styles.modal}>
         <header className={styles.header}>
           <h3 id="jump-to-title">
             <Search size={16} className={styles.headerIcon} />
@@ -269,46 +323,14 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
               {normalized && (
                 <div className={styles.section}>
                   <p className={styles.sectionLabel}>People</p>
-                  {showUserLoading ? (
-                    <div className={styles.loading}>
-                      <Loader2 size={18} className={styles.spinner} />
-                      Searching…
-                    </div>
-                  ) : matchingUsers.length === 0 ? (
-                    <p className={styles.hintSmall}>No new people match.</p>
-                  ) : (
-                    <ul className={styles.list}>
-                      {matchingUsers.map((user) => {
-                        const idx = flatItems.findIndex(
-                          (it) => it.kind === 'user' && it.user.id === user.id,
-                        );
-                        const active = idx === activeIndex;
-                        const label = user.displayName || user.username || user.email;
-                        return (
-                          <li key={user.id}>
-                            <button
-                              type="button"
-                              className={`${styles.item} ${active ? styles.itemActive : ''}`}
-                              disabled={creating}
-                              onMouseEnter={() => setActiveIndex(idx)}
-                              onClick={() => void handleSelectUser(user)}
-                            >
-                              <UserAvatar
-                                userId={user.id}
-                                avatarUrl={user.avatarUrl}
-                                displayName={user.displayName}
-                                email={user.email}
-                                className={styles.itemAvatar}
-                              />
-                              <span className={styles.itemLabel}>{label}</span>
-                              <span className={styles.itemMeta}>
-                                <User size={12} /> Start DM
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                  {renderPeopleResults(
+                    showUserLoading,
+                    matchingUsers,
+                    creating,
+                    flatItems,
+                    activeIndex,
+                    setActiveIndex,
+                    handleSelectUser,
                   )}
                 </div>
               )}
@@ -316,7 +338,7 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
           )}
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 

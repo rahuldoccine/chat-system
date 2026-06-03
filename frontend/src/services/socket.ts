@@ -11,10 +11,42 @@ const SOCKET_OPTIONS = {
   transports: ['websocket', 'polling'] as ('websocket' | 'polling')[],
 };
 
+/** Server events forwarded to app listeners unchanged. */
+const SOCKET_RELAY_EVENTS = [
+  'message:new',
+  'poll:updated',
+  'typing:update',
+  'presence:changed',
+  'receipt:read',
+  'receipt:delivered',
+  'reaction:added',
+  'reaction:removed',
+  'message:updated',
+  'message:deleted',
+  'message:pinned',
+  'message:unpinned',
+  'session:revoked',
+  'user:profile:updated',
+  'user:block:updated',
+  'call:incoming',
+  'call:ringing',
+  'call:answered',
+  'call:rejected',
+  'call:ended',
+  'call:ice',
+  'call:busy',
+  'call:signal',
+  'call:transcript',
+  'groupCall:started',
+  'groupCall:participantUpdate',
+  'groupCall:ended',
+  'groupCall:signal',
+] as const;
+
 class SocketService {
   private socket: Socket | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
+  private readonly listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
   private authToken: string | null = null;
   private intentionalDisconnect = false;
 
@@ -60,7 +92,7 @@ class SocketService {
 
     manager.on('reconnect_failed', () => {
       this.trigger('reconnect_failed');
-      if (!this.intentionalDisconnect && this.socket && !this.socket.connected) {
+      if (!this.intentionalDisconnect && this.socket?.connected === false) {
         void this.refreshSocketAuth().then(() => this.socket?.connect());
       }
     });
@@ -93,117 +125,11 @@ class SocketService {
       console.log('Socket session ready:', data);
     });
 
-    this.socket.on('message:new', (data) => {
-      this.trigger('message:new', data);
-    });
-
-    this.socket.on('poll:updated', (data) => {
-      this.trigger('poll:updated', data);
-    });
-
-    this.socket.on('typing:update', (data) => {
-      this.trigger('typing:update', data);
-    });
-
-    this.socket.on('presence:changed', (data) => {
-      this.trigger('presence:changed', data);
-    });
-
-    this.socket.on('receipt:read', (data) => {
-      this.trigger('receipt:read', data);
-    });
-
-    this.socket.on('receipt:delivered', (data) => {
-      this.trigger('receipt:delivered', data);
-    });
-
-    this.socket.on('reaction:added', (data) => {
-      this.trigger('reaction:added', data);
-    });
-
-    this.socket.on('reaction:removed', (data) => {
-      this.trigger('reaction:removed', data);
-    });
-
-    this.socket.on('message:updated', (data) => {
-      this.trigger('message:updated', data);
-    });
-
-    this.socket.on('message:deleted', (data) => {
-      this.trigger('message:deleted', data);
-    });
-
-    this.socket.on('message:pinned', (data) => {
-      this.trigger('message:pinned', data);
-    });
-
-    this.socket.on('message:unpinned', (data) => {
-      this.trigger('message:unpinned', data);
-    });
-
-    this.socket.on('session:revoked', (data) => {
-      this.trigger('session:revoked', data);
-    });
-
-    this.socket.on('user:profile:updated', (data) => {
-      this.trigger('user:profile:updated', data);
-    });
-
-    this.socket.on('user:block:updated', (data) => {
-      this.trigger('user:block:updated', data);
-    });
-
-    this.socket.on('call:incoming', (data) => {
-      this.trigger('call:incoming', data);
-    });
-
-    this.socket.on('call:ringing', (data) => {
-      this.trigger('call:ringing', data);
-    });
-
-    this.socket.on('call:answered', (data) => {
-      this.trigger('call:answered', data);
-    });
-
-    this.socket.on('call:rejected', (data) => {
-      this.trigger('call:rejected', data);
-    });
-
-    this.socket.on('call:ended', (data) => {
-      this.trigger('call:ended', data);
-    });
-
-    this.socket.on('call:ice', (data) => {
-      this.trigger('call:ice', data);
-    });
-
-    this.socket.on('call:busy', (data) => {
-      this.trigger('call:busy', data);
-    });
-
-    this.socket.on('call:signal', (data) => {
-      this.trigger('call:signal', data);
-    });
-
-    this.socket.on('call:transcript', (data) => {
-      this.trigger('call:transcript', data);
-    });
-
-    this.socket.on('groupCall:started', (data) => {
-      this.trigger('groupCall:started', data);
-    });
-
-    this.socket.on('groupCall:participantUpdate', (data) => {
-      this.trigger('groupCall:participantUpdate', data);
-    });
-
-    this.socket.on('groupCall:ended', (data) => {
-      this.trigger('groupCall:ended', data);
-    });
-
-    this.socket.on('groupCall:signal', (data) => {
-      this.trigger('groupCall:signal', data);
-    });
+    for (const event of SOCKET_RELAY_EVENTS) {
+      this.socket.on(event, (data) => {
+        this.trigger(event, data);
+      });
+    }
   }
 
   connect(token: string) {
@@ -236,7 +162,7 @@ class SocketService {
     }
     this.intentionalDisconnect = false;
     void this.refreshSocketAuth().then(() => {
-      if (this.socket && !this.socket.connected) {
+      if (this.socket?.connected === false) {
         this.socket.connect();
       }
     });

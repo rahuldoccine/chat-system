@@ -20,7 +20,7 @@
   height: 64px;
   border-radius: 50%;
   background: var(--muted, #f1f5f9);
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   margin-bottom: 0.35rem;
 }
 
@@ -40,7 +40,7 @@
 .hint {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--muted-foreground, #64748b);
+  color: var(--muted-foreground, #5c6b7a);
   max-width: 280px;
   line-height: 1.45;
 }

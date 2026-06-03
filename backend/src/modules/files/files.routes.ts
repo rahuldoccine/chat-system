@@ -16,7 +16,7 @@ import { verifyAccessTokenActive } from "../../lib/validate-access-token.js";
 export function createFilesRouter(config: AppConfig): Router {
   const router = Router();
 
-  const requireAuthOrQueryToken = (req: any, res: any, next: any) => {
+  const requireAuthOrQueryToken = (req: any, _res: any, next: any) => {
     void (async () => {
       try {
         let token: string | undefined;
@@ -35,7 +35,7 @@ export function createFilesRouter(config: AppConfig): Router {
         }
         req.user = await verifyAccessTokenActive(token, config);
         next();
-      } catch (e) {
+      } catch {
         next(new AppError(401, "UNAUTHORIZED", "Invalid token"));
       }
     })();

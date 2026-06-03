@@ -1,36 +1,14 @@
-import { Prisma, type CallKind, type CallStatus } from "@prisma/client";
-import { getPrisma } from "../prisma.js";
+import { type CallKind, type CallStatus } from "@prisma/client";
 import {
   formatCallCiphertext,
   mapTerminalStatus,
   type CallContentStatus,
 } from "./call-helpers.js";
 import { publicMessage } from "../../modules/chats/chats.service.js";
-
-const messageWithSenderInclude = {
-  sender: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      username: true,
-      avatarUrl: true,
-    },
-  },
-  replyTo: {
-    include: {
-      sender: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          username: true,
-          avatarUrl: true,
-        },
-      },
-    },
-  },
-} as const;
+import {
+  createSystemMessageWithReceipts,
+  findSystemMessageByClientId,
+} from "../system-message-persist.js";
 
 export async function createCallSystemMessage(input: {
   chatId: string;
@@ -43,7 +21,6 @@ export async function createCallSystemMessage(input: {
   endReason?: string;
 }): Promise<ReturnType<typeof publicMessage> | null> {
   if (!input.chatId) return null;
-  const prisma = getPrisma();
   const contentStatus: CallContentStatus = mapTerminalStatus(input.status, input.endReason);
   const ciphertext = formatCallCiphertext(input.kind, contentStatus, input.durationSec);
   const contentMeta = {
@@ -59,41 +36,17 @@ export async function createCallSystemMessage(input: {
 
   const clientMessageId = `call-${input.callId}`;
 
-  const existing = await prisma.message.findUnique({
-    where: { chatId_clientMessageId: { chatId: input.chatId, clientMessageId } },
-    include: messageWithSenderInclude,
-  });
+  const existing = await findSystemMessageByClientId(input.chatId, clientMessageId);
   if (existing) {
     return publicMessage(existing, [], "sent", null);
   }
 
-  const members = await prisma.chatMember.findMany({
-    where: { chatId: input.chatId, leftAt: null },
-  });
-
-  const message = await prisma.$transaction(async (tx) => {
-    const msg = await tx.message.create({
-      data: {
-        chatId: input.chatId,
-        senderId: input.initiatorId,
-        clientMessageId,
-        kind: "SYSTEM",
-        ciphertext,
-        contentMeta: contentMeta as Prisma.InputJsonValue,
-      },
-      include: messageWithSenderInclude,
-    });
-    const receipts = members
-      .filter((m) => m.userId !== input.initiatorId)
-      .map((m) => ({ messageId: msg.id, userId: m.userId }));
-    if (receipts.length) {
-      await tx.receipt.createMany({ data: receipts });
-    }
-    await tx.chat.update({
-      where: { id: input.chatId },
-      data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
-    });
-    return msg;
+  const message = await createSystemMessageWithReceipts({
+    chatId: input.chatId,
+    senderId: input.initiatorId,
+    clientMessageId,
+    ciphertext,
+    contentMeta,
   });
 
   return publicMessage(message, [], "sent", null);
@@ -106,12 +59,8 @@ export async function createCallTranscriptMessage(input: {
   lines: Array<{ t: number; speaker: string; text: string }>;
 }): Promise<ReturnType<typeof publicMessage> | null> {
   if (!input.chatId || !input.lines.length) return null;
-  const prisma = getPrisma();
   const clientMessageId = `call-transcript-${input.callId}-${input.userId}`;
-  const existing = await prisma.message.findUnique({
-    where: { chatId_clientMessageId: { chatId: input.chatId, clientMessageId } },
-    include: messageWithSenderInclude,
-  });
+  const existing = await findSystemMessageByClientId(input.chatId, clientMessageId);
   if (existing) {
     return publicMessage(existing, [], "sent", null);
   }
@@ -127,33 +76,12 @@ export async function createCallTranscriptMessage(input: {
     },
   };
 
-  const members = await prisma.chatMember.findMany({
-    where: { chatId: input.chatId, leftAt: null },
-  });
-
-  const message = await prisma.$transaction(async (tx) => {
-    const msg = await tx.message.create({
-      data: {
-        chatId: input.chatId,
-        senderId: input.userId,
-        clientMessageId,
-        kind: "SYSTEM",
-        ciphertext,
-        contentMeta: contentMeta as Prisma.InputJsonValue,
-      },
-      include: messageWithSenderInclude,
-    });
-    const receipts = members
-      .filter((m) => m.userId !== input.userId)
-      .map((m) => ({ messageId: msg.id, userId: m.userId }));
-    if (receipts.length) {
-      await tx.receipt.createMany({ data: receipts });
-    }
-    await tx.chat.update({
-      where: { id: input.chatId },
-      data: { lastMessageAt: msg.createdAt, updatedAt: new Date() },
-    });
-    return msg;
+  const message = await createSystemMessageWithReceipts({
+    chatId: input.chatId,
+    senderId: input.userId,
+    clientMessageId,
+    ciphertext,
+    contentMeta,
   });
 
   return publicMessage(message, [], "sent", null);

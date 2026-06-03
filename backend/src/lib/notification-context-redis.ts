@@ -1,39 +1,9 @@
-import { createClient } from "redis";
-
 import type { AppConfig } from "../config/index.js";
+import { isPlainObject } from "./plain-object.js";
+import { getRedisClient } from "./redis-lazy-client.js";
 
 const KEY_PREFIX = "notifyctx:";
 const TTL_SEC = 120;
-
-type RedisClient = ReturnType<typeof createClient>;
-
-let client: RedisClient | null = null;
-let connectPromise: Promise<RedisClient | null> | null = null;
-
-async function getRedisClient(config: AppConfig): Promise<RedisClient | null> {
-  if (!config.redisUrl) {
-    return null;
-  }
-  if (client?.isOpen) {
-    return client;
-  }
-  if (!connectPromise) {
-    connectPromise = (async () => {
-      try {
-        const c = createClient({ url: config.redisUrl });
-        await c.connect();
-        client = c;
-        return client;
-      } catch {
-        client = null;
-        return null;
-      } finally {
-        connectPromise = null;
-      }
-    })();
-  }
-  return connectPromise;
-}
 
 export async function setNotificationContextRedis(
   userId: string,
@@ -72,7 +42,8 @@ export async function isActivelyViewingChatRedis(
   const raw = await c.get(`${KEY_PREFIX}${userId}`);
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as { tabVisible?: boolean; activeChatId?: string | null };
+    const parsed: unknown = JSON.parse(raw);
+    if (!isPlainObject(parsed)) return null;
     return Boolean(parsed.tabVisible && parsed.activeChatId === chatId);
   } catch {
     return null;
