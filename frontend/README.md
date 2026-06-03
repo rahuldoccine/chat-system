@@ -1,6 +1,6 @@
 # Chat System — Frontend
 
-Vite + **React 19** SPA for real-time messaging, group channels, WebRTC calls, and client-side E2EE.
+Vite + **React 19** SPA for real-time messaging, group channels, WebRTC calls, client-side E2EE, and installable PWA support.
 
 ## Stack
 
@@ -8,15 +8,19 @@ Vite + **React 19** SPA for real-time messaging, group channels, WebRTC calls, a
 |--------|------------|
 | Build | Vite 8, TypeScript |
 | UI | React 19, CSS Modules, Framer Motion, Lucide |
-| State | **TanStack React Query** + React Context (Auth, Socket, Chat, Calls) |
-| HTTP | **Axios** (`src/api/axios.ts`) — refresh cookie + 401 retry |
+| Theming | Light / dark / system via `ThemeContext` + CSS variables (`data-theme` on `<html>`) |
+| State | TanStack React Query + React Context (Auth, Socket, Chat, Theme, Calls) |
+| HTTP | Axios (`src/api/axios.ts`) — refresh cookie + 401 retry |
 | Routing | React Router 7 |
-| Realtime | Socket.IO client |
+| Realtime | Socket.IO client (`src/services/socket.ts`, `socketAck.ts`) |
 | Forms | React Hook Form + Zod |
+| Modals | Native `<dialog>` (`ModalDialog`) + Radix Dialog (incoming call, some confirm flows) |
 | PWA | `vite-plugin-pwa`, custom `src/sw.ts` |
-| Toasts | Sonner |
+| Toasts | Sonner (single global instance in `main.tsx`) |
 
-**Not used:** Redux, Tailwind.
+**Not used:** Redux, Tailwind, lodash-es.
+
+**Shared with repo root:** `shared/http-url.ts` (link preview URL parsing) is imported from the monorepo `shared/` folder via `tsconfig` include.
 
 ## Quick start
 
@@ -26,9 +30,9 @@ npm install
 npm run dev
 ```
 
-→ `http://localhost:5173` (backend on port **4000** required).
+→ **http://localhost:5173** (backend on port **4000** required).
 
-See [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) for proxy vs direct API URL setup.
+See [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) for proxy vs direct API URL and LAN testing.
 
 ### Environment (`frontend/.env.example`)
 
@@ -36,38 +40,55 @@ See [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) for proxy vs direct API URL
 |----------|---------|
 | `VITE_API_URL` | REST base (default `http://localhost:4000/api/v1`) |
 | `VITE_SOCKET_URL` | Socket.IO origin (default `http://localhost:4000`) |
-| `VITE_GIPHY_API_KEY` | GIF picker |
-| `VITE_STUN_URL` / `VITE_TURN_*` | WebRTC ICE |
+| `VITE_FILES_API_PATH` | Path prefix for protected uploads |
+| `VITE_GIPHY_API_KEY` | GIF picker (optional) |
+| `VITE_STUN_URL` / `VITE_TURN_*` | WebRTC ICE for calls |
+| `VITE_MAX_ATTACHMENTS` / `VITE_MAX_UPLOAD_MB` | Composer limits |
+
+Theme preference is stored in `localStorage` (`chat-theme`) — not an env variable.
 
 ## Project structure
 
 ```
 frontend/src/
-├── api/                 # Axios + auth session / refresh
-├── config/              # env.ts, queryClient
-├── context/             # Auth, Socket, Chat
+├── api/                    # Axios + auth session / refresh
+├── components/             # ModalDialog, AppSyncEffects, brand
+├── config/                 # env.ts, queryClient
+├── context/                # Auth, Socket, Chat, Theme
 ├── features/
-│   ├── auth/            # Login, register, password reset
-│   ├── calls/           # 1:1 + group WebRTC
-│   ├── chat/            # Messages, composer, groups, threads, JumpToSearch
-│   ├── e2ee/            # DM_V1 + GROUP_V1
-│   ├── pwa/             # Install prompt
-│   ├── settings/        # Profile, privacy, push
-│   └── sync/            # Offline outbox (partial)
-├── layouts/             # MainLayout (sidebar), AuthLayout
-├── pages/               # Home, Settings, auth, NotFound (404)
-├── services/            # socket, push
-└── sw.ts                # Service worker
+│   ├── auth/               # Login, register, password reset
+│   ├── calls/              # 1:1 + group WebRTC, call-layout tokens
+│   ├── chat/               # Messages, composer, groups, threads, search
+│   ├── e2ee/               # DM_V1 + GROUP_V1
+│   ├── pwa/                # Install prompt
+│   ├── settings/           # Profile, privacy, push, appearance
+│   └── sync/               # Offline outbox (partial)
+├── layouts/                # MainLayout (sidebar), GroupActionsModal
+├── pages/                  # Home, Settings, auth, NotFound
+├── services/               # socket.ts, socketAck.ts, push
+├── utils/                  # debounce, asyncHandler, motion
+├── index.css               # Global theme tokens (:root + [data-theme='dark'])
+├── themeBootstrap.ts       # Apply stored theme before first paint
+└── sw.ts                   # Service worker
 ```
 
 ## Routes
 
 | Path | Page |
 |------|------|
-| `/` | Home — chat shell (`MainLayout` + `HomePage`) |
-| `/settings` | Profile, privacy, E2EE recovery, push |
+| `/` | Home — chat shell (`MainLayout` + `HomePage` / `ActiveChatView`) |
+| `/settings` | Account, appearance (theme), privacy, E2EE recovery, push |
 | `/login`, `/register`, `/forgot-password` | Auth |
-| `*` | **404** — `NotFoundPage` |
+| `*` | `NotFoundPage` |
+
+## Appearance (light / dark theme)
+
+- **Settings → Appearance** or system preference when set to “System”.
+- Semantic colors live in [`src/index.css`](src/index.css): `--foreground`, `--surface-elevated`, `--muted-foreground`, sidebar tokens, call overlay tokens (`--call-modal-fg` in `features/calls/styles/call-layout.css`).
+- **Sidebar** stays Discord-style dark in both themes (by design).
+- **Main chat area** and **dashboard** follow the active theme.
+- **Modals** (group actions, create group, call incoming/outgoing) use theme variables so text contrast is correct in light mode.
+- **Empty states** inherit color from their parent container (`EmptyState` uses `color: inherit` on titles).
 
 ## Sidebar (`MainLayout`)
 
@@ -75,59 +96,60 @@ Order: **Favorites** → **Channels** → **Direct Messages**.
 
 | Section | Actions |
 |---------|---------|
-| **Favorites** | Starred channels and DMs (empty hint when none) |
-| **Channels** | **+** create/join public · **⋯** settings for active channel |
-| **Direct Messages** | **+** new DM · **⋯** DM settings for active chat |
+| **Favorites** | Starred channels and DMs |
+| **Channels** | **+** create/join public · **⋯** channel menu |
+| **Direct Messages** | **+** new DM · **⋯** DM settings |
 
-Per-row **⋯** menu (`ChatSidebarMenu`):
+Per-row **⋯** menu: favorite, close DM (DMs), leave group (channels).
 
-- **DMs:** Favorite · Close DM
-- **Channels:** Favorite · Leave group (confirm modal)
-
-**Jump to…** — search bar / `Cmd+Ctrl+K` → `JumpToSearch` (chats + users).
+**Jump to…** — search bar or `Cmd/Ctrl+K` → `JumpToSearch`.
 
 ## Implemented UI
 
 ### Messaging
-- Direct + group chats, optimistic send, pagination
+- Direct + group chats, optimistic send, cursor pagination
 - Text, images, files, voice notes, GIFs, polls
 - Reply, edit, delete, forward, reactions, pins, threads
-- In-chat search, link previews, `@mentions`, `@all` (admins)
+- In-chat search, link previews, `@mentions`, `@all` (group admins)
 
 ### Groups
-- Create group (avatar, visibility, members)
-- Join public channels, group info / roles panel
-- Leave from sidebar menu or group settings
+- Create group (avatar, visibility, members, optional GROUP_V1)
+- Join public channels/groups modal
+- Group info panel, roles, public join
 
 ### Calls
-- 1:1 and group audio/video, history panels, responsive overlays
+- 1:1 and group audio/video (WebRTC + socket signaling)
+- Incoming/outgoing modals with theme-aware text on mobile full-screen overlay
+- Call history panels, responsive `CallOverlay`
 
 ### E2EE
-- Mandatory DM encryption; GROUP_V1 on new groups
-- Key backup / recovery in Settings → Privacy
+- Mandatory DM encryption (`DM_V1`); `GROUP_V1` on new groups
+- Key backup / recovery under Settings → Privacy
 
 ### PWA & responsive
 - Install prompt, update toast, offline shell
-- Mobile: full-screen thread, sub-nav panels, call UI, touch-friendly composer
+- Mobile: full-screen chat, sub-nav panels, touch-friendly composer
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Vite dev server |
-| `npm run build` | Typecheck + production build |
+| `npm run dev` | Vite dev server (port 5173) |
+| `npm run build` | `tsc -b` + production build |
 | `npm run preview` | Preview production build |
-| `npm test` | Vitest |
+| `npm test` | Vitest (`src/features/e2ee/*.test.ts`, etc.) |
 | `npm run lint` | ESLint |
 
 ## Related docs
 
+- [../readme.md](../readme.md) — Monorepo overview & quick start
 - [../docs/INTEGRATION.md](../docs/INTEGRATION.md) — Auth, API, sockets
-- [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) — Monorepo setup & seed data
+- [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) — Setup, seed data, scripts
 - [../docs/CODEBASE_FEATURE_ANALYSIS.md](../docs/CODEBASE_FEATURE_ANALYSIS.md) — Feature status
+- [../backend/README.md](../backend/README.md) — API reference
 
 ## Known gaps
 
-- **Friends UI** — backend ready, no sidebar friends panel
+- **Friends UI** — backend ready; no dedicated friends sidebar yet
 - **Offline outbox** — partial reconnect flush
-- **CI / E2E** — no GitHub Actions / Playwright yet
+- **CI / E2E** — no GitHub Actions / Playwright in repo yet

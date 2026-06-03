@@ -1,4 +1,4 @@
-# Mernchat - Backend
+# Chat System — Backend
 
 Node.js **Express** API with **PostgreSQL** (Prisma), **Socket.IO** realtime, optional **Redis** for multi-node sockets, and optional **Web Push / FCM** for notifications.
 
@@ -10,136 +10,169 @@ Node.js **Express** API with **PostgreSQL** (Prisma), **Socket.IO** realtime, op
 | HTTP | Express 4 |
 | Database | PostgreSQL + Prisma ORM |
 | Realtime | Socket.IO 4 (JWT on connect) |
-| Auth | Access JWT (Bearer) + refresh token (httpOnly cookie + body fallback) |
-| Validation | Zod (request bodies / socket payloads) |
-| Docs | OpenAPI JSON at `/api/v1/openapi.json`, Swagger UI at `/api/docs` (dev by default) |
+| Auth | Access JWT (Bearer) + refresh token (httpOnly cookie + JSON body fallback) |
+| Validation | Zod (REST bodies + socket payloads) |
+| IDs | `crypto.randomUUID()` (no `uuid` package) |
+| Docs | OpenAPI at `/api/v1/openapi.json`, Swagger UI at `/api/docs` (dev by default) |
 
 ## Repository structure
 
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma      # Data model (User, Chat, Message, E2EE, Calls, …)
-│   └── migrations/        # SQL migrations
-├── scripts/               # Maintenance (e.g. orphan uploads cleanup)
+│   ├── schema.prisma       # User, Chat, Message, E2EE, Calls, …
+│   └── migrations/
+├── scripts/                # Seed, cleanup uploads, clear chat data
 ├── src/
-│   ├── app.ts             # Express app factory (middleware, `/api/v1` mount)
-│   ├── server.ts          # HTTP server + Socket.IO bootstrap + graceful shutdown
-│   ├── config/            # Env → typed AppConfig
-│   ├── routes/
-│   │   └── index.ts       # Composes all `/api/v1/*` routers
-│   ├── middleware/        # auth, rate-limit, errors, security (helmet, cors), request id
-│   ├── docs/              # OpenAPI builder + Swagger UI setup
-│   ├── lib/               # prisma, jwt, logger, push queue, shared helpers
-│   ├── modules/           # Feature modules (routes + controller + service + schemas)
+│   ├── app.ts              # Express factory (middleware, /api/v1)
+│   ├── server.ts           # HTTP + Socket.IO + graceful shutdown
+│   ├── config/             # Env → typed AppConfig (Zod)
+│   ├── routes/index.ts     # Composes all /api/v1 routers
+│   ├── middleware/         # auth (Bearer + optional query token), rate-limit, errors
+│   ├── docs/               # OpenAPI + Swagger UI
+│   ├── lib/                # prisma, jwt, push, uploads, user-display-name, …
+│   ├── modules/            # Feature modules (routes + controller + service + schemas)
 │   │   ├── auth/
 │   │   ├── health/
 │   │   ├── users/
-│   │   ├── chats/
+│   │   ├── chats/          # Large chats.service.ts (messages, groups, receipts, list)
 │   │   ├── messages/
-│   │   ├── groups/
+│   │   ├── groups/         # Thin alias over chats for group creation
 │   │   ├── friends/
 │   │   ├── polls/
-│   │   ├── files/         # Authenticated file download
-│   │   ├── uploads/       # Multipart upload + virus/size checks
-│   │   ├── devices/       # Push device registration (Web Push / FCM)
-│   │   ├── e2ee/          # Identity, devices, backup, DM E2EE flags
-│   │   ├── e2ee/recovery/ # Email step-up for backup restore
-│   │   ├── calls/         # Call history REST
-│   │   └── moderation/    # Blocks, reports
+│   │   ├── files/          # Authorized download (?token= for <img src>)
+│   │   ├── uploads/
+│   │   ├── devices/        # Web Push / FCM registration
+│   │   ├── e2ee/ + e2ee/recovery/
+│   │   ├── calls/
+│   │   └── moderation/
 │   └── sockets/
-│       ├── index.ts       # io instance, CORS, optional Redis adapter
-│       ├── handlers.ts    # message:send, receipts, typing, presence, call:* …
-│       ├── schemas.ts     # Zod for socket payloads
-│       └── *.ts           # Presence, call state, integration tests
+│       ├── index.ts        # io, CORS, optional Redis adapter
+│       ├── handlers.ts     # Connection + event wiring
+│       ├── handlers-shared.ts  # ack helpers, reconnect delivery flush
+│       ├── schemas.ts        # Zod socket payloads
+│       ├── chat-broadcast.ts, message-broadcast.ts, calls-state.ts, …
+│       └── *.integration.test.ts
 └── package.json
 ```
 
+**Monorepo note:** TypeScript `rootDir` includes `../shared` for shared utilities (e.g. HTTP URL helpers used by link preview).
+
 ## Quick start
 
-1. **PostgreSQL** - create a database and set `DATABASE_URL` in `.env` (copy from `.env.example`).
+1. **PostgreSQL** — create a database; set `DATABASE_URL` in `.env` (copy from `.env.example`).
 
 2. **Install & migrate**
 
    ```bash
    npm install
    npm run db:generate
-   npm run db:migrate:dev   # or db:migrate for deploy
+   npm run db:migrate:dev    # development
+   # npm run db:migrate     # production deploy
    ```
 
 3. **Run**
 
    ```bash
-   npm run dev              # tsx watch src/server.ts
+   npm run dev               # tsx watch src/server.ts
    ```
 
-   Default listen: `HOST` + `PORT` from env (often `http://0.0.0.0:4000`).
+   Default: `http://0.0.0.0:4000` (`HOST` + `PORT` from env).
 
-4. **API base path** - all REST routes are under **`/api/v1`**.
+4. **API base path** — all REST routes under **`/api/v1`**.
+
+**Dev seed** (optional dummy users/groups):
+
+```bash
+npm run db:seed-test
+# Remove later: CONFIRM=YES npm run db:remove-seed
+```
 
 ## REST API surface (summary)
 
-Routers are mounted in `src/routes/index.ts`. Typical patterns:
+Routers are mounted in `src/routes/index.ts`.
 
 | Prefix | Purpose |
 |--------|---------|
 | `GET /api/v1/health` | Liveness |
-| `GET /api/v1/openapi.json` | Machine-readable OpenAPI |
-| `GET /api/v1/config/public` | Public config (e.g. VAPID key for Web Push) |
-| `/api/v1/auth/*` | Register, login, refresh, logout, me, forgot/reset password |
-| `/api/v1/users/*` | Search users, profiles |
-| `/api/v1/chats/*` | List/create chats, messages, mute, E2EE mode, polls under chat |
+| `GET /api/v1/openapi.json` | OpenAPI spec |
+| `GET /api/v1/config/public` | Public config (e.g. VAPID key) |
+| `/api/v1/auth/*` | Register, login, refresh, logout, forgot/reset password |
+| `/api/v1/users/*` | Search, profiles |
+| `/api/v1/chats/*` | List/create, messages, mute, favorite, close, pin, E2EE mode, polls |
 | `/api/v1/messages/*` | Edit, delete, reactions |
-| `/api/v1/groups/*` | Group CRUD, members, roles |
-| `/api/v1/friends/*` | Friend requests, accept/reject, list |
+| `/api/v1/groups/*` | Group create (delegates to chats service), members, roles |
+| `/api/v1/friends/*` | Friend requests |
 | `/api/v1/polls/*` | Poll fetch & vote |
-| `/api/v1/files/*` | Authorized download of stored uploads |
-| `/api/v1/uploads/*` | Upload pipeline |
-| `/api/v1/devices/*` | Register Web Push / FCM tokens |
-| `/api/v1/e2ee/*` | Identity keys, device keys, encrypted backup, recovery flows |
-| `/api/v1/calls/history` | Recent call logs for current user |
-| `/api/v1/moderation/*` | Block/unblock, reports |
+| `/api/v1/files/*` | Authorized file download (Bearer or `?token=`) |
+| `/api/v1/uploads/*` | Multipart upload pipeline |
+| `/api/v1/devices/*` | Push device tokens |
+| `/api/v1/e2ee/*` | Keys, backup, recovery |
+| `/api/v1/calls/history` | Call logs |
+| `/api/v1/moderation/*` | Block, report |
 
-**Authoritative detail:** open Swagger at **`/api/docs`** (when enabled) or read `src/docs/openapi.ts` / generated `openapi.json`.
+**Detail:** Swagger at **`/api/docs`** when enabled, or `src/docs/openapi.ts`.
+
+### Chat member preferences (REST)
+
+| Endpoint | Body | Notes |
+|----------|------|--------|
+| `PATCH /api/v1/chats/:chatId/favorite` | `{ favorited: boolean }` | DMs and groups |
+| `PATCH /api/v1/chats/:chatId/close` | `{ closed: boolean }` | DMs only; cleared on new message |
+| `PATCH /api/v1/chats/:chatId/pin` | `{ pinned: boolean }` | |
+| `PATCH /api/v1/chats/:chatId/mute` | `{ mutedUntil: string \| null }` | |
+
+Leave group: `DELETE /api/v1/groups/:groupId/members/:userId` (self-leave allowed).
 
 ## Socket.IO (realtime)
 
-- **URL:** same origin as the API host (browser often uses `globalThis.location.origin`); path **`/socket.io`**.
-- **Auth:** `Authorization: Bearer <accessToken>` or `handshake.auth.token`.
-- **Server events** (examples): `session:ready`, `message:new`, `message:updated`, `message:deleted`, `reaction:*`, `receipt:*`, `typing:update`, `presence:changed`, **`call:incoming`**, **`call:ringing`**, **`call:answered`**, **`call:rejected`**, **`call:ended`**, **`call:ice`**, **`groupCall:started`**, **`groupCall:participantUpdate`**, **`groupCall:ended`**, **`groupCall:signal`**.
-- **Client events** (examples): `message:send`, `receipt:delivered`, `receipt:read`, `typing:start` / `typing:stop`, `presence:update`, **`call:offer`**, **`call:answer`**, **`call:reject`**, **`call:end`**, **`call:ice`**, **`groupCall:start`**, **`groupCall:join`**, **`groupCall:leave`**, **`groupCall:signal`** (many use ack callbacks `{ ok, data } | { ok: false, code, message }`).
+- **Path:** `/socket.io` on the same host as the API.
+- **Auth:** `handshake.auth.token` or `Authorization: Bearer <accessToken>`.
+- **Server → client (examples):** `session:ready`, `message:new`, `message:updated`, `message:deleted`, `reaction:*`, `receipt:*`, `typing:update`, `presence:changed`, `call:*`, `groupCall:*`.
+- **Client → server (examples):** `message:send`, `receipt:delivered`, `receipt:read`, `typing:start` / `typing:stop`, `presence:update`, `call:offer` / `answer` / `reject` / `end` / `ice`, `groupCall:start` / `join` / `leave` / `signal` (many use ack callbacks `{ ok, data } | { ok: false, code, message }`).
 
-Implementation: `src/sockets/handlers.ts` + `src/sockets/schemas.ts`. Optional **Redis** enables horizontal scaling of Socket.IO via `@socket.io/redis-adapter`.
+Implementation: `src/sockets/handlers.ts`, payloads in `src/sockets/schemas.ts`, shared ack/reconnect helpers in `handlers-shared.ts`. Optional **Redis** (`REDIS_URL`) for `@socket.io/redis-adapter`.
 
 ## Core functionality
 
-- **Accounts:** email/password, JWT access + refresh sessions, optional password reset email (SMTP).
-- **Chats:** direct and group threads, members, roles (Owner/Admin/Mod/Member), public/private visibility, last message, unread counts, per-member **favorite** / **close DM** / pin / mute.
-- **Messages:** ciphertext for E2EE, attachments metadata, replies, edits, soft delete, reactions, `@mention` metadata.
-- **E2EE:** `DM_V1` (mandatory direct chats) and `GROUP_V1` (sender-key group envelopes); server stores public keys / wrapped backups only.
-- **Groups:** create, patch, add/remove members, role changes, public join, system activity messages.
-- **Friends:** request / accept / reject / remove (API ready; frontend UI pending).
-- **Polls:** create in chat, vote, tallies.
-- **Uploads:** size/type limits, disk storage under `UPLOAD_DIR`.
-- **Push:** device tokens; Web Push (VAPID) and/or FCM; mention-aware routing (`notification-router.ts`).
-- **Calls:** 1:1 and group signaling (SDP/ICE not logged); **`CallLog`** + group call system messages for history.
-- **Search & previews:** in-chat message search (ILIKE); SSRF-safe link preview fetch + cache.
+- **Accounts:** email/password, JWT sessions, SMTP password reset (optional).
+- **Chats:** direct + group, roles, public/private visibility, favorites, close DM, pin, mute, unread counts.
+- **Messages:** E2EE ciphertext, attachments, replies, edits, soft delete, reactions, mentions.
+- **E2EE:** `DM_V1` (mandatory DMs), `GROUP_V1` (group sender-key); server stores keys/ciphertext only.
+- **Groups:** create, members, roles, public join, system activity messages via `group-system-message.ts`.
+- **Friends:** request / accept / reject (API ready).
+- **Polls:** create, vote, tallies.
+- **Uploads:** validated types/sizes, disk storage under `UPLOAD_DIR`.
+- **Push:** Web Push (VAPID) and/or FCM; mention-aware routing.
+- **Calls:** 1:1 + group signaling; `CallLog` + system messages for history.
+- **Search & previews:** in-chat ILIKE search; SSRF-safe link preview.
+
+## Shared libraries (selected)
+
+| Module | Role |
+|--------|------|
+| `lib/user-display-name.ts` | Single display-name resolver (chats, calls, group activity) |
+| `lib/validate-access-token.ts` | JWT verify + `authVersion` check |
+| `middleware/auth.ts` | `createRequireAuth`, `createRequireAuthOrQueryToken` (files) |
+| `lib/receipt-status.ts` | Message receipt status derivation |
+| `lib/notification-router.ts` | Push routing with mention awareness |
 
 ## Environment variables
 
-See **`.env.example`** for the full list. Important entries:
+See **`.env.example`**. Important entries:
 
 | Variable | Role |
 |----------|------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Signing secrets (min length enforced in config) |
+| `DATABASE_URL` | PostgreSQL |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Token signing |
 | `PORT`, `HOST` | HTTP + Socket.IO bind |
-| `CORS_ORIGIN` | Allowed browser origin(s) |
+| `CORS_ORIGIN` | Browser origin(s); add LAN URL for mobile dev |
 | `FRONTEND_URL` | Password-reset links |
 | `REFRESH_COOKIE_NAME` | httpOnly refresh cookie |
 | `UPLOAD_DIR`, `MAX_UPLOAD_MB` | File storage |
-| `REDIS_URL` | Optional Socket.IO adapter + presence |
+| `REDIS_URL` | Optional Socket.IO scale-out + presence |
 | `VAPID_*` / FCM vars | Optional push |
+| `SMTP_*` | Optional email (forgot password, E2EE recovery) |
 | `ENABLE_SWAGGER` | Expose `/api/docs` in production if set |
 
 ## NPM scripts
@@ -149,46 +182,40 @@ See **`.env.example`** for the full list. Important entries:
 | `npm run dev` | Watch mode (`tsx watch src/server.ts`) |
 | `npm run build` | `tsc` → `dist/` |
 | `npm start` | `node dist/backend/src/server.js` |
+| `npm run lint` | ESLint `src` |
 | `npm run db:generate` | Prisma client |
 | `npm run db:migrate:dev` | Dev migrations |
 | `npm run db:migrate` | Deploy migrations |
-| `npm test` | Vitest |
-| `npm run cleanup-uploads` | Orphan file maintenance script |
-| `npm run db:seed-test` | Dev-only dummy users & groups (see `scripts/seed-dummy-test-data.mjs`) |
-| `npm run db:remove-seed` | Remove seed data (`CONFIRM=YES` required) |
+| `npm run db:push` | Schema push (prototyping) |
+| `npm test` | Vitest unit/integration tests |
+| `npm run test:integration` | Auth integration test |
+| `npm run test:socket` | Socket integration test |
+| `npm run cleanup-uploads` | Orphan upload maintenance |
+| `npm run db:seed-test` | Dev dummy data |
+| `npm run db:remove-seed` | Remove seed (`CONFIRM=YES`) |
 | `npm run db:clear-chats` | Wipe chat/message data (destructive) |
-
-### Chat member preferences (REST)
-
-Per-user sidebar state on `ChatMember`:
-
-| Endpoint | Body | Notes |
-|----------|------|--------|
-| `PATCH /api/v1/chats/:chatId/favorite` | `{ favorited: boolean }` | DMs and groups |
-| `PATCH /api/v1/chats/:chatId/close` | `{ closed: boolean }` | DMs only; cleared when a new message arrives |
-| `PATCH /api/v1/chats/:chatId/pin` | `{ pinned: boolean }` | Pin in list |
-| `PATCH /api/v1/chats/:chatId/mute` | `{ mutedUntil: string \| null }` | Mute notifications |
-
-Leave a group: `DELETE /api/v1/groups/:groupId/members/:userId` (self-leave allowed).
-
-See [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) for seed script env vars (`SEED_JOIN_EMAIL`, `SEED_TEST_PASSWORD`).
 
 ## Testing
 
-- **Unit / integration:** Vitest (`src/**/*.test.ts`, `*.integration.test.ts`).
-- Exercise auth, sockets, uploads via focused npm scripts in `package.json` where defined.
+- **Vitest:** `src/**/*.test.ts`, `*.integration.test.ts`.
+- Run focused suites: `npm run test:integration`, `npm run test:socket`.
+
+Some unit tests use Prisma mocks; a few suites may need mock updates when schema or access helpers change.
 
 ## Security notes
 
-- Secrets never belong in git; use `.env` locally and a secrets manager in production.
-- Rate limits on login, forgot-password, refresh (configurable).
-- Helmet + CORS + structured logging (request IDs); sensitive fields redacted in logs where implemented.
-- Refresh tokens are hashed at rest; access tokens are short-lived.
+- Secrets in `.env` only — never commit real credentials.
+- Rate limits on auth routes (configurable).
+- Helmet, CORS, structured logging with request IDs.
+- Refresh tokens hashed at rest; short-lived access tokens.
+- File downloads require auth (header or query token) + membership check.
 
 ## Related
 
-- **Frontend:** `../frontend` — Vite SPA consuming `/api/v1` and Socket.IO (see `frontend/README.md`).
-- **Integration:** `../docs/INTEGRATION.md` — auth, proxy, socket contract.
-- **Feature status:** `../docs/CODEBASE_FEATURE_ANALYSIS.md` — implemented vs pending, roadmap, UI suggestions.
-- **E2EE boundaries:** `src/docs/e2ee-boundary.md`
-- **TURN (calls):** `../docs/coturn.md`
+- [../readme.md](../readme.md) — Monorepo overview
+- [../frontend/README.md](../frontend/README.md) — SPA, themes, PWA
+- [../docs/INTEGRATION.md](../docs/INTEGRATION.md) — Auth, proxy, socket contract
+- [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) — Full dev setup
+- [../docs/CODEBASE_FEATURE_ANALYSIS.md](../docs/CODEBASE_FEATURE_ANALYSIS.md) — Feature matrix
+- [src/docs/e2ee-boundary.md](src/docs/e2ee-boundary.md) — E2EE server boundaries
+- [../docs/coturn.md](../docs/coturn.md) — TURN for WebRTC
