@@ -1,7 +1,8 @@
 node_modules/
 dist/
 .env
-uploads/
+# User-uploaded files on disk (not the src/modules/uploads API code)
+/uploads/
 scripts/.seed-test-manifest.json
 *.log
 .DS_Store
