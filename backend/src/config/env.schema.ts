@@ -42,6 +42,12 @@ const envSchema = z
     AUTH_REFRESH_MAX: z.coerce.number().int().positive().default(60),
     /** Set to "false" to hide Swagger UI. When unset, Swagger is on in development only. */
     ENABLE_SWAGGER: z.string().optional(),
+    /** Public API base for OpenAPI servers (e.g. https://your-app.up.railway.app/api/v1). */
+    PUBLIC_API_URL: z
+      .string()
+      .url()
+      .optional()
+      .transform((v) => (v ? v.replace(/\/$/g, "") : undefined)),
     /** When set, Socket.IO uses `@socket.io/redis-adapter` for multi-node fan-out. */
     REDIS_URL: z.preprocess(
       (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),

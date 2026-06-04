@@ -38,6 +38,8 @@ export type AppConfig = {
   authRefreshMax: number;
   /** Swagger UI at /api/docs and OpenAPI JSON at /api/v1/openapi.json */
   swaggerEnabled: boolean;
+  /** Optional public API base URL for OpenAPI `servers` (production). */
+  publicApiUrl?: string;
   /** Optional Redis for Socket.IO adapter (cluster). */
   redisUrl?: string;
   /** Optional FCM / Firebase push. */
@@ -123,6 +125,7 @@ export function loadConfig(overrides?: Partial<NodeJS.ProcessEnv>): AppConfig {
     authRefreshWindowMs: env.AUTH_REFRESH_WINDOW_MS,
     authRefreshMax: env.AUTH_REFRESH_MAX,
     swaggerEnabled,
+    publicApiUrl: env.PUBLIC_API_URL,
     redisUrl: env.REDIS_URL,
     fcmProjectId: env.FCM_PROJECT_ID,
     fcmServiceAccountPath: env.FCM_SERVICE_ACCOUNT_PATH,

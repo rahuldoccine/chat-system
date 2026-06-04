@@ -19,20 +19,26 @@ import {
 
 /** OpenAPI 3.0 document for Swagger UI and `/api/v1/openapi.json`. */
 export function buildOpenApiDocument(config: AppConfig): Record<string, unknown> {
-  const serverUrl = `http://127.0.0.1:${config.port}/api/v1`;
+  const localServer = `http://127.0.0.1:${config.port}/api/v1`;
+  const servers = config.publicApiUrl
+    ? [
+        { url: config.publicApiUrl, description: "Deployed API" },
+        { url: localServer, description: "Local" },
+      ]
+    : [{ url: localServer, description: "API" }];
   const refreshCookie = config.refreshCookieName;
 
   return {
     openapi: "3.0.3",
     info: {
-      title: "Mernchat API",
+      title: "Chat System API",
       version: "0.1.0",
       description:
         "REST API for the chat backend. Access JWT: `Authorization: Bearer <token>`. Refresh: HttpOnly cookie `" +
         refreshCookie +
         "` on `/api/v1/auth` **or** JSON field `refreshToken` on refresh/logout.",
     },
-    servers: [{ url: serverUrl, description: "Local (Try it out)" }],
+    servers,
     tags: [
       { name: "Health", description: "Liveness and readiness" },
       { name: "Auth", description: "Registration, sessions, password reset" },

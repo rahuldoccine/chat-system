@@ -16,10 +16,14 @@ export function applySecurityMiddleware(app: Express, config: AppConfig): void {
           contentSecurityPolicy: {
             directives: {
               ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+              "default-src": ["'self'"],
               "script-src": ["'self'", "'unsafe-inline'"],
-              "style-src": ["'self'", "'unsafe-inline'", "https:"],
+              "script-src-attr": ["'unsafe-inline'"],
+              "style-src": ["'self'", "'unsafe-inline'"],
               "img-src": ["'self'", "data:", "https:", "blob:"],
-              "font-src": ["'self'", "https:", "data:"],
+              "font-src": ["'self'", "data:"],
+              "connect-src": ["'self'"],
+              "worker-src": ["'self'", "blob:"],
             },
           },
         })
