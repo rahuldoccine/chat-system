@@ -8,12 +8,14 @@ import {
   type DmV1Payload,
 } from './protocol';
 import {
+  ensureSenderKeyDistributed,
   fetchGroupSenderKeys,
   getOwnSenderKeyFromServer,
   getRememberedSenderKey,
   publishSenderKey,
   rememberSenderKey,
 } from './groupSenderKeys';
+import { resolveGroupMemberIds } from './groupMembers';
 
 async function importRawAesKey(bytes: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', new Uint8Array(bytes), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
@@ -24,14 +26,22 @@ export async function ensureGroupSenderKey(
   chatId: string,
   memberUserIds: string[],
 ): Promise<Uint8Array> {
+  const members = await resolveGroupMemberIds(chatId, memberUserIds);
+
   const existing = getRememberedSenderKey(chatId, userId, 0);
-  if (existing) return existing;
+  if (existing) {
+    await ensureSenderKeyDistributed(userId, chatId, 0, existing, members);
+    return existing;
+  }
 
   const fromServer = await getOwnSenderKeyFromServer(userId, chatId, 0);
-  if (fromServer) return fromServer;
+  if (fromServer) {
+    await ensureSenderKeyDistributed(userId, chatId, 0, fromServer, members);
+    return fromServer;
+  }
 
   const key = crypto.getRandomValues(new Uint8Array(32));
-  await publishSenderKey(userId, chatId, 0, key, memberUserIds);
+  await publishSenderKey(userId, chatId, 0, key, members);
   rememberSenderKey(chatId, userId, 0, key);
   return key;
 }
@@ -43,7 +53,8 @@ export async function encryptGroupMessage(
   plaintext: string,
   meta?: Record<string, unknown>,
 ): Promise<{ ciphertext: string; contentMeta: Record<string, unknown> }> {
-  const keyBytes = await ensureGroupSenderKey(userId, chatId, memberUserIds);
+  const members = await resolveGroupMemberIds(chatId, memberUserIds);
+  const keyBytes = await ensureGroupSenderKey(userId, chatId, members);
   const aesKey = await importRawAesKey(keyBytes);
   const payload = encodePayload({ text: plaintext, meta });
   const { iv, ct } = await aesGcmEncrypt(aesKey, payload);

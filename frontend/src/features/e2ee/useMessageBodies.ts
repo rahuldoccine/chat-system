@@ -22,7 +22,7 @@ import { decryptMessagePayload } from './decryptMessagePayload';
 import { mergeContentMetaWithStubs } from './transportFileStubs';
 import { parseE2eePollMeta, type E2eePollPayload } from './pollMeta';
 import { logDecryptFailure, retryDecryptMessage } from './decryptRetry';
-import { onE2eeKeysUnlocked } from './e2eeEvents';
+import { onE2eeGroupKeysUpdated, onE2eeKeysUnlocked } from './e2eeEvents';
 
 export type DecryptedBody = {
   text: string;
@@ -74,13 +74,21 @@ async function runMessageBodiesDecrypt(
 
   if (!toDecrypt.length || isCancelled()) return;
 
-  const material = await getLocalKeyMaterial(userId);
-  if (!material || isCancelled()) return;
-
   const fingerprintCache = new Map<string, string>();
   const onBody = (messageId: string, body: DecryptedBody) => {
     setBodies((prev) => ({ ...prev, [messageId]: body }));
   };
+
+  const material = await getLocalKeyMaterial(userId);
+  if (!material) {
+    if (!isCancelled()) {
+      for (const msg of toDecrypt) {
+        onBody(msg.id, pendingDecryptBody(msg, keysLocked));
+      }
+    }
+    return;
+  }
+  if (isCancelled()) return;
 
   for (let i = 0; i < toDecrypt.length; i += DECRYPT_CHUNK) {
     if (isCancelled()) return;
@@ -120,6 +128,15 @@ function senderE2eeDisplayText(
 function bodyFromPayload(payload: { text: string; meta?: Record<string, unknown> }): DecryptedBody {
   const preview = payload.meta?.preview as LinkPreviewMeta | undefined;
   return { text: payload.text, preview, meta: payload.meta };
+}
+
+function pendingDecryptBody(_msg: Message, keysLocked: boolean): DecryptedBody {
+  if (keysLocked) {
+    return {
+      text: 'Unlock encryption with your password (Settings) to read encrypted messages.',
+    };
+  }
+  return { text: '[Unable to decrypt]' };
 }
 
 function unavailableSenderBody(msg: Message, keysLocked: boolean): DecryptedBody {
@@ -244,12 +261,16 @@ export function useMessageBodies(
   const { user, e2eeKeysLocked } = useAuth();
   const [bodies, setBodies] = useState<Record<string, DecryptedBody>>({});
   const [unlockGeneration, setUnlockGeneration] = useState(0);
+  const [groupKeysGeneration, setGroupKeysGeneration] = useState(0);
 
   const messagesKey = useMemo(
     () =>
       messages?.length
         ? messages
-            .map((m) => `${m.id}:${m.ciphertext?.length ?? 0}:${m.editedAt ?? ''}`)
+            .map(
+              (m) =>
+                `${m.clientMessageId ?? m.id}:${m.ciphertext?.length ?? 0}:${m.editedAt ?? ''}`,
+            )
             .join(',')
         : '',
     [messages],
@@ -265,13 +286,21 @@ export function useMessageBodies(
   }, [user?.id]);
 
   useEffect(() => {
+    return onE2eeGroupKeysUpdated((chatId) => {
+      if (messages?.some((m) => m.chatId === chatId && isGroupE2eeMessage(m))) {
+        setGroupKeysGeneration((n) => n + 1);
+      }
+    });
+  }, [messages]);
+
+  useEffect(() => {
     if (!user?.id || !messages?.length || e2eeKeysLocked) return;
     let cancelled = false;
     void runMessageBodiesDecrypt(user.id, messages, e2eeKeysLocked, () => cancelled, setBodies);
     return () => {
       cancelled = true;
     };
-  }, [messagesKey, user?.id, e2eeKeysLocked, unlockGeneration, messages]);
+  }, [messagesKey, user?.id, e2eeKeysLocked, unlockGeneration, groupKeysGeneration, messages]);
 
   return bodies;
 }

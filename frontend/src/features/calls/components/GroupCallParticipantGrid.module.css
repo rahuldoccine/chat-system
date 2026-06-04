@@ -87,6 +87,14 @@
   background: #020617;
 }
 
+.tileVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+
 .tileAvatar {
   width: min(42%, 88px);
   height: min(42%, 88px);

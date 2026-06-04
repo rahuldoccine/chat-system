@@ -1,4 +1,12 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +19,7 @@ import {
 } from './cameraSwitch';
 import GroupCallOverlay from './components/GroupCallOverlay';
 import GroupCallIncomingPrompt from './components/GroupCallIncomingPrompt';
+import { GroupCallMesh, type GroupCallSignalType } from './GroupCallMesh';
 
 type GroupCallState = {
   sessionId: string | null;
@@ -70,6 +79,10 @@ function endGroupCallSession(state: GroupCallState, endedSessionId: string): Gro
   };
 }
 
+function stopGroupCallMesh(mesh: GroupCallMesh | null): void {
+  mesh?.stop();
+}
+
 function applyStartAck(
   ack: StartAck | undefined,
   userId: string,
@@ -96,11 +109,21 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
   const [state, setState] = useState<GroupCallState>(INITIAL_STATE);
   const [dismissedIncomingSessionId, setDismissedIncomingSessionId] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<CameraFacing>(DEFAULT_CAMERA_FACING);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const meshRef = useRef<GroupCallMesh | null>(null);
+
+  if (!meshRef.current) {
+    meshRef.current = new GroupCallMesh(() => {
+      setRemoteStreams(meshRef.current?.getRemoteStreams() ?? {});
+    });
+  }
 
   const leaveGroupCall = useCallback(() => {
     if (socket && state.sessionId) {
       socket.emit('groupCall:leave', { sessionId: state.sessionId });
     }
+    stopGroupCallMesh(meshRef.current);
+    setRemoteStreams({});
     stopLocalStream(state.localStream);
     setState(INITIAL_STATE);
   }, [socket, state.sessionId, state.localStream]);
@@ -131,19 +154,60 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
     };
 
     const onEnded = (p: { sessionId: string }) => {
+      stopGroupCallMesh(meshRef.current);
+      setRemoteStreams({});
       setState((s) => endGroupCallSession(s, p.sessionId));
       setDismissedIncomingSessionId((prev) => (prev === p.sessionId ? null : prev));
+    };
+
+    const onSignal = (p: {
+      sessionId: string;
+      fromUserId: string;
+      type: GroupCallSignalType;
+      payload: unknown;
+    }) => {
+      void meshRef.current?.handleSignal(p.fromUserId, p.type, p.payload);
     };
 
     socket.on('groupCall:started', onStarted);
     socket.on('groupCall:participantUpdate', onUpdate);
     socket.on('groupCall:ended', onEnded);
+    socket.on('groupCall:signal', onSignal);
     return () => {
       socket.off('groupCall:started', onStarted);
       socket.off('groupCall:participantUpdate', onUpdate);
       socket.off('groupCall:ended', onEnded);
+      socket.off('groupCall:signal', onSignal);
     };
   }, [socket]);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || !socket || !user?.id || !state.sessionId || !state.localStream) return;
+
+    mesh.start(state.sessionId, user.id, state.localStream);
+    mesh.setSignaler((targetUserId, type, payload) => {
+      socket.emit('groupCall:signal', {
+        sessionId: state.sessionId,
+        targetUserId,
+        type,
+        payload,
+      });
+    });
+    mesh.syncParticipants(state.participants);
+
+    return () => {
+      mesh.setSignaler(null);
+    };
+  }, [socket, user?.id, state.sessionId, state.localStream]);
+
+  useEffect(() => {
+    meshRef.current?.syncParticipants(state.participants);
+  }, [state.participants]);
+
+  useEffect(() => {
+    meshRef.current?.updateLocalStream(state.localStream);
+  }, [state.localStream]);
 
   const startGroupCall = useCallback(
     async (chatId: string, video = false) => {
@@ -226,6 +290,8 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
     const { ok, facing } = await switchVideoCamera(stream, cameraFacing, null);
     if (ok) {
       setCameraFacing(facing);
+      const track = stream.getVideoTracks()[0] ?? null;
+      meshRef.current?.replaceVideoTrack(track);
       setState((s) => ({ ...s }));
       return true;
     }
@@ -265,6 +331,7 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
           chatId={state.chatId}
           kind={state.kind}
           participants={state.participants}
+          remoteStreams={remoteStreams}
           localStream={state.localStream}
           startedAtMs={state.startedAtMs}
           onLeave={leaveGroupCall}

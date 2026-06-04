@@ -48,6 +48,7 @@ type GroupCallOverlayProps = Readonly<{
   chatId: string;
   kind: 'AUDIO' | 'VIDEO';
   participants: string[];
+  remoteStreams: Record<string, MediaStream>;
   localStream: MediaStream | null;
   startedAtMs: number | null;
   onLeave: () => void;
@@ -62,6 +63,7 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
   chatId,
   kind,
   participants,
+  remoteStreams,
   localStream,
   startedAtMs,
   onLeave,
@@ -150,6 +152,8 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
                 localUserId={user?.id}
                 excludeLocalFromGrid={useLocalPip}
                 activeSpeakerId={activeSpeakerId}
+                remoteStreams={remoteStreams}
+                isVideoCall
               />
               {useLocalPip && (
                 <GroupCallLocalPip
@@ -171,6 +175,8 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
                 participantIds={participantIds}
                 localUserId={user?.id}
                 activeSpeakerId={activeSpeakerId}
+                remoteStreams={remoteStreams}
+                isVideoCall={false}
               />
             </div>
           )}

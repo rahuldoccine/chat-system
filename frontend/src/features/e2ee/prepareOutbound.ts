@@ -2,6 +2,7 @@ import type { Chat } from '../chat/types';
 import { buildPushPreview } from '../chat/utils/pushPreview';
 import { isDmE2eeChat, isGroupE2eeChat } from './chatE2ee';
 import { encryptGroupMessage } from './groupChat';
+import { resolveGroupMemberIds } from './groupMembers';
 import { GROUP_E2EE_VERSION } from './protocol';
 import { ensureE2eeReady, E2eeKeysLockedError } from './bootstrap';
 import { encryptDirectMessage, E2eePeerNotReadyError } from './directChat';
@@ -98,7 +99,7 @@ export async function prepareOutboundMessage(
 
   if (isGroupE2eeChat(chat ?? null) && input.chatId) {
     await ensureE2eeReady(userId, { offline: offlineMode });
-    const memberIds = input.groupMemberIds ?? [];
+    const memberIds = await resolveGroupMemberIds(input.chatId, input.groupMemberIds);
     const plainMeta = plainMetaFromInput(input.contentMeta);
     const encrypted = await encryptGroupMessage(
       userId,

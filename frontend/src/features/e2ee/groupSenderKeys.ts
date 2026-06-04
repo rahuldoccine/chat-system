@@ -1,5 +1,6 @@
 import api from '../../api/axios';
 import { decryptDirectPayload, encryptDirectMessage } from './directChat';
+import { listPeerDevices } from './e2eeApi';
 import {
   idbLoadGroupSenderKeys,
   idbPutGroupSenderKey,
@@ -72,10 +73,54 @@ export function getRememberedSenderKey(
 type DistributionV2 = {
   v?: number;
   self?: { key?: string; epoch?: number };
-  wrapped?: Record<string, string>;
+  /** Legacy: one ciphertext per member. New: deviceId → ciphertext for multi-device members. */
+  wrapped?: Record<string, string | Record<string, string>>;
   key?: string;
   epoch?: number;
 };
+
+async function unwrapSenderKeyCiphertext(
+  viewerUserId: string,
+  senderId: string,
+  epoch: number,
+  ciphertext: string,
+  chatId: string,
+): Promise<boolean> {
+  const payload = await decryptDirectPayload(
+    viewerUserId,
+    {
+      id: `group-key-${senderId}-${epoch}`,
+      ciphertext,
+      senderId,
+      contentMeta: {},
+    },
+    viewerUserId,
+  );
+  const meta = payload?.meta as { groupSenderKey?: { key?: string } } | undefined;
+  const keyB64 = meta?.groupSenderKey?.key;
+  if (typeof keyB64 !== 'string') return false;
+  rememberSenderKey(chatId, senderId, epoch, keyBytesFromB64(keyB64));
+  return true;
+}
+
+async function unwrapWrappedEntryForViewer(
+  viewerUserId: string,
+  senderId: string,
+  epoch: number,
+  entry: string | Record<string, string>,
+  chatId: string,
+): Promise<boolean> {
+  if (typeof entry === 'string') {
+    return unwrapSenderKeyCiphertext(viewerUserId, senderId, epoch, entry, chatId);
+  }
+  for (const ciphertext of Object.values(entry)) {
+    if (typeof ciphertext !== 'string') continue;
+    if (await unwrapSenderKeyCiphertext(viewerUserId, senderId, epoch, ciphertext, chatId)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 async function parseDistributionRow(
   viewerUserId: string,
@@ -93,19 +138,15 @@ async function parseDistributionRow(
       rememberSenderKey(row.chatId, row.senderId, row.epoch, keyBytesFromB64(parsed.self.key));
       return;
     }
-    const wrapped = parsed.wrapped?.[viewerUserId];
-    if (wrapped) {
-      const payload = await decryptDirectPayload(viewerUserId, {
-        id: `group-key-${row.senderId}-${row.epoch}`,
-        ciphertext: wrapped,
-        senderId: row.senderId,
-        contentMeta: {},
-      }, viewerUserId);
-      const meta = payload?.meta as { groupSenderKey?: { key?: string } } | undefined;
-      const keyB64 = meta?.groupSenderKey?.key;
-      if (typeof keyB64 === 'string') {
-        rememberSenderKey(row.chatId, row.senderId, row.epoch, keyBytesFromB64(keyB64));
-      }
+    const wrappedEntry = parsed.wrapped?.[viewerUserId];
+    if (wrappedEntry) {
+      await unwrapWrappedEntryForViewer(
+        viewerUserId,
+        row.senderId,
+        row.epoch,
+        wrappedEntry,
+        row.chatId,
+      );
       return;
     }
   }
@@ -135,6 +176,97 @@ export async function fetchGroupSenderKeys(
   }
 }
 
+async function wrapSenderKeyForMember(
+  userId: string,
+  peerId: string,
+  keyB64: string,
+  epoch: number,
+): Promise<string | Record<string, string> | null> {
+  let devices: Awaited<ReturnType<typeof listPeerDevices>> = [];
+  try {
+    devices = await listPeerDevices(peerId);
+  } catch {
+    devices = [];
+  }
+
+  const meta = { groupSenderKey: { key: keyB64, epoch } };
+  const byDevice: Record<string, string> = {};
+
+  for (const device of devices) {
+    try {
+      const enc = await encryptDirectMessage(userId, {
+        peerUserId: peerId,
+        preferPeerDeviceId: device.deviceId,
+        plaintext: '',
+        contentMeta: meta,
+      });
+      byDevice[device.deviceId] = enc.ciphertext;
+    } catch {
+      /* try other devices */
+    }
+  }
+
+  if (Object.keys(byDevice).length > 1) return byDevice;
+  if (Object.keys(byDevice).length === 1) {
+    return Object.values(byDevice)[0] ?? null;
+  }
+
+  try {
+    const enc = await encryptDirectMessage(userId, {
+      peerUserId: peerId,
+      plaintext: '',
+      contentMeta: meta,
+    });
+    return enc.ciphertext;
+  } catch {
+    return null;
+  }
+}
+
+/** Re-publish when earlier distributions omitted members or only wrapped one of a member's devices. */
+export async function ensureSenderKeyDistributed(
+  userId: string,
+  chatId: string,
+  epoch: number,
+  keyBytes: Uint8Array,
+  memberUserIds: string[],
+): Promise<void> {
+  const members = memberUserIds.filter((id) => id && id !== userId);
+  if (!members.length) return;
+
+  await ensureIdbHydrated();
+  const res = await api.get(`/e2ee/group-keys/${chatId}`);
+  const rows = (res.data?.data ?? []) as Array<{
+    senderId: string;
+    epoch: number;
+    distribution: string;
+  }>;
+  const own = rows.find((r) => r.senderId === userId && r.epoch === epoch);
+  let needsRepublish = !own;
+
+  if (own?.distribution) {
+    try {
+      const parsed = JSON.parse(own.distribution) as DistributionV2;
+      if (parsed.v === 2 && parsed.wrapped) {
+        for (const memberId of members) {
+          if (!parsed.wrapped[memberId]) {
+            needsRepublish = true;
+            break;
+          }
+        }
+      } else {
+        needsRepublish = true;
+      }
+    } catch {
+      needsRepublish = true;
+    }
+  }
+
+  if (needsRepublish) {
+    await publishSenderKey(userId, chatId, epoch, keyBytes, memberUserIds);
+  }
+}
+
 export async function publishSenderKey(
   userId: string,
   chatId: string,
@@ -144,15 +276,11 @@ export async function publishSenderKey(
 ): Promise<void> {
   await ensureIdbHydrated();
   const keyB64 = keyBytesToB64(keyBytes);
-  const wrapped: Record<string, string> = {};
+  const wrapped: Record<string, string | Record<string, string>> = {};
   for (const peerId of memberUserIds) {
     if (peerId === userId) continue;
-    const enc = await encryptDirectMessage(userId, {
-      peerUserId: peerId,
-      plaintext: '',
-      contentMeta: { groupSenderKey: { key: keyB64, epoch } },
-    });
-    wrapped[peerId] = enc.ciphertext;
+    const entry = await wrapSenderKeyForMember(userId, peerId, keyB64, epoch);
+    if (entry) wrapped[peerId] = entry;
   }
   const distribution = JSON.stringify({
     v: 2,
