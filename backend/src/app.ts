@@ -16,6 +16,10 @@ export function createApp(deps: { config: AppConfig; logger: Logger }): express.
   const { config, logger } = deps;
   const app = express();
 
+  if (process.env.RAILWAY_ENVIRONMENT) {
+    app.set("trust proxy", 1);
+  }
+
   applySecurityMiddleware(app, config);
   app.use(requestIdMiddleware);
   app.use(cookieParser());

@@ -6,7 +6,8 @@ import helmet from "helmet";
 import type { AppConfig } from "../config/index.js";
 
 export function applySecurityMiddleware(app: Express, config: AppConfig): void {
-  if (config.isProd) {
+  // Railway / reverse proxies: required for correct HTTPS and to avoid redirect loops
+  if (config.isProd || process.env.RAILWAY_ENVIRONMENT) {
     app.set("trust proxy", 1);
   }
 
