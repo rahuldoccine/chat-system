@@ -1,4 +1,5 @@
 import type { AppConfig } from "../config/index.js";
+import { normalizePublicApiBaseUrl } from "../lib/public-api-url.js";
 import {
   authTokensResponse,
   bearerAuthSecurity,
@@ -22,8 +23,7 @@ function isLocalOrigin(origin: string): boolean {
 }
 
 function apiBaseFromOrigin(origin: string): string {
-  const base = origin.replace(/\/$/, "");
-  return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+  return normalizePublicApiBaseUrl(origin);
 }
 
 /** Swagger "Servers" list: live URL first; local only in development. */
@@ -37,15 +37,16 @@ export function resolveOpenApiServers(
       ? apiBaseFromOrigin(requestOrigin)
       : undefined;
   const liveServer = config.publicApiUrl ?? fromRequest;
+  const liveUrl = liveServer ? normalizePublicApiBaseUrl(liveServer) : undefined;
 
-  if (liveServer) {
+  if (liveUrl) {
     if (config.isDev) {
       return [
-        { url: liveServer, description: "Live API" },
+        { url: liveUrl, description: "Live API" },
         { url: localServer, description: "Local" },
       ];
     }
-    return [{ url: liveServer, description: "Live API" }];
+    return [{ url: liveUrl, description: "Live API" }];
   }
   return [{ url: localServer, description: "API" }];
 }

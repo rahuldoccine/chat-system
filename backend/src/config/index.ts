@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import path from "node:path";
 
+import { normalizePublicApiBaseUrl } from "../lib/public-api-url.js";
 import { parseEnv, type EnvSchema } from "./env.schema.js";
 
 export type AppConfig = {
@@ -85,12 +86,11 @@ function resolvePublicApiUrl(
   runtime: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
   if (explicit) {
-    return explicit.replace(/\/$/g, "");
+    return normalizePublicApiBaseUrl(explicit);
   }
   const staticUrl = runtime.RAILWAY_STATIC_URL?.trim();
   if (staticUrl) {
-    const base = staticUrl.replace(/\/$/g, "");
-    return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+    return normalizePublicApiBaseUrl(staticUrl);
   }
   const domain = runtime.RAILWAY_PUBLIC_DOMAIN?.trim();
   if (domain) {
