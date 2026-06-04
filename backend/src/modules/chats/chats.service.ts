@@ -653,8 +653,8 @@ export async function patchChatE2eeMode(userId: string, chatId: string, e2eeMode
       throw new AppError(400, "INVALID_CHAT", "Direct chats only support DM_V1");
     }
   } else if (chat.type === "GROUP") {
-    if (e2eeMode !== "NONE" && e2eeMode !== "GROUP_V1") {
-      throw new AppError(400, "INVALID_CHAT", "Groups support NONE or GROUP_V1");
+    if (e2eeMode !== "NONE" && e2eeMode !== "DM_V1") {
+      throw new AppError(400, "INVALID_CHAT", "Groups support NONE or DM_V1");
     }
   }
   await prisma.chat.update({
@@ -759,7 +759,7 @@ async function createGroupChat(
   body: {
     title: string;
     memberIds?: string[];
-    e2eeMode?: "NONE" | "GROUP_V1";
+    e2eeMode?: "NONE" | "DM_V1" | "GROUP_V1";
     groupVisibility?: "PRIVATE" | "PUBLIC";
   },
 ) {
@@ -775,7 +775,8 @@ async function createGroupChat(
     }
   }
 
-  const groupE2ee = body.e2eeMode === "GROUP_V1" ? "GROUP_V1" : "NONE";
+  const groupE2ee =
+    body.e2eeMode === "DM_V1" || body.e2eeMode === "GROUP_V1" ? "DM_V1" : "NONE";
   const groupVisibility = body.groupVisibility ?? "PRIVATE";
 
   const chat = await prisma.$transaction(async (tx) => {
@@ -832,7 +833,7 @@ export async function createChat(
         type: "GROUP";
         title: string;
         memberIds?: string[];
-        e2eeMode?: "NONE" | "GROUP_V1";
+        e2eeMode?: "NONE" | "DM_V1" | "GROUP_V1";
         groupVisibility?: "PRIVATE" | "PUBLIC";
       },
 ) {
@@ -1121,7 +1122,7 @@ export async function createMessage(
     throw new AppError(404, "NOT_FOUND", "Chat not found");
   }
   const { isE2ee } = resolveChatE2eeFlags(chat);
-  assertE2eeMessageInput(isE2ee, input.ciphertext, input.contentMeta);
+  assertE2eeMessageInput(chat, isE2ee, input.ciphertext, input.contentMeta);
 
   const idempotentHit = await loadIdempotentCreateMessageResult(
     prisma,

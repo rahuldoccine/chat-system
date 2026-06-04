@@ -5,6 +5,7 @@ import { decryptMessagePayload, resolveSenderFingerprint } from './decryptMessag
 import { decryptGroupMessage } from './groupChat';
 import { fetchGroupSenderKeys } from './groupSenderKeys';
 import { isGroupE2eeMessage, type DmV1Payload } from './protocol';
+import { isGroupDmE2eeMessage } from './groupDmChat';
 import {
   ensureSentPlaintextHydrated,
   getSentPlaintext,
@@ -47,6 +48,9 @@ async function retryOwnSenderMessage(
   const sent = getSentPlaintext(userId, msg) ?? (await getSentPlaintextAsync(userId, msg));
   if (sent !== undefined) {
     return { payload: { text: sent } };
+  }
+  if (isGroupDmE2eeMessage(msg)) {
+    return null;
   }
   if (!isGroupE2eeMessage(msg)) {
     return null;
@@ -107,7 +111,7 @@ export async function retryDecryptMessage(
     return { payload: null, reason: 'sent_plaintext_missing' };
   }
 
-  if (isGroupE2eeMessage(msg)) {
+  if (isGroupE2eeMessage(msg) && !isGroupDmE2eeMessage(msg)) {
     return retryIncomingGroupMessage(userId, msg, fingerprintCache);
   }
 

@@ -114,6 +114,8 @@ export type Message = {
     height?: number;
     preview?: LinkPreviewMeta;
     e2eeVersion?: string;
+    /** Group dm-v1: per-member encrypted envelopes (same format as DM ciphertext). */
+    recipientCiphertexts?: Record<string, string>;
     mentions?: { userIds?: string[]; all?: boolean };
     groupActivity?: Record<string, unknown>;
     /** E2EE transport attachment manifest (no encryption keys). */

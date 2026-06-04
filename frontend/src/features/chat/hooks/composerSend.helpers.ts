@@ -1,7 +1,6 @@
 import { toast } from 'sonner';
 import { E2eePeerNotReadyError } from '../../e2ee/directChat';
 import { E2eeKeysLockedError } from '../../e2ee/bootstrap';
-import { GroupKeyDistributionError } from '../../e2ee/groupSenderKeys';
 import { sendComposerMedia } from './composerSendMedia';
 import { sendComposerText } from './composerSendText';
 import type { ComposerSendContext, ComposerSendDeps } from './composerSend.types';
@@ -9,11 +8,7 @@ import type { ComposerSendContext, ComposerSendDeps } from './composerSend.types
 export type { ComposerSendContext, ComposerSendDeps } from './composerSend.types';
 
 function handleComposerSendError(err: unknown): boolean {
-  if (
-    err instanceof E2eePeerNotReadyError ||
-    err instanceof E2eeKeysLockedError ||
-    err instanceof GroupKeyDistributionError
-  ) {
+  if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
     toast.error(err.message);
     return true;
   }

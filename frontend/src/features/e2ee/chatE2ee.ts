@@ -6,6 +6,13 @@ export function isDmE2eeChat(chat: Pick<Chat, 'type' | 'e2eeMode'> | null | unde
 }
 
 export function isGroupE2eeChat(chat: Pick<Chat, 'type' | 'e2eeMode'> | null | undefined): boolean {
+  return chat?.type === 'GROUP' && chat.e2eeMode === 'DM_V1';
+}
+
+/** @deprecated Legacy sender-key groups; read-only decrypt. */
+export function isLegacyGroupV1E2eeChat(
+  chat: Pick<Chat, 'type' | 'e2eeMode'> | null | undefined,
+): boolean {
   return chat?.type === 'GROUP' && chat.e2eeMode === 'GROUP_V1';
 }
 

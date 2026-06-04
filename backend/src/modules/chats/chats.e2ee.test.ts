@@ -56,6 +56,19 @@ describe("E2EE DM invariants", () => {
     ).rejects.toMatchObject({ code: "E2EE_REQUIRED" });
   });
 
+  it("rejects group E2EE without recipientCiphertexts", async () => {
+    prisma.chat.findUnique.mockResolvedValueOnce({ type: "GROUP", e2eeMode: "DM_V1" });
+
+    await expect(
+      createMessage("u1", "c1", {
+        clientMessageId: "g1",
+        kind: "TEXT" as MessageKind,
+        ciphertext: "ct",
+        contentMeta: { e2eeVersion: "dm-v1" },
+      }),
+    ).rejects.toMatchObject({ code: "E2EE_META_INVALID" });
+  });
+
   it("rejects missing contentMeta.e2eeVersion for DM_V1 direct chats", async () => {
     type Tx = {
       message: { create: (args: unknown) => Promise<unknown> };

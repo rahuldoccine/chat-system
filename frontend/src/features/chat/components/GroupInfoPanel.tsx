@@ -24,8 +24,6 @@ import {
   roleLabel,
 } from '../utils/groupRoles';
 import { isChatMuted, muteUntilIndefinite } from '../utils/mute';
-import { isGroupE2eeChat } from '../../e2ee/chatE2ee';
-import { refreshMyGroupSenderKeys } from '../../e2ee/groupE2eeRecovery';
 import { useMuteChat, getApiErrorMessage } from '../../settings/hooks/useUserSettings';
 import UserAvatar from './UserAvatar';
 import ChatAvatar from './ChatAvatar';
@@ -53,7 +51,6 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
   );
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leavePending, setLeavePending] = useState(false);
-  const [refreshKeysPending, setRefreshKeysPending] = useState(false);
   const { mutateAsync: muteChat, isPending: muting } = useMuteChat();
   const { data: searchData } = useSearchUsers(addQuery);
 
@@ -74,22 +71,6 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
   const canEditInfoAndVisibility = myRole === 'OWNER' || myRole === 'ADMIN';
   const canInvite = myRole === 'OWNER' || myRole === 'ADMIN';
   const canMod = canModerateMessages(myRole);
-  const isGroupE2ee = isGroupE2eeChat(chat);
-
-  const handleRefreshGroupKeys = async () => {
-    if (!user?.id || refreshKeysPending) return;
-    setRefreshKeysPending(true);
-    try {
-      const memberIds = group?.members.map((m) => m.userId);
-      await refreshMyGroupSenderKeys(user.id, chat.id, memberIds);
-      toast.success('Group encryption keys updated for new messages');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not refresh encryption keys');
-    } finally {
-      setRefreshKeysPending(false);
-    }
-  };
-
   const handleSaveTitle = async () => {
     const t = editTitle.trim();
     if (!t || t === chat.title) return;
@@ -328,33 +309,6 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
               </div>
             )}
           </div>
-
-          {isGroupE2ee && (
-            <div className={styles.settingsBlock}>
-              <h4 className={styles.blockTitle}>Encryption</h4>
-              <p className={styles.e2eeHint}>
-                If others cannot read your new messages, refresh your sender keys. They must send a
-                new message after you refresh.
-              </p>
-              <button
-                type="button"
-                className={styles.e2eeKeyRefreshBtn}
-                disabled={refreshKeysPending}
-                onClick={handler(() => {
-                  void handleRefreshGroupKeys();
-                })}
-              >
-                {refreshKeysPending ? (
-                  <>
-                    <Loader2 size={16} className={styles.spinner} />
-                    Refreshing…
-                  </>
-                ) : (
-                  'Refresh my encryption keys'
-                )}
-              </button>
-            </div>
-          )}
 
           <div className={styles.settingsBlock}>
             <h4 className={styles.blockTitle}>Notifications</h4>

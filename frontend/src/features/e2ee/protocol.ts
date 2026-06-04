@@ -31,6 +31,7 @@ export function isE2eeMessage(msg: {
   return typeof v === 'string' && v.length > 0;
 }
 
+/** Legacy group-v1 sender-key messages (read-only decrypt). */
 export function isGroupE2eeMessage(msg: {
   contentMeta?: { e2eeVersion?: string } | null;
 }): boolean {

@@ -1,19 +1,6 @@
-import { useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import type { Chat } from '../chat/types';
-import { isGroupE2eeChat } from './chatE2ee';
-import { fetchGroupSenderKeys } from './groupSenderKeys';
-import { emitE2eeGroupKeysUpdated } from './e2eeEvents';
 
-/** Prefetch group sender keys when opening a GROUP_V1 chat. */
-export function useE2eeChatPrefetch(chatId: string | null, chat: Chat | null | undefined): void {
-  const { user, e2eeKeysLocked } = useAuth();
-
-  useEffect(() => {
-    if (!user?.id || !chatId || !chat || e2eeKeysLocked) return;
-    if (!isGroupE2eeChat(chat)) return;
-    void fetchGroupSenderKeys(chatId, user.id).then(() => {
-      emitE2eeGroupKeysUpdated(chatId);
-    });
-  }, [chat, chatId, e2eeKeysLocked, user?.id]);
+/** Group E2EE uses per-member dm-v1 envelopes; no sender-key prefetch. */
+export function useE2eeChatPrefetch(_chatId: string | null, _chat: Chat | null | undefined): void {
+  /* no-op */
 }

@@ -32,7 +32,8 @@ export async function fetchGroup(groupId: string): Promise<GroupDetails> {
 export async function createGroup(input: {
   title: string;
   memberIds?: string[];
-  e2eeMode?: 'NONE' | 'GROUP_V1';
+  /** Encrypted groups use the same dm-v1 protocol as direct chats (per-member envelopes). */
+  e2eeMode?: 'NONE' | 'DM_V1';
   groupVisibility?: GroupVisibility;
 }): Promise<{ chat: { id: string }; created: boolean }> {
   const res = await api.post('/groups', {

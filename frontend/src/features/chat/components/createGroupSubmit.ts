@@ -29,7 +29,7 @@ export async function submitCreateGroup(params: {
   const result = await createGroup({
     title: name,
     memberIds: params.selected.map((u) => u.id),
-    e2eeMode: 'GROUP_V1',
+    e2eeMode: 'DM_V1',
     groupVisibility: params.visibility,
   });
 

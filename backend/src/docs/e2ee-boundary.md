@@ -1,6 +1,6 @@
 ## E2EE boundary (DIRECT and GROUP chats)
 
-This backend supports **ciphertext-only** storage and transport for **private (DIRECT) chats** when `Chat.e2eeMode = DM_V1`, and for **groups** when `Chat.e2eeMode = GROUP_V1` (sender-key envelopes; opaque key distribution in `GroupSenderKey`).
+This backend supports **ciphertext-only** storage and transport for **private (DIRECT) chats** and **encrypted groups** when `Chat.e2eeMode = DM_V1`, using the same **dm-v1** envelope format. Group messages store per-member ciphertexts in `contentMeta.recipientCiphertexts` (one dm-v1 envelope per recipient). Legacy `GROUP_V1` sender-key messages may remain in the database until replaced by new traffic.
 
 ### Backend is allowed to know
 - **Participants and membership**: `chatId`, `senderId`, recipients (via `ChatMember`)
@@ -19,9 +19,12 @@ Account verification (email/MFA step-up) may gate access to **wrapped** key back
 - `KeyBackup.wrappedPrivateKeyMaterial` is opaque and only usable with client-held recovery material.
 - Backup payload **v2** (client-side JSON before wrapping) may include: identity/device/prekey material, sent-plaintext index, and group sender keys. The server stores only the wrapped blob.
 
-### Group sender-key distribution (`group-v1`)
-- `GroupSenderKey.distribution` is opaque JSON. Preferred shape: `{ v: 2, self: { key, epoch }, wrapped: { userId: dmCiphertext } }`.
-- Legacy `{ key, epoch }` plaintext self rows remain readable by all members for backward compatibility.
+### Group dm-v1 fan-out
+- `contentMeta.recipientCiphertexts`: map of `memberUserId → base64 dm-v1 envelope` (same shape as direct messages).
+- `Message.ciphertext` duplicates one envelope for API compatibility; clients decrypt using the entry for the viewing member.
+- Legacy `group-v1` messages (sender-key) are client-decrypted only; `/e2ee/group-keys` is retired.
+
+### Identity rotation
 - Identity keys cannot be overwritten via `PUT /e2ee/identity` when the fingerprint changes unless the client sends `x-identity-rotate: true`.
 
 ### Client envelope (`dm-v1`)

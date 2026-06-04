@@ -1,6 +1,5 @@
 import { getOrCreateDeviceId } from '../calls/deviceId';
 import type { E2eeKeyMaterial } from './keyStore';
-import { exportGroupSenderKeysForBackup } from './groupSenderKeys';
 import { idbLoadSentEntriesForUser, type SentPlaintextEntry } from './sentPlaintextIdb';
 import type { GroupSenderKeyIdbRow } from './groupSenderKeysIdb';
 
@@ -30,13 +29,12 @@ export async function buildBackupPayloadJson(
   material: E2eeKeyMaterial,
 ): Promise<string> {
   const sentPlaintext = await idbLoadSentEntriesForUser(material.userId);
-  const groupSenderKeys = exportGroupSenderKeysForBackup();
   const payload: E2eeBackupPayloadV2 = {
     version: BACKUP_PAYLOAD_VERSION,
     keyMaterial: material,
     deviceId: getOrCreateDeviceId(),
     sentPlaintext,
-    groupSenderKeys,
+    groupSenderKeys: [],
   };
   return JSON.stringify(payload);
 }

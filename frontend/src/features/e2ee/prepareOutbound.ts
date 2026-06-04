@@ -1,14 +1,12 @@
 import type { Chat } from '../chat/types';
 import { buildPushPreview } from '../chat/utils/pushPreview';
 import { isDmE2eeChat, isGroupE2eeChat } from './chatE2ee';
-import { encryptGroupMessage } from './groupChat';
+import { encryptGroupDmMessage } from './groupDmChat';
 import { resolveGroupMemberIds } from './groupMembers';
-import { GROUP_E2EE_VERSION } from './protocol';
 import { ensureE2eeReady, E2eeKeysLockedError } from './bootstrap';
 import { encryptDirectMessage, E2eePeerNotReadyError } from './directChat';
 import { getLocalKeyMaterial } from './keyAccess';
 import { getRememberedPeerDevice } from './peerDevice';
-import { buildSenderCopyMeta } from './senderCopy';
 import { E2EE_UNLOCK_SEND_GROUP_TEXT } from './e2eeDisplay';
 
 export type OutboundPlainMessage = {
@@ -106,12 +104,13 @@ export async function prepareOutboundMessage(
     if (!material) {
       throw new E2eeKeysLockedError(E2EE_UNLOCK_SEND_GROUP_TEXT);
     }
-    const memberIds = await resolveGroupMemberIds(input.chatId, input.groupMemberIds);
+    await resolveGroupMemberIds(input.chatId, input.groupMemberIds);
     const plainMeta = plainMetaFromInput(input.contentMeta);
-    const encrypted = await encryptGroupMessage(
+    const attachmentRefs = buildAttachmentRefs(plainMeta);
+    const encrypted = await encryptGroupDmMessage(
       userId,
       input.chatId,
-      memberIds,
+      input.groupMemberIds ?? [],
       input.text ?? '',
       plainMeta,
     );
@@ -121,16 +120,11 @@ export async function prepareOutboundMessage(
       contentMeta: plainMeta,
     });
     const mentions = mentionsMetaFromInput(plainMeta);
-    const senderCopy = await buildSenderCopyMeta(material, {
-      text: input.text ?? '',
-      meta: plainMeta,
-    });
     return {
       ciphertext: encrypted.ciphertext,
       contentMeta: {
         ...encrypted.contentMeta,
-        e2eeVersion: GROUP_E2EE_VERSION,
-        senderCopy,
+        ...(attachmentRefs ? { attachmentRefs } : {}),
         pushPreview,
         ...(mentions ? { mentions } : {}),
       },

@@ -63,7 +63,11 @@ export function createUploadsRouter(config: AppConfig, logger?: Logger): Router 
           where: { id: fields.chatId },
           select: { type: true, e2eeMode: true },
         });
-        isE2eeDm = Boolean(chat?.type === "DIRECT" && chat.e2eeMode === "DM_V1");
+        isE2eeDm = Boolean(
+          chat &&
+            ((chat.type === "DIRECT" && chat.e2eeMode === "DM_V1") ||
+              (chat.type === "GROUP" && chat.e2eeMode === "DM_V1")),
+        );
         isE2eeDmVoice = isE2eeDm && fields.voiceNote;
       }
 
@@ -71,7 +75,11 @@ export function createUploadsRouter(config: AppConfig, logger?: Logger): Router 
 
       if (fields.e2eeEncrypted && !isE2eeDm) {
         await fs.unlink(path.join(config.uploadDir, req.file.filename)).catch(() => {});
-        throw new AppError(400, "E2EE_UPLOAD_INVALID", "Encrypted uploads are only allowed in E2EE direct chats");
+        throw new AppError(
+          400,
+          "E2EE_UPLOAD_INVALID",
+          "Encrypted uploads are only allowed in E2EE chats",
+        );
       }
 
       if (fields.voiceNote && !isE2eeDmVoice && !isVoiceCapableMime(req.file.mimetype)) {

@@ -4,6 +4,7 @@ import { decryptSenderCopy } from './senderCopy';
 import { aesGcmDecrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
 import { decodeEnvelope, decodePayload, isGroupE2eeMessage, type DmV1Payload } from './protocol';
 import { decryptGroupMessage } from './groupChat';
+import { isGroupDmE2eeMessage, resolveViewerCiphertext } from './groupDmChat';
 import * as e2eeApi from './e2eeApi';
 import { getPayloadFromMemory, setPayloadMemory, ciphertextFingerprint } from './decryptedPayloadCache';
 import type { DecryptedBody } from './useMessageBodies';
@@ -25,23 +26,13 @@ export async function resolveSenderFingerprint(
   }
 }
 
-export async function decryptMessagePayload(
-  userId: string,
+async function decryptDmEnvelopeCiphertext(
   msg: Message,
+  ciphertext: string,
   material: E2eeKeyMaterial,
   fingerprintCache: Map<string, string>,
 ): Promise<DmV1Payload | null> {
-  if (msg.senderId === userId) {
-    const fromCopy = await decryptSenderCopy(material, msg);
-    if (fromCopy) return fromCopy;
-  }
-
-  if (isGroupE2eeMessage(msg)) {
-    const epoch = typeof msg.contentMeta?.epoch === 'number' ? msg.contentMeta.epoch : 0;
-    return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch, userId);
-  }
-
-  const envelope = decodeEnvelope(msg.ciphertext ?? '');
+  const envelope = decodeEnvelope(ciphertext);
   if (!envelope) return null;
 
   const fingerprint = await resolveSenderFingerprint(msg, fingerprintCache);
@@ -66,6 +57,31 @@ export async function decryptMessagePayload(
     }
   }
   return null;
+}
+
+export async function decryptMessagePayload(
+  userId: string,
+  msg: Message,
+  material: E2eeKeyMaterial,
+  fingerprintCache: Map<string, string>,
+): Promise<DmV1Payload | null> {
+  if (msg.senderId === userId) {
+    const fromCopy = await decryptSenderCopy(material, msg);
+    if (fromCopy) return fromCopy;
+  }
+
+  if (isGroupE2eeMessage(msg)) {
+    const epoch = typeof msg.contentMeta?.epoch === 'number' ? msg.contentMeta.epoch : 0;
+    return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch, userId);
+  }
+
+  if (isGroupDmE2eeMessage(msg)) {
+    const viewerCt = resolveViewerCiphertext(msg, userId);
+    if (!viewerCt) return null;
+    return decryptDmEnvelopeCiphertext(msg, viewerCt, material, fingerprintCache);
+  }
+
+  return decryptDmEnvelopeCiphertext(msg, msg.ciphertext ?? '', material, fingerprintCache);
 }
 
 export function getCachedPayloadMeta(

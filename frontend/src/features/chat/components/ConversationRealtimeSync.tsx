@@ -19,9 +19,6 @@ import {
 } from '../utils/messageReceipts';
 import { removeMessageIdsFromUnread } from '../utils/incrementalRead';
 import { syncOnReconnect } from '../../sync/syncOnReconnect';
-import { isGroupE2eeMessage } from '../../e2ee/protocol';
-import { fetchGroupSenderKeys } from '../../e2ee/groupSenderKeys';
-import { emitE2eeGroupKeysUpdated } from '../../e2ee/e2eeEvents';
 import {
   broadcastOutboxFlushed,
   subscribeTabSync,
@@ -77,11 +74,6 @@ const ConversationRealtimeSync: React.FC = () => {
         void ackIncomingMessages(data.chatId, [data.message], user.id);
       }
 
-      if (isGroupE2eeMessage(data.message) && data.message.senderId !== user.id) {
-        void fetchGroupSenderKeys(data.chatId, user.id).then(() => {
-          emitE2eeGroupKeysUpdated(data.chatId);
-        });
-      }
     };
 
     const handleReceiptRead = (data: {

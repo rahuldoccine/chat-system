@@ -5,7 +5,6 @@ import { canSendComposerMessage } from './messageComposer.helpers';
 import { gifToFile, type GifResult } from '../utils/gifPicker';
 import { E2eePeerNotReadyError } from '../../e2ee/directChat';
 import { E2eeKeysLockedError } from '../../e2ee/bootstrap';
-import { GroupKeyDistributionError } from '../../e2ee/groupSenderKeys';
 import { getApiErrorMessage } from '../../settings/hooks/useUserSettings';
 import type { LinkDisplayMode, LinkPreviewMeta } from '../types';
 import type { ComposerSendContext, ComposerSendDeps } from '../hooks/composerSend.types';
@@ -161,11 +160,7 @@ export async function runComposerPollSubmit(p: PollSubmitParams): Promise<void> 
     p.setReplyingTo(null);
     p.scrollToBottom();
   } catch (err: unknown) {
-    if (
-      err instanceof E2eePeerNotReadyError ||
-      err instanceof E2eeKeysLockedError ||
-      err instanceof GroupKeyDistributionError
-    ) {
+    if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
       toast.error(err.message);
       return;
     }

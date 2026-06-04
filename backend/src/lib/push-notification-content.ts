@@ -72,7 +72,8 @@ export async function resolvePushNotificationContent(params: {
   const senderName = sender?.displayName?.trim() || sender?.email?.trim() || "Someone";
   const isE2ee =
     (chat?.type === "DIRECT" && chat.e2eeMode === "DM_V1") ||
-    (chat?.type === "GROUP" && chat.e2eeMode === "GROUP_V1");
+    (chat?.type === "GROUP" &&
+      (chat.e2eeMode === "DM_V1" || chat.e2eeMode === "GROUP_V1"));
   const preview = messagePreviewBody(params.message, isE2ee);
 
   if (chat?.type === "GROUP") {

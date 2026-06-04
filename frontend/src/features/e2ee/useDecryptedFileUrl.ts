@@ -9,7 +9,6 @@ import {
   fileHasDecryptKeys,
 } from './attachmentDeps';
 import { isE2eeMessage } from './directChat';
-import { isGroupE2eeMessage } from './protocol';
 import { decryptMessageFile } from './attachmentCrypto';
 
 type E2eeMessageRef = Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
@@ -47,11 +46,6 @@ export function useDecryptedFileUrl(
     }
 
     if (!hasKeys) {
-      // GROUP E2EE may upload attachments without per-file keys.
-      // In that case, we can still render the media from the plain uploaded bytes.
-      if (isGroupE2eeMessage(e2eeMessage)) {
-        setUrl(buildFileUrl(file, token));
-      }
       return;
     }
 
@@ -86,11 +80,6 @@ export function useDecryptedFileUrl(
         blobUrlCache.set(key, objectUrl);
         setUrl(objectUrl);
         return;
-      }
-      // GROUP E2EE attachments may be plain uploads even when attachment keys exist/infer.
-      // If decrypt returns null, fall back to direct file URL so UI never stays blank.
-      if (isGroupE2eeMessage(e2eeMessage)) {
-        setUrl(buildFileUrl(file, token));
       }
     });
 

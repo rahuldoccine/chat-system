@@ -137,6 +137,7 @@ export function buildMessagePatchUpdateData(data: {
 }
 
 export function assertE2eeMessageInput(
+  chat: Pick<Chat, "type" | "e2eeMode">,
   isE2ee: boolean,
   ciphertext: string | null | undefined,
   contentMeta: Record<string, unknown> | null = null,
@@ -152,6 +153,10 @@ export function assertE2eeMessageInput(
   const v = contentMeta.e2eeVersion;
   if (typeof v !== "string" || v.length < 1) {
     throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE chats");
+  }
+  const { isE2eeGroup } = resolveChatE2eeFlags(chat);
+  if (isE2eeGroup) {
+    assertGroupDmE2eeMeta(contentMeta);
   }
 }
 
@@ -300,11 +305,53 @@ export async function requirePinMessageAccess(
 export function resolveChatE2eeFlags(chat: Pick<Chat, "type" | "e2eeMode">): {
   isE2eeDm: boolean;
   isE2eeGroup: boolean;
+  /** @deprecated Legacy sender-key groups (read-only). */
+  isE2eeGroupLegacy: boolean;
   isE2ee: boolean;
 } {
   const isE2eeDm = chat.type === "DIRECT" && chat.e2eeMode === "DM_V1";
-  const isE2eeGroup = chat.type === "GROUP" && chat.e2eeMode === "GROUP_V1";
-  return { isE2eeDm, isE2eeGroup, isE2ee: isE2eeDm || isE2eeGroup };
+  const isE2eeGroup = chat.type === "GROUP" && chat.e2eeMode === "DM_V1";
+  const isE2eeGroupLegacy = chat.type === "GROUP" && chat.e2eeMode === "GROUP_V1";
+  return {
+    isE2eeDm,
+    isE2eeGroup,
+    isE2eeGroupLegacy,
+    isE2ee: isE2eeDm || isE2eeGroup || isE2eeGroupLegacy,
+  };
+}
+
+const MAX_GROUP_RECIPIENT_CIPHERTEXTS = 64;
+
+function assertGroupDmE2eeMeta(contentMeta: Record<string, unknown>): void {
+  if (contentMeta.e2eeVersion !== "dm-v1") {
+    throw new AppError(
+      400,
+      "E2EE_META_INVALID",
+      "Group E2EE messages must use e2eeVersion dm-v1",
+    );
+  }
+  const wrapped = contentMeta.recipientCiphertexts;
+  if (!isPlainObject(wrapped)) {
+    throw new AppError(
+      400,
+      "E2EE_META_INVALID",
+      "contentMeta.recipientCiphertexts is required for encrypted groups",
+    );
+  }
+  let count = 0;
+  for (const value of Object.values(wrapped)) {
+    if (typeof value === "string" && value.length > 0) count += 1;
+  }
+  if (count < 1) {
+    throw new AppError(
+      400,
+      "E2EE_META_INVALID",
+      "recipientCiphertexts must include at least one envelope",
+    );
+  }
+  if (count > MAX_GROUP_RECIPIENT_CIPHERTEXTS) {
+    throw new AppError(400, "E2EE_META_INVALID", "recipientCiphertexts exceeds member limit");
+  }
 }
 
 /** Create delivery receipts for other members and bump chat last activity. */
