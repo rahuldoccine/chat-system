@@ -33,6 +33,8 @@ import {
   rememberSentPlaintext,
   rememberSentPayloadMeta,
 } from './sentPlaintextCache';
+import { buildSenderCopyMeta, decryptSenderCopy } from './senderCopy';
+import { scheduleE2eeBackupSync } from './e2eeBackupSync';
 
 export class E2eePeerNotReadyError extends Error {
   constructor(message = 'This contact has not finished encryption setup yet.') {
@@ -185,7 +187,10 @@ export async function encryptDirectMessage(
     if (Object.keys(innerMeta).length) {
       rememberSentPayloadMeta(userId, input.clientMessageId, innerMeta);
     }
+    scheduleE2eeBackupSync(userId);
   }
+
+  const senderCopy = await buildSenderCopyMeta(material, payload);
 
   return {
     ciphertext: envelope,
@@ -194,6 +199,7 @@ export async function encryptDirectMessage(
       peerDeviceId,
       senderDeviceId: getOrCreateDeviceId(),
       senderFingerprint,
+      senderCopy,
     },
   };
 }
@@ -247,6 +253,11 @@ export async function decryptDirectPayload(
   if (msg.senderId === viewerId) {
     const cached = getSentPlaintext(userId, msg);
     if (cached !== undefined) return { text: cached };
+    const material = await getLocalKeyMaterial(userId);
+    if (material) {
+      const fromCopy = await decryptSenderCopy(material, msg);
+      if (fromCopy) return fromCopy;
+    }
     return null;
   }
 

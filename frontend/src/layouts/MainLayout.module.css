@@ -242,37 +242,64 @@
 .dmRowWrap {
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
   min-height: 44px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dmRowWrap:hover,
+.dmRowWrap:focus-within,
+.dmRowMenuOpen {
+  background-color: #35373c;
+}
+
+.dmRowActive,
+.dmRowActive:hover,
+.dmRowActive:focus-within {
+  background-color: #3f4147;
+}
+
+.dmRowWrap:hover .navItem,
+.dmRowWrap:focus-within .navItem,
+.dmRowMenuOpen .navItem,
+.dmRowActive .navItem {
+  color: #dbdee1;
 }
 
 .dmRowWrap .navItem {
   flex: 1;
   min-width: 0;
   width: auto;
-  padding-right: 8px;
+  padding-right: 4px;
+}
+
+.dmRowWrap .navItem:hover {
+  background-color: transparent;
 }
 
 .dmMoreBtn {
   flex-shrink: 0;
-  align-self: center;
+  align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  margin-right: 2px;
+  width: 36px;
+  min-width: 36px;
   padding: 0;
+  margin: 0;
   border: none;
-  border-radius: 4px;
-  background: #35373c;
+  border-radius: 0 4px 4px 0;
+  background: transparent;
   color: #dbdee1;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.dmMoreBtn:hover {
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .dmRowWrap:hover .dmMoreBtn,
@@ -327,6 +354,15 @@
 .active {
   background-color: #3f4147 !important;
   color: white !important;
+}
+
+.dmRowWrap .active {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+.dmRowActive .navItem {
+  color: #fff !important;
 }
 
 .miniAvatar {

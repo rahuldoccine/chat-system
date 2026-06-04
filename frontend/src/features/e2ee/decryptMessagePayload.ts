@@ -1,5 +1,6 @@
 import type { Message } from '../chat/types';
 import { getSignedPreKeyPrivate, type E2eeKeyMaterial } from './keyStore';
+import { decryptSenderCopy } from './senderCopy';
 import { aesGcmDecrypt, deriveAesGcmKey, ecdhSharedSecret } from './crypto';
 import { decodeEnvelope, decodePayload, isGroupE2eeMessage, type DmV1Payload } from './protocol';
 import { decryptGroupMessage } from './groupChat';
@@ -30,6 +31,11 @@ export async function decryptMessagePayload(
   material: E2eeKeyMaterial,
   fingerprintCache: Map<string, string>,
 ): Promise<DmV1Payload | null> {
+  if (msg.senderId === userId && !isGroupE2eeMessage(msg)) {
+    const fromCopy = await decryptSenderCopy(material, msg);
+    if (fromCopy) return fromCopy;
+  }
+
   if (isGroupE2eeMessage(msg)) {
     const epoch = typeof msg.contentMeta?.epoch === 'number' ? msg.contentMeta.epoch : 0;
     return decryptGroupMessage(msg.chatId, msg.senderId, msg.ciphertext ?? '', epoch, userId);

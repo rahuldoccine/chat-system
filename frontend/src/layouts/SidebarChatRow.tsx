@@ -36,13 +36,13 @@ export function SidebarChatRow({
 
   return (
     <div
-      className={`${styles.dmRowWrap} ${menuOpen ? styles.dmRowMenuOpen : ''}`}
+      className={`${styles.dmRowWrap} ${active ? styles.dmRowActive : ''} ${menuOpen ? styles.dmRowMenuOpen : ''}`}
     >
       <button
         type="button"
         onClick={onSelect}
         onContextMenu={onOpenMenu}
-        className={`${styles.navItem} ${active ? styles.active : ''}`}
+        className={styles.navItem}
         {...(variant === 'group' && groupVisibilityLabel
           ? { 'aria-label': `${chatName} — ${groupVisibilityLabel}`, title: groupVisibilityLabel }
           : {})}

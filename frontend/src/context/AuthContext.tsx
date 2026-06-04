@@ -21,6 +21,11 @@ import {
   clearSentPlaintextForUser,
 } from '../features/e2ee/sentPlaintextCache';
 import { emitE2eeKeysUnlocked } from '../features/e2ee/e2eeEvents';
+import {
+  clearLoginPasswordForBackup,
+  flushE2eeBackupSync,
+  rememberLoginPasswordForBackup,
+} from '../features/e2ee/e2eeBackupSync';
 import { hydrateGroupSenderKeysFromIdb } from '../features/e2ee/groupSenderKeys';
 
 interface User {
@@ -133,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [e2eeKeysLocked, setE2eeKeysLocked] = useState(false);
 
   const clearAuth = useCallback(() => {
+    clearLoginPasswordForBackup();
     clearSessionUnlock();
     clearAccessToken();
     setToken(null);
@@ -183,6 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new E2eeKeysLockedError();
       }
       await unlockKeyMaterialWithPassword(user.id, password);
+      rememberLoginPasswordForBackup(user.id, password);
       await ensureE2eeReady(user.id, { password });
       setE2eeKeysLocked(false);
       await hydrateE2eeCaches(user.id);
@@ -199,9 +206,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setE2eeKeysLocked(false);
     if (mapped.id) {
       try {
+        if (password) {
+          rememberLoginPasswordForBackup(mapped.id, password);
+        }
         await ensureE2eeReady(mapped.id, { password });
         setE2eeKeysLocked(false);
         void hydrateE2eeCaches(mapped.id);
+        if (password) {
+          void flushE2eeBackupSync(mapped.id);
+        }
         emitE2eeKeysUnlocked(mapped.id);
       } catch (err) {
         if (err instanceof E2eeKeysLockedError) {
@@ -239,10 +252,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [applyProfile]);
 
   const logout = useCallback(async () => {
+    const uid = user?.id;
     try {
       await unregisterWebPush();
     } catch {
       /* best-effort */
+    }
+    if (uid) {
+      await flushE2eeBackupSync(uid);
     }
     try {
       await api.post('/auth/logout');
@@ -250,7 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear local session even if server logout fails (e.g. expired token).
     }
     clearAuth();
-  }, [clearAuth]);
+  }, [clearAuth, user?.id]);
 
   const logoutAll = useCallback(async () => {
     const uid = user?.id;

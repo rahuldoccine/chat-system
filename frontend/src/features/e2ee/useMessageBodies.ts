@@ -37,12 +37,13 @@ async function decryptMessageChunk(
   userId: string,
   material: NonNullable<Awaited<ReturnType<typeof getLocalKeyMaterial>>>,
   fingerprintCache: Map<string, string>,
+  keysLocked: boolean,
   isCancelled: () => boolean,
   onBody: (messageId: string, body: DecryptedBody) => void,
 ): Promise<void> {
   for (const msg of chunk) {
     if (isCancelled()) return;
-    const body = await resolveDecryptedBody(userId, msg, material, fingerprintCache);
+    const body = await resolveDecryptedBody(userId, msg, material, fingerprintCache, keysLocked);
     if (isCancelled()) return;
     onBody(msg.id, body);
   }
@@ -56,6 +57,7 @@ type SetBodiesFn = React.Dispatch<React.SetStateAction<Record<string, DecryptedB
 async function runMessageBodiesDecrypt(
   userId: string,
   messages: Message[],
+  keysLocked: boolean,
   isCancelled: () => boolean,
   setBodies: SetBodiesFn,
 ): Promise<void> {
@@ -83,7 +85,7 @@ async function runMessageBodiesDecrypt(
   for (let i = 0; i < toDecrypt.length; i += DECRYPT_CHUNK) {
     if (isCancelled()) return;
     const chunk = toDecrypt.slice(i, i + DECRYPT_CHUNK);
-    await decryptMessageChunk(chunk, userId, material, fingerprintCache, isCancelled, onBody);
+    await decryptMessageChunk(chunk, userId, material, fingerprintCache, keysLocked, isCancelled, onBody);
   }
 }
 
@@ -120,9 +122,12 @@ function bodyFromPayload(payload: { text: string; meta?: Record<string, unknown>
   return { text: payload.text, preview, meta: payload.meta };
 }
 
-function unavailableSenderBody(msg: Message): DecryptedBody {
+function unavailableSenderBody(msg: Message, keysLocked: boolean): DecryptedBody {
+  const hint = keysLocked
+    ? 'Unlock encryption with your password (Settings) to read sent messages from other devices.'
+    : 'Sent before this device could store a readable copy. New messages will appear on all your devices after sign-in.';
   return {
-    text: messageHasMediaAttachments(msg) ? '' : '[Sent message unavailable on this device]',
+    text: messageHasMediaAttachments(msg) ? '' : hint,
   };
 }
 
@@ -199,6 +204,7 @@ async function resolveDecryptedBody(
   msg: Message,
   material: NonNullable<Awaited<ReturnType<typeof getLocalKeyMaterial>>>,
   fingerprintCache: Map<string, string>,
+  keysLocked: boolean,
 ): Promise<DecryptedBody> {
   const fp = ciphertextFingerprint(msg.ciphertext);
   let payload = await decryptMessagePayload(userId, msg, material, fingerprintCache);
@@ -222,7 +228,7 @@ async function resolveDecryptedBody(
   }
 
   if (msg.senderId === userId) {
-    return unavailableSenderBody(msg);
+    return unavailableSenderBody(msg, keysLocked);
   }
   if (isGroupE2eeMessage(msg)) {
     return { text: '[Unable to decrypt]' };
@@ -261,7 +267,7 @@ export function useMessageBodies(
   useEffect(() => {
     if (!user?.id || !messages?.length || e2eeKeysLocked) return;
     let cancelled = false;
-    void runMessageBodiesDecrypt(user.id, messages, () => cancelled, setBodies);
+    void runMessageBodiesDecrypt(user.id, messages, e2eeKeysLocked, () => cancelled, setBodies);
     return () => {
       cancelled = true;
     };
