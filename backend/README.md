@@ -181,7 +181,7 @@ See **`.env.example`**. Important entries:
 |--------|-------------|
 | `npm run dev` | Watch mode (`tsx watch src/server.ts`) |
 | `npm run build` | `tsc` → `dist/` |
-| `npm start` | `node dist/backend/src/server.js` |
+| `npm start` | `node dist/src/server.js` |
 | `npm run lint` | ESLint `src` |
 | `npm run db:generate` | Prisma client |
 | `npm run db:migrate:dev` | Dev migrations |
