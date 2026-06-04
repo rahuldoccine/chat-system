@@ -31,6 +31,7 @@ const CallShell: React.FC = () => {
     toggleMute,
     toggleCamera,
     switchCamera,
+    cameraFacing,
     clearError,
   } = useCall();
 
@@ -109,6 +110,7 @@ const CallShell: React.FC = () => {
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
           onSwitchCamera={switchCamera}
+          cameraFacing={cameraFacing}
         />
       )}
     </>

@@ -20,6 +20,8 @@ import { CAPTION_LANGUAGES, useCallTranscript } from '../useCallTranscript';
 import { useAudioSpeaking } from '../useAudioSpeaking';
 import type { CallConnectionUiState } from '../CallManager';
 import type { CallPhase } from '../types';
+import type { CameraFacing } from '../cameraSwitch';
+import LocalCallVideo from './LocalCallVideo';
 import styles from './CallOverlay.module.css';
 import { handler } from '../../../utils/asyncHandler';
 
@@ -40,6 +42,7 @@ type CallOverlayProps = Readonly<{
   onToggleMute: () => void;
   onToggleCamera: () => void;
   onSwitchCamera: () => Promise<boolean>;
+  cameraFacing: CameraFacing;
   onEndTranscript?: () => void;
 }>;
 
@@ -222,9 +225,9 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   onToggleMute,
   onToggleCamera,
   onSwitchCamera,
+  cameraFacing,
   onEndTranscript,
 }) => {
-  const localRef = useRef<HTMLVideoElement>(null);
   const remoteRef = useRef<HTMLVideoElement>(null);
   const [speakerOn, setSpeakerOn] = useState(true);
   const { user } = useAuth();
@@ -244,10 +247,6 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   const showVideo = isVideo && (localStream || remoteStream);
   const isRingingOut = phase === 'ringing_out';
   const endLabel = isRingingOut ? 'Cancel call' : 'End call';
-
-  useEffect(() => {
-    if (localRef.current) localRef.current.srcObject = localStream;
-  }, [localStream]);
 
   useEffect(() => {
     if (remoteRef.current) remoteRef.current.srcObject = remoteStream;
@@ -350,9 +349,11 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         )}
         {showVideo && localStream && (
           <div className={styles.localPip}>
-            <video ref={localRef} className={styles.localVideo} autoPlay playsInline muted>
-              <track kind="captions" />
-            </video>
+            <LocalCallVideo
+              stream={localStream}
+              className={styles.localVideo}
+              mirrored={cameraFacing === 'user'}
+            />
           </div>
         )}
         {localSpeaking && !muted && (

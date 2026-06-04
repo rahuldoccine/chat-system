@@ -1,6 +1,7 @@
 import {
   cameraFacingFromTrack,
-  switchCallCamera,
+  DEFAULT_CAMERA_FACING,
+  switchVideoCamera,
   type CameraFacing,
 } from './cameraSwitch';
 import { buildIceServers } from './iceConfig';
@@ -34,7 +35,11 @@ class CallManager {
   private connectionUi: CallConnectionUiState = 'connecting';
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private onPeerFailed: (() => void) | null = null;
-  private cameraFacing: CameraFacing = 'user';
+  private cameraFacing: CameraFacing = DEFAULT_CAMERA_FACING;
+
+  getCameraFacing(): CameraFacing {
+    return this.cameraFacing;
+  }
 
   getPhase(): CallPhase {
     return this.phase;
@@ -189,7 +194,7 @@ class CallManager {
     const track = this.localStream.getVideoTracks()[0];
     if (!track) return false;
 
-    const result = await switchCallCamera(this.pc, this.localStream, this.cameraFacing);
+    const result = await switchVideoCamera(this.localStream, this.cameraFacing, this.pc);
     if (!result.ok) return false;
 
     this.cameraFacing = result.facing;
@@ -229,7 +234,7 @@ class CallManager {
     this.endReason = null;
     this.videoFallback = false;
     this.connectionUi = 'connecting';
-    this.cameraFacing = 'user';
+    this.cameraFacing = DEFAULT_CAMERA_FACING;
     this.notify();
   }
 
@@ -253,7 +258,7 @@ class CallManager {
     this.videoFallback = videoFallback;
     const videoTrack = stream.getVideoTracks()[0];
     if (videoTrack) {
-      this.cameraFacing = cameraFacingFromTrack(videoTrack) ?? 'user';
+      this.cameraFacing = cameraFacingFromTrack(videoTrack) ?? DEFAULT_CAMERA_FACING;
     }
     if (this.meta) {
       this.meta = { ...this.meta, isVideo: isVideo && !videoFallback };

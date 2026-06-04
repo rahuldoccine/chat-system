@@ -3,6 +3,12 @@ import { toast } from 'sonner';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { acquireUserMedia, formatMediaError } from './mediaErrors';
+import {
+  cameraFacingFromTrack,
+  DEFAULT_CAMERA_FACING,
+  switchVideoCamera,
+  type CameraFacing,
+} from './cameraSwitch';
 import GroupCallOverlay from './components/GroupCallOverlay';
 import GroupCallIncomingPrompt from './components/GroupCallIncomingPrompt';
 
@@ -22,6 +28,7 @@ type GroupCallContextValue = {
   leaveGroupCall: () => void;
   toggleMute: () => boolean;
   toggleCamera: () => boolean;
+  switchCamera: () => Promise<boolean>;
 };
 
 type StartAck = {
@@ -88,6 +95,7 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
   const { user } = useAuth();
   const [state, setState] = useState<GroupCallState>(INITIAL_STATE);
   const [dismissedIncomingSessionId, setDismissedIncomingSessionId] = useState<string | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<CameraFacing>(DEFAULT_CAMERA_FACING);
 
   const leaveGroupCall = useCallback(() => {
     if (socket && state.sessionId) {
@@ -146,6 +154,11 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
           toast.info('No camera found. Video call will continue as voice on your side.');
         }
         const kind: 'AUDIO' | 'VIDEO' = video ? 'VIDEO' : 'AUDIO';
+        const facing =
+          stream.getVideoTracks()[0] != null
+            ? (cameraFacingFromTrack(stream.getVideoTracks()[0]) ?? DEFAULT_CAMERA_FACING)
+            : 'user';
+        setCameraFacing(facing);
         setState((s) => ({ ...s, chatId, kind, localStream: stream }));
         socket.emit('groupCall:start', { chatId, kind }, (ack: StartAck) => {
           setState(applyStartAck(ack, user.id, (sessionId) => {
@@ -167,6 +180,11 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
         if (video && videoFallback) {
           toast.info('No camera found. Joined as voice while staying in video call.');
         }
+        const facing =
+          stream.getVideoTracks()[0] != null
+            ? (cameraFacingFromTrack(stream.getVideoTracks()[0]) ?? DEFAULT_CAMERA_FACING)
+            : 'user';
+        setCameraFacing(facing);
         setState((s) => ({
           ...s,
           sessionId,
@@ -199,9 +217,35 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
     return track.enabled;
   }, [state.localStream]);
 
+  const switchCamera = useCallback(async () => {
+    const stream = state.localStream;
+    if (!stream?.getVideoTracks()[0]) {
+      toast.error('No camera available');
+      return false;
+    }
+    const { ok, facing } = await switchVideoCamera(stream, cameraFacing, null);
+    if (ok) {
+      setCameraFacing(facing);
+      setState((s) => ({ ...s }));
+      return true;
+    }
+    toast.error(
+      'Could not switch camera. On a phone, allow camera access; on a computer, connect another webcam or try again.',
+    );
+    return false;
+  }, [state.localStream, cameraFacing]);
+
   const value = useMemo(
-    () => ({ state, startGroupCall, joinGroupCall, leaveGroupCall, toggleMute, toggleCamera }),
-    [state, startGroupCall, joinGroupCall, leaveGroupCall, toggleMute, toggleCamera],
+    () => ({
+      state,
+      startGroupCall,
+      joinGroupCall,
+      leaveGroupCall,
+      toggleMute,
+      toggleCamera,
+      switchCamera,
+    }),
+    [state, startGroupCall, joinGroupCall, leaveGroupCall, toggleMute, toggleCamera, switchCamera],
   );
 
   const incomingSessionId = state.sessionId;
@@ -226,6 +270,8 @@ export function GroupCallProvider({ children }: Readonly<{ children: React.React
           onLeave={leaveGroupCall}
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
+          onSwitchCamera={switchCamera}
+          cameraFacing={cameraFacing}
         />
       )}
       {showIncoming && (

@@ -28,6 +28,7 @@ import type {
 } from './types';
 import { friendlySocketAckMessage } from '../../utils/userFriendlyErrors';
 import { formatMediaError } from './mediaErrors';
+import type { CameraFacing } from './cameraSwitch';
 import CallShell from './components/CallShell';
 
 type PendingIncoming = IncomingCallPayload & {
@@ -51,6 +52,7 @@ type CallContextValue = {
   toggleMute: () => boolean;
   toggleCamera: () => boolean;
   switchCamera: () => Promise<boolean>;
+  cameraFacing: CameraFacing;
   remotePeerMuted: boolean;
   connectedAt: number | null;
   peerRinging: boolean;
@@ -411,6 +413,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return on;
       },
       switchCamera,
+      cameraFacing: callManager.getCameraFacing(),
       remotePeerMuted,
       connectedAt,
       peerRinging,

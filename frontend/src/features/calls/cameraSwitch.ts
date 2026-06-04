@@ -1,7 +1,18 @@
 export type CameraFacing = 'user' | 'environment';
 
+export const DEFAULT_CAMERA_FACING: CameraFacing = 'user';
+
 export function nextCameraFacing(current: CameraFacing): CameraFacing {
   return current === 'user' ? 'environment' : 'user';
+}
+
+/** Phones and tablets where front/back facingMode is meaningful. */
+export function isHandheldMobile(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  if (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true;
+  if (/iPad/i.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
 }
 
 export function cameraFacingFromTrack(track: MediaStreamTrack): CameraFacing | null {
@@ -10,17 +21,40 @@ export function cameraFacingFromTrack(track: MediaStreamTrack): CameraFacing | n
   return null;
 }
 
-async function replaceVideoTrackInCall(
-  pc: RTCPeerConnection,
+function facingFromDeviceLabel(label: string): CameraFacing | null {
+  const l = label.toLowerCase();
+  if (/back|rear|environment|trás|arrière|rück/i.test(l)) return 'environment';
+  if (/front|user|face|selfie|facetime|integrated|built.?in/i.test(l)) return 'user';
+  return null;
+}
+
+function resolveFacingAfterSwitch(localStream: MediaStream, fallback: CameraFacing): CameraFacing {
+  const track = localStream.getVideoTracks()[0];
+  if (!track) return fallback;
+  return cameraFacingFromTrack(track) ?? facingFromDeviceLabel(track.label) ?? fallback;
+}
+
+function replaceVideoTrackInStream(
   localStream: MediaStream,
   oldTrack: MediaStreamTrack,
   newTrack: MediaStreamTrack,
-): Promise<void> {
-  const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-  if (sender) await sender.replaceTrack(newTrack);
+): void {
   oldTrack.stop();
   localStream.removeTrack(oldTrack);
   localStream.addTrack(newTrack);
+}
+
+async function replaceVideoTrack(
+  localStream: MediaStream,
+  oldTrack: MediaStreamTrack,
+  newTrack: MediaStreamTrack,
+  pc?: RTCPeerConnection | null,
+): Promise<void> {
+  if (pc) {
+    const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+    if (sender) await sender.replaceTrack(newTrack);
+  }
+  replaceVideoTrackInStream(localStream, oldTrack, newTrack);
 }
 
 function stopExtraTracks(stream: MediaStream, keep: MediaStreamTrack): void {
@@ -39,54 +73,50 @@ async function openVideoTrack(
   return track;
 }
 
-async function tryFacingConstraints(
-  track: MediaStreamTrack,
+/** Default video constraints: front-facing (user) on mobile and desktop webcam. */
+export function defaultVideoConstraints(): MediaTrackConstraints {
+  return {
+    facingMode: { ideal: DEFAULT_CAMERA_FACING },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  };
+}
+
+async function openVideoTrackWithFacing(
   facing: CameraFacing,
-): Promise<boolean> {
+): Promise<MediaStreamTrack | null> {
   const attempts: MediaTrackConstraints[] = [
-    { facingMode: { exact: facing } },
-    { facingMode: { ideal: facing } },
+    { facingMode: { exact: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
     { facingMode: facing },
   ];
   for (const video of attempts) {
     try {
-      await track.applyConstraints(video);
-      return true;
+      const track = await openVideoTrack(video);
+      if (track) return track;
     } catch {
       /* try next */
     }
   }
-  return false;
+  return null;
 }
 
-async function tryNewTrackWithFacing(
-  pc: RTCPeerConnection,
+async function switchToFacing(
   localStream: MediaStream,
   oldTrack: MediaStreamTrack,
   facing: CameraFacing,
+  pc?: RTCPeerConnection | null,
 ): Promise<boolean> {
-  const attempts: MediaTrackConstraints[] = [
-    { facingMode: { exact: facing } },
-    { facingMode: { ideal: facing } },
-    { facingMode: facing },
-  ];
-  for (const video of attempts) {
-    try {
-      const newTrack = await openVideoTrack(video);
-      if (!newTrack) continue;
-      await replaceVideoTrackInCall(pc, localStream, oldTrack, newTrack);
-      return true;
-    } catch {
-      /* try next */
-    }
-  }
-  return false;
+  const newTrack = await openVideoTrackWithFacing(facing);
+  if (!newTrack) return false;
+  await replaceVideoTrack(localStream, oldTrack, newTrack, pc);
+  return true;
 }
 
 async function tryNextVideoDevice(
-  pc: RTCPeerConnection,
   localStream: MediaStream,
   oldTrack: MediaStreamTrack,
+  pc?: RTCPeerConnection | null,
 ): Promise<boolean> {
   const devices = await navigator.mediaDevices.enumerateDevices();
   const videoInputs = devices.filter((d) => d.kind === 'videoinput' && d.deviceId);
@@ -101,37 +131,57 @@ async function tryNextVideoDevice(
   try {
     const newTrack = await openVideoTrack({ deviceId: { exact: nextDevice.deviceId } });
     if (!newTrack) return false;
-    await replaceVideoTrackInCall(pc, localStream, oldTrack, newTrack);
+    await replaceVideoTrack(localStream, oldTrack, newTrack, pc);
     return true;
   } catch {
     return false;
   }
 }
 
-/** Switch front/back (or next camera) during an active video call. */
+/**
+ * Toggle camera: front ↔ rear on mobile; cycle webcams on desktop.
+ */
+export async function switchVideoCamera(
+  localStream: MediaStream,
+  currentFacing: CameraFacing,
+  pc?: RTCPeerConnection | null,
+): Promise<{ ok: boolean; facing: CameraFacing }> {
+  const oldTrack = localStream.getVideoTracks()[0];
+  if (!oldTrack) return { ok: false, facing: currentFacing };
+
+  const next = nextCameraFacing(currentFacing);
+
+  if (isHandheldMobile()) {
+    if (await switchToFacing(localStream, oldTrack, next, pc)) {
+      return { ok: true, facing: resolveFacingAfterSwitch(localStream, next) };
+    }
+    return { ok: false, facing: currentFacing };
+  }
+
+  if (await tryNextVideoDevice(localStream, oldTrack, pc)) {
+    return { ok: true, facing: resolveFacingAfterSwitch(localStream, next) };
+  }
+
+  if (await switchToFacing(localStream, oldTrack, next, pc)) {
+    return { ok: true, facing: resolveFacingAfterSwitch(localStream, next) };
+  }
+
+  return { ok: false, facing: currentFacing };
+}
+
+/** @deprecated Use switchVideoCamera — kept for CallManager import stability. */
 export async function switchCallCamera(
   pc: RTCPeerConnection,
   localStream: MediaStream,
   preferredFacing: CameraFacing,
 ): Promise<{ ok: boolean; facing: CameraFacing }> {
-  const oldTrack = localStream.getVideoTracks()[0];
-  if (!oldTrack) return { ok: false, facing: preferredFacing };
+  return switchVideoCamera(localStream, preferredFacing, pc);
+}
 
-  const next = nextCameraFacing(preferredFacing);
-
-  if (await tryFacingConstraints(oldTrack, next)) {
-    return { ok: true, facing: next };
-  }
-
-  if (await tryNewTrackWithFacing(pc, localStream, oldTrack, next)) {
-    return { ok: true, facing: next };
-  }
-
-  if (await tryNextVideoDevice(pc, localStream, oldTrack)) {
-    const updated = localStream.getVideoTracks()[0];
-    const facing = updated ? (cameraFacingFromTrack(updated) ?? next) : next;
-    return { ok: true, facing };
-  }
-
-  return { ok: false, facing: preferredFacing };
+/** @deprecated Use switchVideoCamera — kept for GroupCallProvider import stability. */
+export async function replaceLocalVideoTrack(
+  localStream: MediaStream,
+  preferredFacing: CameraFacing,
+): Promise<{ ok: boolean; facing: CameraFacing }> {
+  return switchVideoCamera(localStream, preferredFacing, null);
 }

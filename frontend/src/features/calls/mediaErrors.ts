@@ -64,30 +64,49 @@ export async function acquireUserMedia(wantsVideo: boolean): Promise<AcquireMedi
     return { stream, videoFallback: false };
   }
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: audioConstraints,
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-    });
-    return { stream, videoFallback: false };
-  } catch (error_) {
-    const notFound =
-      error_ instanceof DOMException &&
-      (error_.name === 'NotFoundError' || error_.name === 'DevicesNotFoundError');
-    const overconstrained =
-      error_ instanceof DOMException &&
-      (error_.name === 'OverconstrainedError' || error_.name === 'ConstraintNotSatisfiedError');
+  const videoAttempts: MediaTrackConstraints[] = [
+    { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+    { width: { ideal: 1280 }, height: { ideal: 720 } },
+  ];
 
-    if (!notFound && !overconstrained) throw error_;
-
+  let lastError: unknown;
+  for (const video of videoAttempts) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: audioConstraints,
-        video: false,
+        video,
       });
-      return { stream, videoFallback: true };
-    } catch {
-      throw error_;
+      return { stream, videoFallback: false };
+    } catch (e) {
+      lastError = e;
+      const over =
+        e instanceof DOMException &&
+        (e.name === 'OverconstrainedError' || e.name === 'ConstraintNotSatisfiedError');
+      if (!over) break;
     }
+  }
+
+  if (!lastError) {
+    throw new DOMException('No camera available', 'NotFoundError');
+  }
+
+  const notFound =
+    lastError instanceof DOMException &&
+    (lastError.name === 'NotFoundError' || lastError.name === 'DevicesNotFoundError');
+  const overconstrained =
+    lastError instanceof DOMException &&
+    (lastError.name === 'OverconstrainedError' || lastError.name === 'ConstraintNotSatisfiedError');
+
+  if (!notFound && !overconstrained) throw lastError;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraints,
+      video: false,
+    });
+    return { stream, videoFallback: true };
+  } catch {
+    throw lastError;
   }
 }

@@ -1,85 +1,81 @@
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchGroup } from '../../chat/api/groupsApi';
+import React, { memo } from 'react';
 import UserAvatar from '../../chat/components/UserAvatar';
 import styles from './GroupCallParticipantGrid.module.css';
+import {
+  gridLayoutClass,
+  useGroupParticipantProfiles,
+  type GroupParticipantProfile,
+} from './groupCallParticipants';
 
-type GroupCallParticipantGridProps = {
+type GroupCallParticipantGridProps = Readonly<{
   chatId: string;
   participantIds: string[];
   localUserId?: string;
-  kind: 'AUDIO' | 'VIDEO';
-  localStream?: MediaStream | null;
-};
+  /** When true, local user is shown in PiP — exclude from main grid. */
+  excludeLocalFromGrid?: boolean;
+  activeSpeakerId?: string | null;
+}>;
 
-type ParticipantProfile = {
-  userId: string;
-  label: string;
-  avatarUrl?: string | null;
-  displayName?: string | null;
-  email?: string;
-};
+function RemoteTile({
+  profile,
+  speaking,
+  active,
+}: Readonly<{
+  profile: GroupParticipantProfile;
+  speaking: boolean;
+  active: boolean;
+}>) {
+  return (
+    <div
+      className={`${styles.tile} ${speaking ? styles.tileSpeaking : ''} ${active ? styles.tileActive : ''}`}
+    >
+      <div className={styles.tileMedia}>
+        <UserAvatar
+          userId={profile.userId}
+          avatarUrl={profile.avatarUrl}
+          displayName={profile.displayName}
+          email={profile.email}
+          className={styles.tileAvatar}
+          fallbackFontSize="2rem"
+        />
+        {speaking && <span className={styles.speakingRing} aria-hidden />}
+      </div>
+      <span className={styles.tileName}>{profile.label}</span>
+    </div>
+  );
+}
 
 const GroupCallParticipantGrid: React.FC<GroupCallParticipantGridProps> = ({
   chatId,
   participantIds,
   localUserId,
-  kind,
-  localStream,
+  excludeLocalFromGrid = false,
+  activeSpeakerId = null,
 }) => {
-  const { data: groupDetails } = useQuery({
-    queryKey: ['group', chatId],
-    queryFn: () => fetchGroup(chatId),
-    enabled: Boolean(chatId),
-    staleTime: 60_000,
-  });
+  const profiles = useGroupParticipantProfiles(chatId, participantIds, localUserId);
+  const visible = excludeLocalFromGrid ? profiles.filter((p) => !p.isLocal) : profiles;
+  const layout = gridLayoutClass(Math.max(visible.length, 1));
 
-  const profiles: ParticipantProfile[] = useMemo(() => {
-    const unique = [...new Set(participantIds)];
-    return unique.map((userId) => {
-      const member = groupDetails?.members.find((m) => m.userId === userId);
-      const label =
-        userId === localUserId
-          ? 'You'
-          : member?.displayName || member?.username || member?.email || 'Participant';
-      return {
-        userId,
-        label,
-        avatarUrl: member?.avatarUrl,
-        displayName: member?.displayName,
-        email: member?.email,
-      };
-    });
-  }, [participantIds, groupDetails?.members, localUserId]);
+  if (visible.length === 0) {
+    return (
+      <div className={styles.emptyStage}>
+        <p>Waiting for others to join…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className={styles.grid}>
-      {profiles.map((p) => (
-        <div key={p.userId} className={styles.tile}>
-          {kind === 'VIDEO' && p.userId === localUserId && localStream ? (
-            <video
-              className={styles.tileVideo}
-              autoPlay
-              playsInline
-              muted
-              ref={(el) => {
-                if (el) el.srcObject = localStream;
-              }}
-            />
-          ) : (
-            <UserAvatar
-              userId={p.userId}
-              avatarUrl={p.avatarUrl}
-              displayName={p.displayName}
-              email={p.email}
-              className={styles.tileAvatar}
-            />
-          )}
-          <span className={styles.tileName}>{p.label}</span>
-        </div>
+    <div className={`${styles.grid} ${styles[layout]}`}>
+      {visible.map((p) => (
+        <RemoteTile
+          key={p.userId}
+          profile={p}
+          speaking={activeSpeakerId === p.userId}
+          active={activeSpeakerId === p.userId}
+        />
       ))}
     </div>
   );
 };
 
-export default GroupCallParticipantGrid;
+export default memo(GroupCallParticipantGrid);
