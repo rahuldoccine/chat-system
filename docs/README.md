@@ -4,12 +4,12 @@ A **full-stack chat application** (React + Express + PostgreSQL + Socket.IO) wit
 
 | Resource | Description |
 |----------|-------------|
-| [docs/CODEBASE_FEATURE_ANALYSIS.md](docs/CODEBASE_FEATURE_ANALYSIS.md) | What is implemented vs planned |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, env, scripts, seed data |
-| [docs/INTEGRATION.md](docs/INTEGRATION.md) | Auth, Axios, React Query, Socket.IO |
-| [frontend/README.md](frontend/README.md) | UI, themes, PWA, frontend structure |
-| [backend/README.md](backend/README.md) | API, sockets, Prisma, npm scripts |
-| [docs/coturn.md](docs/coturn.md) | TURN server for WebRTC |
+| [CODEBASE_FEATURE_ANALYSIS.md](./CODEBASE_FEATURE_ANALYSIS.md) | What is implemented vs planned |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | Setup, env, scripts, seed data |
+| [INTEGRATION.md](./INTEGRATION.md) | Auth, Axios, React Query, Socket.IO |
+| [../frontend/README.md](../frontend/README.md) | UI, themes, PWA, frontend structure |
+| [../backend/README.md](../backend/README.md) | API, sockets, Prisma, npm scripts |
+| [coturn.md](./coturn.md) | TURN server for WebRTC |
 
 ---
 
@@ -54,11 +54,11 @@ cd frontend && npm run build && npm test
 
 ```
 chat-module/
-├── frontend/          # Vite + React 19 SPA
 ├── backend/           # Express + Prisma + Socket.IO
-├── shared/            # Cross-package utilities (e.g. http-url)
-├── docs/              # Development, integration, feature analysis
-└── readme.md          # This file
+│   └── shared/        # Backend utilities (e.g. http-url)
+├── frontend/          # Vite + React 19 SPA
+│   └── shared/        # Frontend copy of the same helpers
+└── docs/              # This folder — guides and reference
 ```
 
 ### Frontend (`frontend/`)
@@ -117,7 +117,7 @@ See package READMEs for full folder trees and scripts.
 | JWT secrets | Yes | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` |
 | SMTP | Optional | Forgot-password / recovery emails log a warning if unset |
 | Firebase / VAPID | Optional | Push notifications |
-| TURN server | Optional | Recommended for calls behind strict NAT ([coturn](docs/coturn.md)) |
+| TURN server | Optional | Recommended for calls behind strict NAT ([coturn](./coturn.md)) |
 | `uploads/` directory | Yes (auto-created) | `UPLOAD_DIR` on backend |
 
 Copy `backend/.env.example` and `frontend/.env.example` before running.
@@ -162,7 +162,7 @@ Copy `backend/.env.example` and `frontend/.env.example` before running.
 ### Social & groups
 - Group chats with Owner/Admin/Mod/Member roles
 - Public channel join; group info panel
-- **Friends API** ready — **friends UI** not in sidebar yet
+- **Friends API** ready — **friends UI** in sidebar when enabled
 - Polls, mentions, moderation (block/report)
 
 ### Account & settings
@@ -184,7 +184,7 @@ Copy `backend/.env.example` and `frontend/.env.example` before running.
 
 **Not E2EE:** WebRTC call media (signaling only on server). Legacy plaintext messages may still display until rotated.
 
-Server boundary details: [backend/src/docs/e2ee-boundary.md](backend/src/docs/e2ee-boundary.md).
+Server boundary details: [../backend/src/docs/e2ee-boundary.md](../backend/src/docs/e2ee-boundary.md).
 
 ---
 
@@ -192,7 +192,7 @@ Server boundary details: [backend/src/docs/e2ee-boundary.md](backend/src/docs/e2
 
 | Item | Status |
 |------|--------|
-| Friends UI (sidebar) | API done, UI pending |
+| Friends UI (sidebar) | API + UI in app |
 | Group invite links | Public join done; shareable invite URLs planned |
 | OAuth (Google/GitHub) | Planned |
 | SFU for large group video | Planned |
@@ -206,14 +206,14 @@ Server boundary details: [backend/src/docs/e2ee-boundary.md](backend/src/docs/e2
 
 - **Teams & startups** — Private team chat with E2EE DMs  
 - **Developers** — Reference for real-time + E2EE + WebRTC patterns  
-- **Learners** — Full-stack TypeScript monorepo example  
+- **Learners** — Full-stack TypeScript example  
 - **Personal use** — Self-hosted chat (configure your own infra)
 
 ---
 
 ## Reference: original build plan
 
-The sections below were the initial implementation roadmap. **Most sprints are complete** in this repository; use [docs/CODEBASE_FEATURE_ANALYSIS.md](docs/CODEBASE_FEATURE_ANALYSIS.md) for an accurate gap list.
+The sections below were the initial implementation roadmap. **Most sprints are complete** in this repository; use [CODEBASE_FEATURE_ANALYSIS.md](./CODEBASE_FEATURE_ANALYSIS.md) for an accurate gap list.
 
 <details>
 <summary>Sprint-wise build plan (historical)</summary>
@@ -222,7 +222,7 @@ The sections below were the initial implementation roadmap. **Most sprints are c
 2. **Auth** — register, login, refresh, logout, password reset  
 3. **Core chat APIs** — chats, messages, list UI  
 4. **Realtime** — Socket.IO, receipts, typing, presence  
-5. **Friends & groups** — roles, members (friends UI pending)  
+5. **Friends & groups** — roles, members  
 6. **Uploads** — multer, secure file access  
 7. **Notifications** — push tokens, reconnect flush  
 8. **E2EE** — DM_V1, backup/recovery  
@@ -233,7 +233,7 @@ The sections below were the initial implementation roadmap. **Most sprints are c
 <details>
 <summary>API endpoint checklist (summary)</summary>
 
-REST lives under `/api/v1`. See [backend/README.md](backend/README.md) and Swagger for the full surface.
+REST lives under `/api/v1`. See [../backend/README.md](../backend/README.md) and Swagger for the full surface.
 
 **Auth:** register, login, refresh, logout, forgot/reset password  
 **Users:** me, search, profiles  
@@ -268,4 +268,4 @@ Core models include `User`, `Session`, `Chat`, `ChatMember`, `Message`, `Receipt
 
 ---
 
-*Built as a learning and production-oriented chat module. For deployment, configure secrets, SMTP, push, TURN, and CORS for your domain — see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).*
+*Built as a learning and production-oriented chat module. For deployment, configure secrets, SMTP, push, TURN, and CORS for your domain — see [DEVELOPMENT.md](./DEVELOPMENT.md).*

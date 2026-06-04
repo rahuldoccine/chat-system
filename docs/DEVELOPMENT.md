@@ -103,20 +103,14 @@ Stored on `ChatMember`:
 
 ```
 chat-module/
-├── frontend/src/
-│   ├── api/              # Axios + auth refresh
-│   ├── config/           # env.ts, queryClient
-│   ├── context/          # Auth, Socket, Chat
-│   ├── features/         # chat, calls, e2ee, settings, sync, pwa
-│   ├── layouts/          # MainLayout (sidebar), AuthLayout
-│   ├── pages/            # Home, Settings, auth, NotFound
-│   └── sw.ts             # Service worker
-├── backend/src/
-│   ├── modules/          # auth, users, chats, groups, e2ee, calls, …
-│   ├── sockets/          # Socket.IO handlers
-│   └── routes/index.ts   # /api/v1 mount
-├── docs/                 # Integration, features, coturn, this file
-└── readme.md             # Product overview + historical sprint notes
+├── backend/
+│   ├── src/              # API, sockets, modules
+│   ├── prisma/
+│   └── shared/           # e.g. http-url helpers
+├── frontend/
+│   ├── src/              # React app (api, features, pages, …)
+│   └── shared/           # mirror of backend shared helpers
+└── docs/                 # README.md = overview; INTEGRATION, DEVELOPMENT, …
 ```
 
 ## Routes (frontend)

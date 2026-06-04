@@ -20,7 +20,7 @@ Vite + **React 19** SPA for real-time messaging, group channels, WebRTC calls, c
 
 **Not used:** Redux, Tailwind, lodash-es.
 
-**Shared with repo root:** `shared/http-url.ts` (link preview URL parsing) is imported from the monorepo `shared/` folder via `tsconfig` include.
+**Shared utilities:** `frontend/shared/http-url.ts` (link preview URL parsing) — mirrored in `backend/shared/` for the API.
 
 ## Quick start
 
@@ -142,7 +142,7 @@ Per-row **⋯** menu: favorite, close DM (DMs), leave group (channels).
 
 ## Related docs
 
-- [../readme.md](../readme.md) — Monorepo overview & quick start
+- [../docs/README.md](../docs/README.md) — Project overview & quick start
 - [../docs/INTEGRATION.md](../docs/INTEGRATION.md) — Auth, API, sockets
 - [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) — Setup, seed data, scripts
 - [../docs/CODEBASE_FEATURE_ANALYSIS.md](../docs/CODEBASE_FEATURE_ANALYSIS.md) — Feature status

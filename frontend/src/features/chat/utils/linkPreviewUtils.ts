@@ -1,7 +1,7 @@
 import type { LinkDisplayMode, LinkPreviewMeta } from '../types';
-import { extractFirstHttpUrl } from '../../../../../shared/http-url.ts';
+import { extractFirstHttpUrl } from '../../../../shared/http-url.ts';
 
-export { extractFirstHttpUrl } from '../../../../../shared/http-url.ts';
+export { extractFirstHttpUrl } from '../../../../shared/http-url.ts';
 
 export function linkDisplayMode(preview: LinkPreviewMeta): LinkDisplayMode {
   return preview.displayAs ?? 'inline';

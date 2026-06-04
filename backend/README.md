@@ -56,7 +56,7 @@ backend/
 └── package.json
 ```
 
-**Monorepo note:** TypeScript `rootDir` includes `../shared` for shared utilities (e.g. HTTP URL helpers used by link preview).
+**Shared utilities:** `backend/shared/http-url.ts` (link preview URL parsing) — keep in sync with `frontend/shared/http-url.ts`.
 
 ## Quick start
 
@@ -212,7 +212,7 @@ Some unit tests use Prisma mocks; a few suites may need mock updates when schema
 
 ## Related
 
-- [../readme.md](../readme.md) — Monorepo overview
+- [../docs/README.md](../docs/README.md) — Project overview & quick start
 - [../frontend/README.md](../frontend/README.md) — SPA, themes, PWA
 - [../docs/INTEGRATION.md](../docs/INTEGRATION.md) — Auth, proxy, socket contract
 - [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) — Full dev setup

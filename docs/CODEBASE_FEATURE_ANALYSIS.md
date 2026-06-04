@@ -15,7 +15,7 @@
 
 **Stack (actual):** React Query + Context (not Redux), CSS Modules (not Tailwind), **Giphy** (`frontend/src/config/env.ts`).
 
-**Docs:** Treat this file + `docs/INTEGRATION.md` as integration truth. Root `readme.md` is updated for stack alignment; sprint sections remain historical planning context.
+**Docs:** Treat this file + `docs/INTEGRATION.md` as integration truth. `docs/README.md` is the product overview; sprint sections there remain historical planning context.
 
 ---
 
@@ -217,7 +217,7 @@ Based on current CSS Modules layout and recent group/call work:
 
 ---
 
-## readme.md alignment (current)
+## docs/README.md alignment (current)
 
 | Claim | Repo reality |
 |-------|--------------|
@@ -236,7 +236,7 @@ Based on current CSS Modules layout and recent group/call work:
 
 ## Related docs
 
-- `readme.md` — product overview, privacy commitment, sprint history
+- `docs/README.md` — product overview, privacy commitment, sprint history
 - `frontend/README.md` — frontend setup and structure
 - `backend/README.md` — API, sockets, env
 - `docs/INTEGRATION.md` — auth, proxy, socket contract

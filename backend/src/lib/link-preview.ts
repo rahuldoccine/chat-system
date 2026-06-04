@@ -12,7 +12,7 @@ export type LinkPreview = {
   siteName?: string;
 };
 
-import { extractFirstHttpUrl } from "../../../shared/http-url.ts";
+import { extractFirstHttpUrl } from "../../shared/http-url.ts";
 
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_BODY_BYTES = 512 * 1024;
@@ -46,7 +46,7 @@ function cacheSet(url: string, preview: LinkPreview | null): void {
   }
 }
 
-export { extractFirstHttpUrl } from "../../../shared/http-url.ts";
+export { extractFirstHttpUrl } from "../../shared/http-url.ts";
 
 function isPrivateIpv4(ip: string): boolean {
   const parts = ip.split(".").map(Number);
