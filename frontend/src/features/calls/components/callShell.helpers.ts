@@ -1,4 +1,4 @@
-import type { CallMeta, OutgoingPreview } from '../types';
+import type { CallMeta, CallPhase, OutgoingPreview } from '../types';
 
 export function overlayMetaFromPreview(preview: OutgoingPreview): CallMeta {
   return {
@@ -23,6 +23,17 @@ export function resolveCallOverlayMeta(
     return overlayMetaFromPreview(outgoingPreview);
   }
   return null;
+}
+
+/** Callee is ringing — show Accept / Decline, not the outgoing "Calling…" card. */
+export function isIncomingCallRinging(
+  phase: CallPhase,
+  meta: CallMeta | null,
+  hasPendingIncoming: boolean,
+): boolean {
+  if (phase !== 'ringing_in') return false;
+  if (hasPendingIncoming) return true;
+  return Boolean(meta && meta.isInitiator === false);
 }
 
 export function callOutgoingStatusLabel(

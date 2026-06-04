@@ -1,5 +1,4 @@
 import React from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
 import { createPortal } from 'react-dom';
 import { Phone, PhoneOff, Video } from 'lucide-react';
 import UserAvatar from '../../chat/components/UserAvatar';
@@ -23,34 +22,33 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
   onDecline,
 }) =>
   createPortal(
-    <Dialog.Root open onOpenChange={(open) => !open && onDecline()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className={styles.backdrop} />
-        <Dialog.Content className={styles.card} aria-label="Incoming call">
+    <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="Incoming call">
+      <div className={styles.card}>
+        <h2 className={styles.title}>{peerName}</h2>
+        <p className={styles.sub}>
+          Incoming {isVideo ? 'video' : 'voice'} call…
+        </p>
+        <div className={styles.avatarWrap}>
           <UserAvatar
             userId={peerUserId}
             avatarUrl={peerAvatarUrl}
             displayName={peerName}
             className={styles.avatar}
-            fallbackFontSize="2rem"
+            fallbackFontSize="2.75rem"
           />
-          <Dialog.Title className={styles.title}>{peerName}</Dialog.Title>
-          <Dialog.Description className={styles.sub}>
-            Incoming {isVideo ? 'video' : 'voice'} call…
-          </Dialog.Description>
-          <div className={styles.actions}>
-            <button type="button" className={styles.declineBtn} onClick={onDecline}>
-              <PhoneOff size={18} />
-              Decline
-            </button>
-            <button type="button" className={styles.acceptBtn} onClick={onAccept}>
-              {isVideo ? <Video size={18} /> : <Phone size={18} />}
-              Accept
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>,
+        </div>
+        <div className={styles.actions}>
+          <button type="button" className={styles.declineBtn} onClick={onDecline}>
+            <PhoneOff size={20} strokeWidth={2.25} />
+            Decline
+          </button>
+          <button type="button" className={styles.acceptBtn} onClick={onAccept}>
+            {isVideo ? <Video size={20} strokeWidth={2.25} /> : <Phone size={20} strokeWidth={2.25} />}
+            Accept
+          </button>
+        </div>
+      </div>
+    </div>,
     document.body,
   );
 

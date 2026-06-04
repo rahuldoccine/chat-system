@@ -132,12 +132,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const onIncoming = (payload: IncomingCallPayload) => {
-      if (callManager.isBusy()) return;
+      if (callManager.isBusy()) {
+        setError('You are already in a call. End it before answering another.');
+        refresh();
+        return;
+      }
       const peer = resolvePeerInfo(queryClient, payload.fromUserId, payload.chatId);
       const peerDisplayName = peer.name;
       remoteSdpRef.current = payload.sdp;
       setPendingIncoming({ ...payload, peerDisplayName, peerAvatarUrl: peer.avatarUrl });
-      callManager.setMeta({
+      callManager.stageIncoming({
         callId: payload.callId,
         chatId: payload.chatId,
         peerUserId: payload.fromUserId,
@@ -146,7 +150,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isVideo: Boolean(payload.media?.video),
         isInitiator: false,
       });
-      callManager.setPhase('ringing_in');
       refresh();
     };
 

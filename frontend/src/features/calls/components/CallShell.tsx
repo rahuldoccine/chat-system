@@ -7,6 +7,7 @@ import CallErrorBanner from './CallErrorBanner';
 import { handler } from '../../../utils/asyncHandler';
 import {
   callOutgoingStatusLabel,
+  isIncomingCallRinging,
   resolveCallOverlayMeta,
 } from './callShell.helpers';
 
@@ -33,15 +34,24 @@ const CallShell: React.FC = () => {
     clearError,
   } = useCall();
 
-  if (pendingIncoming && phase === 'ringing_in') {
+  const incomingRinging = isIncomingCallRinging(phase, meta, Boolean(pendingIncoming));
+
+  if (incomingRinging) {
+    const peerName =
+      pendingIncoming?.peerDisplayName ?? meta?.peerDisplayName ?? 'Contact';
+    const peerUserId = pendingIncoming?.fromUserId ?? meta?.peerUserId;
+    const peerAvatarUrl = pendingIncoming?.peerAvatarUrl ?? meta?.peerAvatarUrl;
+    const isVideo = pendingIncoming
+      ? Boolean(pendingIncoming.media?.video)
+      : Boolean(meta?.isVideo);
     return (
       <>
         {error && <CallErrorBanner message={error} onDismiss={clearError} />}
         <IncomingCallModal
-          peerName={pendingIncoming.peerDisplayName}
-          peerUserId={pendingIncoming.fromUserId}
-          peerAvatarUrl={pendingIncoming.peerAvatarUrl}
-          isVideo={Boolean(pendingIncoming.media?.video)}
+          peerName={peerName}
+          peerUserId={peerUserId}
+          peerAvatarUrl={peerAvatarUrl}
+          isVideo={isVideo}
           onAccept={handler(acceptIncoming)}
           onDecline={handler(rejectIncoming)}
         />
@@ -53,6 +63,7 @@ const CallShell: React.FC = () => {
 
   const showOutgoingCard =
     Boolean(overlayMeta) &&
+    meta?.isInitiator !== false &&
     (isStarting || phase === 'ringing_out' || phase === 'connecting');
 
   const showActiveOverlay = phase === 'connected' && Boolean(meta ?? overlayMeta);
