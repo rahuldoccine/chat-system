@@ -371,6 +371,19 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     handleEnded('ended');
   }, [handleEnded]);
 
+  const switchCamera = useCallback(async () => {
+    const ok = await callManager.switchCamera();
+    if (!ok) {
+      setError(
+        'Could not switch the camera. If you are on a computer, try another webcam; on a phone, allow camera access and try again.',
+      );
+    } else {
+      setError(null);
+    }
+    refresh();
+    return ok;
+  }, [refresh]);
+
   const value = useMemo<CallContextValue>(
     () => ({
       phase: callManager.getPhase(),
@@ -397,7 +410,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (meta?.callId) emitCallSignal(meta.callId, on ? 'camera_on' : 'camera_off');
         return on;
       },
-      switchCamera: () => callManager.switchCamera(),
+      switchCamera,
       remotePeerMuted,
       connectedAt,
       peerRinging,
@@ -418,6 +431,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       acceptIncoming,
       rejectIncoming,
       hangUp,
+      switchCamera,
     ],
   );
 

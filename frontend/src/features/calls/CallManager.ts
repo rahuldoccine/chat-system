@@ -1,3 +1,8 @@
+import {
+  cameraFacingFromTrack,
+  switchCallCamera,
+  type CameraFacing,
+} from './cameraSwitch';
 import { buildIceServers } from './iceConfig';
 import { acquireUserMedia } from './mediaErrors';
 import type { CallIcePayload, CallMeta, CallPhase } from './types';
@@ -29,6 +34,7 @@ class CallManager {
   private connectionUi: CallConnectionUiState = 'connecting';
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private onPeerFailed: (() => void) | null = null;
+  private cameraFacing: CameraFacing = 'user';
 
   getPhase(): CallPhase {
     return this.phase;
@@ -179,27 +185,22 @@ class CallManager {
   }
 
   async switchCamera(): Promise<boolean> {
-    const track = this.localStream?.getVideoTracks()[0];
-    if (!track || !this.pc) return false;
-    const settings = track.getSettings();
-    const nextFacing = settings.facingMode === 'environment' ? 'user' : 'environment';
-    try {
-      const fresh = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: nextFacing } },
-        audio: false,
-      });
-      const newTrack = fresh.getVideoTracks()[0];
-      if (!newTrack) return false;
-      const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
-      if (sender) await sender.replaceTrack(newTrack);
-      track.stop();
-      this.localStream?.removeTrack(track);
-      this.localStream?.addTrack(newTrack);
-      this.notify();
-      return true;
-    } catch {
-      return false;
+    if (!this.pc || !this.localStream) return false;
+    const track = this.localStream.getVideoTracks()[0];
+    if (!track) return false;
+
+    const result = await switchCallCamera(this.pc, this.localStream, this.cameraFacing);
+    if (!result.ok) return false;
+
+    this.cameraFacing = result.facing;
+    const updated = this.localStream.getVideoTracks()[0];
+    if (updated) {
+      updated.enabled = true;
+      const fromTrack = cameraFacingFromTrack(updated);
+      if (fromTrack) this.cameraFacing = fromTrack;
     }
+    this.notify();
+    return true;
   }
 
   setConnectedAt(ts: number): void {
@@ -228,6 +229,7 @@ class CallManager {
     this.endReason = null;
     this.videoFallback = false;
     this.connectionUi = 'connecting';
+    this.cameraFacing = 'user';
     this.notify();
   }
 
@@ -249,6 +251,10 @@ class CallManager {
     const { stream, videoFallback } = await acquireUserMedia(isVideo);
     this.localStream = stream;
     this.videoFallback = videoFallback;
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      this.cameraFacing = cameraFacingFromTrack(videoTrack) ?? 'user';
+    }
     if (this.meta) {
       this.meta = { ...this.meta, isVideo: isVideo && !videoFallback };
     }

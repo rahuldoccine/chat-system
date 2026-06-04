@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { handler } from '../../../utils/asyncHandler';
-import { Info, Loader2, MoreHorizontal, Phone, Video } from 'lucide-react';
+import { Loader2, Phone, Video } from 'lucide-react';
 import { CallDirectionIcon } from './CallDirectionIcon';
 import { formatCallHistoryTimestamp } from '../../../utils/timeFormat';
 import { useCallHistory, type CallHistoryRow } from '../useCallHistory';
@@ -77,17 +77,6 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
 
   const displayName = peerDisplayName ?? rows[0]?.peer?.displayName ?? rows[0]?.peer?.email ?? 'Contact';
 
-  const handleRedial = (row: CallHistoryRow) => {
-    if (!peerUserId || phase !== 'idle') return;
-    const name = peerDisplayName ?? row.peer?.displayName ?? row.peer?.email ?? 'Contact';
-    void startCall({
-      chatId,
-      peerUserId: row.peer?.id ?? peerUserId,
-      peerDisplayName: name,
-      video: row.kind === 'VIDEO',
-    });
-  };
-
   return (
     <div className={styles.panel}>
       <div className={styles.filters}>
@@ -127,14 +116,20 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
           const typeLabel = formatCallTypeLabel(row.kind);
           const iconPrefix = callDirectionIconPrefix(row.direction);
 
+          const redial = (video: boolean) => {
+            if (!peerUserId || phase !== 'idle') return;
+            const name = peerDisplayName ?? row.peer?.displayName ?? row.peer?.email ?? 'Contact';
+            void startCall({
+              chatId,
+              peerUserId: row.peer?.id ?? peerUserId,
+              peerDisplayName: name,
+              video,
+            });
+          };
+
           return (
             <li key={row.id} className={styles.listItem}>
-              <button
-                type="button"
-                className={styles.row}
-                onClick={() => handleRedial(row)}
-                disabled={phase !== 'idle'}
-              >
+              <div className={styles.row}>
                 <UserAvatar
                   userId={avatarUserId}
                   avatarUrl={avatarUrl}
@@ -144,9 +139,21 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
                   fallbackFontSize="1.1rem"
                 />
                 <div className={styles.body}>
-                  <span className={`${styles.name} ${isMissed ? styles.nameMissed : ''}`}>
-                    {peerDisplayName ?? row.peer?.displayName ?? row.peer?.email ?? displayName}
-                  </span>
+                  <div className={styles.titleRow}>
+                    <span className={`${styles.name} ${isMissed ? styles.nameMissed : ''}`}>
+                      {peerDisplayName ?? row.peer?.displayName ?? row.peer?.email ?? displayName}
+                    </span>
+                    <span
+                      className={styles.callType}
+                      aria-label={row.kind === 'VIDEO' ? 'Video call' : 'Audio call'}
+                    >
+                      {row.kind === 'VIDEO' ? (
+                        <Video size={20} strokeWidth={1.75} />
+                      ) : (
+                        <Phone size={20} strokeWidth={1.75} />
+                      )}
+                    </span>
+                  </div>
                   <div className={styles.meta}>
                     <CallDirectionIcon
                       direction={row.direction}
@@ -156,45 +163,39 @@ const CallHistoryPanel: React.FC<CallHistoryPanelProps> = ({
                         incoming: styles.arrowIncoming,
                       }}
                     />
-                    <span className={styles.time}>{iconPrefix} {directionLabel} {typeLabel} Call</span>
+                    <span className={styles.time}>
+                      {iconPrefix} {directionLabel} {typeLabel}
+                    </span>
                     <span className={`${styles.statusBadge} ${statusToneClass}`}>
                       {formatCallStatusBadge(row.status)}
                     </span>
                   </div>
                   <div className={styles.detailGrid}>
-                    <span>{formatCallHistoryTimestamp(row.startedAt)} • {formatDuration(row.durationSec)}</span>
-                    <span>Started: {formatDateTime(row.startedAt)}</span>
-                    <span>Ended: {formatDateTime(row.endedAt)}</span>
-                  </div>
-                  <div className={styles.actionRow}>
-                    <span className={styles.actionChip}>Call Again</span>
-                    <span className={styles.actionChip}>Info</span>
-                    <span className={styles.actionChip}>⋮</span>
+                    <span className={styles.detailPrimary}>
+                      {formatCallHistoryTimestamp(row.startedAt)} · {formatDuration(row.durationSec)}
+                    </span>
+                    <span className={styles.detailExtra}>
+                      Started {formatDateTime(row.startedAt)} · Ended {formatDateTime(row.endedAt)}
+                    </span>
                   </div>
                 </div>
-                <span
-                  className={styles.callType}
-                  aria-label={row.kind === 'VIDEO' ? 'Video call' : 'Audio call'}
-                >
-                  {row.kind === 'VIDEO' ? (
-                    <Video size={22} strokeWidth={1.75} />
-                  ) : (
-                    <Phone size={22} strokeWidth={1.75} />
-                  )}
-                </span>
-              </button>
+              </div>
               <div className={styles.quickActions}>
-                <button type="button" onClick={() => handleRedial(row)} disabled={phase !== 'idle'}>
-                  <Phone size={14} /> Call Again
+                <button
+                  type="button"
+                  className={styles.quickActionBtn}
+                  onClick={() => redial(row.kind === 'VIDEO')}
+                  disabled={phase !== 'idle'}
+                >
+                  <Phone size={14} /> Call again
                 </button>
-                <button type="button">
+                <button
+                  type="button"
+                  className={styles.quickActionBtn}
+                  onClick={() => redial(true)}
+                  disabled={phase !== 'idle'}
+                >
                   <Video size={14} /> Video
-                </button>
-                <button type="button">
-                  <Info size={14} /> Details
-                </button>
-                <button type="button" aria-label="More">
-                  <MoreHorizontal size={14} />
                 </button>
               </div>
             </li>
