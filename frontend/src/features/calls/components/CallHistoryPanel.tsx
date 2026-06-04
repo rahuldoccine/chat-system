@@ -3,7 +3,7 @@ import { handler } from '../../../utils/asyncHandler';
 import { Loader2, Phone, Video } from 'lucide-react';
 import { CallDirectionIcon } from './CallDirectionIcon';
 import { formatCallHistoryTimestamp } from '../../../utils/timeFormat';
-import { useCallHistory, type CallHistoryRow } from '../useCallHistory';
+import { useCallHistory } from '../useCallHistory';
 import { filterCallHistoryRows } from '../utils/callHistoryFilters';
 import { useCall } from '../CallProvider';
 import UserAvatar from '../../chat/components/UserAvatar';
