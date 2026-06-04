@@ -23,6 +23,11 @@ import { mergeContentMetaWithStubs } from './transportFileStubs';
 import { parseE2eePollMeta, type E2eePollPayload } from './pollMeta';
 import { logDecryptFailure, retryDecryptMessage } from './decryptRetry';
 import { onE2eeGroupKeysUpdated, onE2eeKeysUnlocked } from './e2eeEvents';
+import {
+  E2EE_DECRYPTING_PLACEHOLDER,
+  E2EE_UNABLE_DECRYPT_TEXT,
+  E2EE_UNLOCK_BODY_TEXT,
+} from './e2eeDisplay';
 
 export type DecryptedBody = {
   text: string;
@@ -132,11 +137,9 @@ function bodyFromPayload(payload: { text: string; meta?: Record<string, unknown>
 
 function pendingDecryptBody(_msg: Message, keysLocked: boolean): DecryptedBody {
   if (keysLocked) {
-    return {
-      text: 'Unlock encryption with your password (Settings) to read encrypted messages.',
-    };
+    return { text: E2EE_UNLOCK_BODY_TEXT };
   }
-  return { text: '[Unable to decrypt]' };
+  return { text: E2EE_UNABLE_DECRYPT_TEXT };
 }
 
 function unavailableSenderBody(msg: Message, keysLocked: boolean): DecryptedBody {
@@ -248,11 +251,11 @@ async function resolveDecryptedBody(
     return unavailableSenderBody(msg, keysLocked);
   }
   if (isGroupE2eeMessage(msg)) {
-    return { text: '[Unable to decrypt]' };
+    return { text: E2EE_UNABLE_DECRYPT_TEXT };
   }
 
   const plain = await decryptDirectMessage(userId, msg, userId);
-  return { text: plain ?? '[Unable to decrypt]' };
+  return { text: plain ?? E2EE_UNABLE_DECRYPT_TEXT };
 }
 
 export function useMessageBodies(
@@ -275,6 +278,12 @@ export function useMessageBodies(
         : '',
     [messages],
   );
+
+  const [debouncedMessagesKey, setDebouncedMessagesKey] = useState(messagesKey);
+  useEffect(() => {
+    const timer = globalThis.setTimeout(() => setDebouncedMessagesKey(messagesKey), 80);
+    return () => globalThis.clearTimeout(timer);
+  }, [messagesKey]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -300,7 +309,30 @@ export function useMessageBodies(
     return () => {
       cancelled = true;
     };
-  }, [messagesKey, user?.id, e2eeKeysLocked, unlockGeneration, groupKeysGeneration, messages]);
+  }, [
+    debouncedMessagesKey,
+    user?.id,
+    e2eeKeysLocked,
+    unlockGeneration,
+    groupKeysGeneration,
+    messages,
+  ]);
+
+  useEffect(() => {
+    if (!user?.id || !messages?.length || !e2eeKeysLocked) return;
+    setBodies((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const msg of messages) {
+        if (!isE2eeMessage(msg)) continue;
+        if (!next[msg.id]) {
+          next[msg.id] = pendingDecryptBody(msg, true);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [messagesKey, user?.id, e2eeKeysLocked, messages]);
 
   return bodies;
 }
@@ -309,9 +341,15 @@ export function getMessageDisplayBody(
   msg: Message,
   bodies: Record<string, DecryptedBody>,
   userId: string,
+  keysLocked = false,
 ): string {
   if (isE2eeMessage(msg)) {
-    return bodies[msg.id]?.text ?? getSentPlaintext(userId, msg) ?? '…';
+    const fromBody = bodies[msg.id]?.text;
+    if (fromBody !== undefined) return fromBody;
+    const sent = getSentPlaintext(userId, msg);
+    if (sent !== undefined) return sent;
+    if (keysLocked) return E2EE_UNLOCK_BODY_TEXT;
+    return E2EE_DECRYPTING_PLACEHOLDER;
   }
   return msg.ciphertext ?? '';
 }

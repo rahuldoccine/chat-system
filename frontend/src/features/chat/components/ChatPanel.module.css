@@ -122,7 +122,8 @@
 
 @media (max-width: 576px) {
   .panel {
-    padding: 1rem 1rem 1.5rem;
+    padding: 0.85rem 0.75rem 1.25rem;
+    overflow-x: hidden;
   }
 
   .searchInput {

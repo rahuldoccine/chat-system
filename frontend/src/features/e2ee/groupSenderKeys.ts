@@ -13,6 +13,21 @@ export type SenderKeyRecord = {
   keyBytes: Uint8Array;
 };
 
+export class GroupKeyDistributionError extends Error {
+  readonly failedMemberIds: string[];
+
+  constructor(failedMemberIds: string[]) {
+    const count = failedMemberIds.length;
+    super(
+      count === 1
+        ? 'Could not share encryption keys with one group member. They may need to sign in and finish encryption setup.'
+        : `Could not share encryption keys with ${count} group members. They may need to sign in and finish encryption setup.`,
+    );
+    this.name = 'GroupKeyDistributionError';
+    this.failedMemberIds = failedMemberIds;
+  }
+}
+
 const localKeys = new Map<string, Uint8Array>();
 
 let idbHydrated = false;
@@ -176,6 +191,25 @@ export async function fetchGroupSenderKeys(
   }
 }
 
+async function peerDeviceCount(peerId: string): Promise<number> {
+  try {
+    const devices = await listPeerDevices(peerId);
+    return devices.length;
+  } catch {
+    return 0;
+  }
+}
+
+async function memberWrapNeedsUpgrade(
+  peerId: string,
+  entry: string | Record<string, string> | undefined,
+): Promise<boolean> {
+  if (!entry) return true;
+  const deviceCount = await peerDeviceCount(peerId);
+  if (deviceCount > 1 && typeof entry === 'string') return true;
+  return false;
+}
+
 async function wrapSenderKeyForMember(
   userId: string,
   peerId: string,
@@ -249,7 +283,12 @@ export async function ensureSenderKeyDistributed(
       const parsed = JSON.parse(own.distribution) as DistributionV2;
       if (parsed.v === 2 && parsed.wrapped) {
         for (const memberId of members) {
-          if (!parsed.wrapped[memberId]) {
+          const entry = parsed.wrapped[memberId];
+          if (!entry) {
+            needsRepublish = true;
+            break;
+          }
+          if (await memberWrapNeedsUpgrade(memberId, entry)) {
             needsRepublish = true;
             break;
           }
@@ -277,10 +316,18 @@ export async function publishSenderKey(
   await ensureIdbHydrated();
   const keyB64 = keyBytesToB64(keyBytes);
   const wrapped: Record<string, string | Record<string, string>> = {};
+  const failedMemberIds: string[] = [];
   for (const peerId of memberUserIds) {
     if (peerId === userId) continue;
     const entry = await wrapSenderKeyForMember(userId, peerId, keyB64, epoch);
-    if (entry) wrapped[peerId] = entry;
+    if (entry) {
+      wrapped[peerId] = entry;
+    } else {
+      failedMemberIds.push(peerId);
+    }
+  }
+  if (failedMemberIds.length) {
+    throw new GroupKeyDistributionError(failedMemberIds);
   }
   const distribution = JSON.stringify({
     v: 2,

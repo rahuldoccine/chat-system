@@ -18,6 +18,7 @@ import {
 import type { LinkDisplayMode, Message, ReplyPreview } from '../types';
 import type { DecryptedBody } from '../../e2ee/useMessageBodies';
 import type { MessageKindFlags, MessageMediaLayout } from '../utils/messageStream.helpers';
+import { GroupE2eeDecryptRetry } from './GroupE2eeDecryptRetry';
 
 export type MessageStreamRowContentProps = Readonly<{
   msg: Message;
@@ -220,6 +221,7 @@ export function MessageStreamRowContent({
             activeSearchMessageId={activeSearchMessageId}
           />
         ) : null}
+        <GroupE2eeDecryptRetry msg={msg} displayBody={displayBody} activeId={activeId} />
         {renderLinkPreview(false)}
         {!mediaOnly && (
           <MessageMeta

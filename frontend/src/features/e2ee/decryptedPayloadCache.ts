@@ -135,7 +135,7 @@ export async function rememberPayload(
   ctFingerprint: string,
   body: DecryptedBody,
 ): Promise<void> {
-  if (body.text === '[Unable to decrypt]') return;
+  if (body.text === '[Unable to decrypt]' || body.text.includes('Unlock encryption')) return;
   const entry: CachedPayloadEntry = { ...body, ctFingerprint };
   setPayloadMemory(userId, messageId, ctFingerprint, body);
   await idbPut(userId, messageId, entry);

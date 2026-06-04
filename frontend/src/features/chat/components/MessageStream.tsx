@@ -86,7 +86,7 @@ const MessageStream: React.FC<MessageStreamProps> = ({
     inChatSearchMatchIds,
     inChatSearchActiveIndex,
   } = useChat();
-  const { user } = useAuth();
+  const { user, e2eeKeysLocked } = useAuth();
   const { socket, isConnected } = useSocket();
   const queryClient = useQueryClient();
   const updateLinkDisplay = useUpdateLinkDisplay();
@@ -144,8 +144,9 @@ const MessageStream: React.FC<MessageStreamProps> = ({
   )?.data?.find((c) => c.id === activeId);
 
   const bodyOf = useCallback(
-    (msg: Message) => getMessageDisplayBody(msg, decryptedBodies, user?.id ?? ''),
-    [decryptedBodies, user?.id],
+    (msg: Message) =>
+      getMessageDisplayBody(msg, decryptedBodies, user?.id ?? '', e2eeKeysLocked),
+    [decryptedBodies, user?.id, e2eeKeysLocked],
   );
 
   const searchQuery = inChatSearchOpen ? inChatSearchQuery.trim() : '';

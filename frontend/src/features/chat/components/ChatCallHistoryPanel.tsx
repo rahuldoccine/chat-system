@@ -24,10 +24,7 @@ import ChatAvatar from './ChatAvatar';
 import EmptyState from './EmptyState';
 
 function groupCallTitle(kind: GroupCallHistoryRow['kind']): string {
-  const isVideo = kind === 'VIDEO';
-  const emoji = isVideo ? '📹' : '📞';
-  const label = isVideo ? 'Video' : 'Audio';
-  return `${emoji} ${label} Group Call`;
+  return kind === 'VIDEO' ? 'Video group call' : 'Audio group call';
 }
 
 const ChatCallHistoryPanel: React.FC = () => {
@@ -116,10 +113,20 @@ const ChatCallHistoryPanel: React.FC = () => {
                             className={styles.groupAvatar}
                           />
                           <div className={styles.groupBody}>
-                            <div className={styles.groupTop}>
-                              <div className={styles.groupTitle}>{groupCallTitle(row.kind)}</div>
+                            <div className={styles.groupHeader}>
+                              <p className={styles.groupTitle}>{groupCallTitle(row.kind)}</p>
                               <span className={`${styles.groupStatus} ${toneClass}`}>
                                 {formatGroupCallStatusBadge(row.status)}
+                              </span>
+                              <span
+                                className={styles.groupCallType}
+                                aria-label={row.kind === 'VIDEO' ? 'Video call' : 'Audio call'}
+                              >
+                                {row.kind === 'VIDEO' ? (
+                                  <Video size={20} strokeWidth={1.75} />
+                                ) : (
+                                  <Phone size={20} strokeWidth={1.75} />
+                                )}
                               </span>
                             </div>
                             <div className={styles.groupMeta}>
@@ -131,22 +138,37 @@ const ChatCallHistoryPanel: React.FC = () => {
                                   incoming: styles.arrowIncoming,
                                 }}
                               />
-                              <span>{formatCallDirection(row)} • {row.startedAt ? formatCallDateTime(row.startedAt) : formatCallDateTime(row.endedAt)}</span>
+                              <span className={styles.groupMetaText}>
+                                {formatCallDirection(row)} ·{' '}
+                                {row.startedAt
+                                  ? formatCallDateTime(row.startedAt)
+                                  : formatCallDateTime(row.endedAt)}
+                              </span>
                             </div>
                             <div className={styles.groupSubMeta}>Started by {row.actor}</div>
-                            <div className={styles.groupDetail}>Started at: {formatCallDateTime(row.startedAt)}</div>
-                            <div className={styles.groupDetail}>Ended at: {formatCallDateTime(row.endedAt)}</div>
-                            <div className={styles.groupDetailStrong}>
-                              Duration: {formatCallDuration(row.durationSec)}
+                            <p className={styles.groupCompact}>
+                              <span className={styles.groupCompactStrong}>
+                                {formatCallDuration(row.durationSec)}
+                              </span>
+                              {row.startedAt ? (
+                                <>
+                                  {' '}
+                                  · {formatCallDateTime(row.startedAt)}
+                                </>
+                              ) : null}
+                            </p>
+                            <div className={styles.groupDetails}>
+                              <div className={styles.groupDetail}>
+                                Started at: {formatCallDateTime(row.startedAt)}
+                              </div>
+                              <div className={styles.groupDetail}>
+                                Ended at: {formatCallDateTime(row.endedAt)}
+                              </div>
+                              <div className={styles.groupDetailStrong}>
+                                Duration: {formatCallDuration(row.durationSec)}
+                              </div>
                             </div>
                           </div>
-                          <span className={styles.groupCallType} aria-label={row.kind === 'VIDEO' ? 'Video call' : 'Audio call'}>
-                            {row.kind === 'VIDEO' ? (
-                              <Video size={22} strokeWidth={1.75} />
-                            ) : (
-                              <Phone size={22} strokeWidth={1.75} />
-                            )}
-                          </span>
                         </div>
                       </li>
                     );

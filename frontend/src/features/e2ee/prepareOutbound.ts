@@ -6,7 +6,10 @@ import { resolveGroupMemberIds } from './groupMembers';
 import { GROUP_E2EE_VERSION } from './protocol';
 import { ensureE2eeReady, E2eeKeysLockedError } from './bootstrap';
 import { encryptDirectMessage, E2eePeerNotReadyError } from './directChat';
+import { getLocalKeyMaterial } from './keyAccess';
 import { getRememberedPeerDevice } from './peerDevice';
+import { buildSenderCopyMeta } from './senderCopy';
+import { E2EE_UNLOCK_SEND_GROUP_TEXT } from './e2eeDisplay';
 
 export type OutboundPlainMessage = {
   chatId: string;
@@ -99,6 +102,10 @@ export async function prepareOutboundMessage(
 
   if (isGroupE2eeChat(chat ?? null) && input.chatId) {
     await ensureE2eeReady(userId, { offline: offlineMode });
+    const material = await getLocalKeyMaterial(userId);
+    if (!material) {
+      throw new E2eeKeysLockedError(E2EE_UNLOCK_SEND_GROUP_TEXT);
+    }
     const memberIds = await resolveGroupMemberIds(input.chatId, input.groupMemberIds);
     const plainMeta = plainMetaFromInput(input.contentMeta);
     const encrypted = await encryptGroupMessage(
@@ -114,11 +121,16 @@ export async function prepareOutboundMessage(
       contentMeta: plainMeta,
     });
     const mentions = mentionsMetaFromInput(plainMeta);
+    const senderCopy = await buildSenderCopyMeta(material, {
+      text: input.text ?? '',
+      meta: plainMeta,
+    });
     return {
       ciphertext: encrypted.ciphertext,
       contentMeta: {
         ...encrypted.contentMeta,
         e2eeVersion: GROUP_E2EE_VERSION,
+        senderCopy,
         pushPreview,
         ...(mentions ? { mentions } : {}),
       },

@@ -31,7 +31,7 @@ export async function decryptMessagePayload(
   material: E2eeKeyMaterial,
   fingerprintCache: Map<string, string>,
 ): Promise<DmV1Payload | null> {
-  if (msg.senderId === userId && !isGroupE2eeMessage(msg)) {
+  if (msg.senderId === userId) {
     const fromCopy = await decryptSenderCopy(material, msg);
     if (fromCopy) return fromCopy;
   }
