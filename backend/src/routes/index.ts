@@ -21,8 +21,10 @@ import { createModerationRouter } from "../modules/moderation/moderation.routes.
 export function createApiRouter(config: AppConfig, logger: Logger): Router {
   const api = Router();
 
-  api.get("/openapi.json", (_req, res) => {
-    res.json(buildOpenApiDocument(config));
+  api.get("/openapi.json", (req, res) => {
+    const host = req.get("host");
+    const requestOrigin = host ? `${req.protocol}://${host}` : undefined;
+    res.json(buildOpenApiDocument(config, { requestOrigin }));
   });
 
   api.get("/config/public", (_req, res) => {

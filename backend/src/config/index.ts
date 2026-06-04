@@ -79,6 +79,26 @@ function resolveUploadDir(relativeOrAbsolute: string): string {
   return path.resolve(process.cwd(), relativeOrAbsolute);
 }
 
+/** OpenAPI / Swagger "Servers" base URL (must end with `/api/v1`). */
+function resolvePublicApiUrl(
+  explicit?: string,
+  runtime: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  if (explicit) {
+    return explicit.replace(/\/$/g, "");
+  }
+  const staticUrl = runtime.RAILWAY_STATIC_URL?.trim();
+  if (staticUrl) {
+    const base = staticUrl.replace(/\/$/g, "");
+    return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+  }
+  const domain = runtime.RAILWAY_PUBLIC_DOMAIN?.trim();
+  if (domain) {
+    return `https://${domain}/api/v1`;
+  }
+  return undefined;
+}
+
 export function loadConfig(overrides?: Partial<NodeJS.ProcessEnv>): AppConfig {
   if (cached && !overrides) {
     return cached;
@@ -125,7 +145,7 @@ export function loadConfig(overrides?: Partial<NodeJS.ProcessEnv>): AppConfig {
     authRefreshWindowMs: env.AUTH_REFRESH_WINDOW_MS,
     authRefreshMax: env.AUTH_REFRESH_MAX,
     swaggerEnabled,
-    publicApiUrl: env.PUBLIC_API_URL,
+    publicApiUrl: resolvePublicApiUrl(env.PUBLIC_API_URL, { ...process.env, ...overrides }),
     redisUrl: env.REDIS_URL,
     fcmProjectId: env.FCM_PROJECT_ID,
     fcmServiceAccountPath: env.FCM_SERVICE_ACCOUNT_PATH,

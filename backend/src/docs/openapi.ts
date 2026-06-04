@@ -17,15 +17,45 @@ import {
   withUnauthorized,
 } from "./openapi.helpers.js";
 
-/** OpenAPI 3.0 document for Swagger UI and `/api/v1/openapi.json`. */
-export function buildOpenApiDocument(config: AppConfig): Record<string, unknown> {
+function isLocalOrigin(origin: string): boolean {
+  return /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?$/i.test(origin.replace(/\/$/, ""));
+}
+
+function apiBaseFromOrigin(origin: string): string {
+  const base = origin.replace(/\/$/, "");
+  return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+}
+
+/** Swagger "Servers" list: live URL first; local only in development. */
+export function resolveOpenApiServers(
+  config: AppConfig,
+  requestOrigin?: string,
+): Array<{ url: string; description: string }> {
   const localServer = `http://127.0.0.1:${config.port}/api/v1`;
-  const servers = config.publicApiUrl
-    ? [
-        { url: config.publicApiUrl, description: "Deployed API" },
+  const fromRequest =
+    requestOrigin && !isLocalOrigin(requestOrigin)
+      ? apiBaseFromOrigin(requestOrigin)
+      : undefined;
+  const liveServer = config.publicApiUrl ?? fromRequest;
+
+  if (liveServer) {
+    if (config.isDev) {
+      return [
+        { url: liveServer, description: "Live API" },
         { url: localServer, description: "Local" },
-      ]
-    : [{ url: localServer, description: "API" }];
+      ];
+    }
+    return [{ url: liveServer, description: "Live API" }];
+  }
+  return [{ url: localServer, description: "API" }];
+}
+
+/** OpenAPI 3.0 document for Swagger UI and `/api/v1/openapi.json`. */
+export function buildOpenApiDocument(
+  config: AppConfig,
+  options?: { requestOrigin?: string },
+): Record<string, unknown> {
+  const servers = resolveOpenApiServers(config, options?.requestOrigin);
   const refreshCookie = config.refreshCookieName;
 
   return {
