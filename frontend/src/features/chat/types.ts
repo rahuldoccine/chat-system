@@ -135,6 +135,12 @@ export type Message = {
     senderFingerprint?: string;
     peerDeviceId?: string;
     senderDeviceId?: string;
+    /** Encrypted copy of outbound E2EE payload (readable on sender's other devices). */
+    senderCopy?: {
+      v: 1;
+      iv: string;
+      ct: string;
+    };
   };
 };
 
