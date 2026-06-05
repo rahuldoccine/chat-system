@@ -29,7 +29,6 @@ const HomeDashboard: React.FC<HomeDashboardProps> = ({
 }) => {
   const {
     greeting,
-    needsKeyBackup,
     memberChats,
     channels,
     totalUnread,
@@ -59,12 +58,6 @@ const HomeDashboard: React.FC<HomeDashboardProps> = ({
         <p className={styles.heroSubtitle}>
           Pick up where you left off or start something new with your team.
         </p>
-        {needsKeyBackup ? (
-          <output className={styles.backupWarning}>
-            Your encryption keys are not backed up to your account yet. Sign out and sign in with
-            your password once to protect message history across devices.
-          </output>
-        ) : null}
       </motion.header>
 
       <HomeDashboardStats

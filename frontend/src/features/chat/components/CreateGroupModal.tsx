@@ -186,7 +186,6 @@ const CreateGroupModalBody: React.FC<BodyProps> = ({ onlineUsers, getUserLabel, 
           <span className={styles.visibilityCardDesc}>Invite only (Owner / Mod)</span>
         </label>
       </fieldset>
-      <p className={styles.e2eeNote}>Groups are end-to-end encrypted by default.</p>
     </section>
 
     <div className={styles.divider} />

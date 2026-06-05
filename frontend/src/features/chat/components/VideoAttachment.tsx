@@ -1,13 +1,11 @@
 import React from 'react';
 import MessageMeta from './MessageMeta';
 import { useMessageFileSource } from '../hooks/useMessageFileSource';
-import type { ContentMeta, Message } from '../types';
+import type { Message } from '../types';
 import styles from './VideoAttachment.module.css';
 
 type VideoAttachmentProps = {
   contentMeta: Message['contentMeta'];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
   embedded?: boolean;
   bubbleVariant?: 'sent' | 'received';
   onMediaLoad?: () => void;
@@ -21,19 +19,12 @@ type VideoAttachmentProps = {
 
 const VideoAttachment: React.FC<VideoAttachmentProps> = ({
   contentMeta,
-  e2eeMessage,
-  transportMeta,
   embedded = false,
   bubbleVariant = 'received',
   onMediaLoad,
   mediaTimestamp,
 }) => {
-  const { displayName, fullUrl } = useMessageFileSource(
-    contentMeta,
-    e2eeMessage,
-    transportMeta,
-    'Video',
-  );
+  const { displayName, fullUrl } = useMessageFileSource(contentMeta, 'Video');
 
   if (!fullUrl) {
     return <div className={styles.unavailable}>Video unavailable</div>;

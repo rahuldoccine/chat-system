@@ -17,7 +17,6 @@ import { fetchGroup, joinPublicGroup } from '../features/chat/api/groupsApi';
 import type { Chat } from '../features/chat/types';
 import HomeDashboard from '../features/chat/components/HomeDashboard';
 import ThreadPanel from '../features/chat/components/ThreadPanel';
-import { useE2eeChatPrefetch } from '../features/e2ee/useE2eeChatPrefetch';
 import ActiveChatView from './ActiveChatView';
 import { getCallDisabledReason, getChatName } from './homePage.helpers';
 import styles from './HomePage.module.css';
@@ -70,7 +69,6 @@ const HomePage: React.FC = () => {
   const { data: conversations } = useConversations();
   const chatList = conversations?.data ?? [];
   const activeChat = chatList.find((c) => c.id === activeId);
-  useE2eeChatPrefetch(activeId, activeChat);
   const [joiningGroup, setJoiningGroup] = React.useState(false);
   const canJoinPublicGroup = Boolean(
     activeChat?.type === 'GROUP' && activeChat.canJoin && activeChat.isMember === false,

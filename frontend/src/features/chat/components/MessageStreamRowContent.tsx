@@ -6,9 +6,8 @@ import LinkPreviewBlock from './LinkPreviewBlock';
 import { replyPreviewAuthor, replyPreviewLabel } from '../utils/messageReply';
 import { linkDisplayMode } from '../utils/linkPreviewUtils';
 import {
-  getDecryptedPollMeta,
   getMessageLinkPreview,
-} from '../../e2ee/useMessageBodies';
+} from '../utils/messageBody';
 import { HighlightedMessageText, MentionHighlightedText } from '../utils/searchHighlight';
 import {
   bodyTextForDisplay,
@@ -16,7 +15,7 @@ import {
   shouldRenderBodyText,
 } from './messageStreamRow.helpers';
 import type { LinkDisplayMode, Message, ReplyPreview } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 import type { MessageKindFlags, MessageMediaLayout } from '../utils/messageStream.helpers';
 
 export type MessageStreamRowContentProps = Readonly<{
@@ -175,11 +174,7 @@ export function MessageStreamRowContent({
       )}
       {kindFlags.isPoll && msg.contentMeta?.pollId && (
         <div className={styles.pollBlock}>
-          <PollMessage
-            pollId={msg.contentMeta.pollId}
-            isMe={isMe}
-            decryptedPoll={getDecryptedPollMeta(msg, decryptedBodies, userId ?? '')}
-          />
+          <PollMessage pollId={msg.contentMeta.pollId} isMe={isMe} />
         </div>
       )}
       {hasMedia && !kindFlags.isPoll && (
@@ -191,8 +186,6 @@ export function MessageStreamRowContent({
           <MediaAttachment
             kind={displayMsg.kind ?? 'FILE'}
             contentMeta={displayMsg.contentMeta}
-            e2eeMessage={msg}
-            transportMeta={displayMsg.contentMeta}
             embedded
             caption={groupedWithCaption ? displayBody : undefined}
             bubbleVariant={isMe ? 'sent' : 'received'}

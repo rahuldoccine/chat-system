@@ -112,7 +112,7 @@ export function mimeFromExtension(originalname: string): string | null {
 
 /**
  * Resolve MIME from browser declaration or safe filename extension
- * (e.g. application/octet-stream for Office docs or E2EE ciphertext with original name).
+ * (e.g. application/octet-stream for Office docs with original name).
  */
 export function resolveDeclaredUploadMime(originalname: string, declaredMime: string): string | null {
   const mime = declaredMime.toLowerCase().split(";")[0]?.trim() ?? "";

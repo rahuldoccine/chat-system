@@ -1,43 +1,44 @@
-import { decryptMessageFile } from '../../e2ee/attachmentCrypto';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import type { Message } from '../types';
 import { buildFileUrl } from './fileUrl';
-import type { FileAttachmentMeta } from './fileMeta';
 import { downloadBlob, downloadFileFromUrl } from './downloadFile';
+import type { FileAttachmentMeta } from './fileMeta';
+import type { Message } from '../types';
 
-export type FileMessageRef = Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-
-/** Plain API URL or decrypted blob URL for preview/download. */
 export async function resolveFileAccessUrl(
-  message: FileMessageRef,
+  _message: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
   file: FileAttachmentMeta,
-  transportMeta: Record<string, unknown> | undefined,
-  userId: string | undefined,
-  token: string | null,
+  _transportMeta: Record<string, unknown> | undefined,
+  _userId: string | undefined,
+  token: string | null | undefined,
 ): Promise<string | null> {
-  if (isE2eeMessage(message) && userId) {
-    const blob = await decryptMessageFile(userId, message, file, userId, token, transportMeta);
-    if (blob) return URL.createObjectURL(blob);
-    return null;
-  }
-  const url = buildFileUrl(file, token);
+  const url = buildFileUrl(file, token ?? null);
   return url || null;
 }
 
 export async function downloadMessageFile(
-  message: FileMessageRef,
+  _message: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
+  file: FileAttachmentMeta,
+  _transportMeta: Record<string, unknown> | undefined,
+  _userId: string | undefined,
+  token: string | null | undefined,
+  displayName: string,
+): Promise<void> {
+  const url = buildFileUrl(file, token ?? null);
+  if (!url) return;
+  await downloadFileFromUrl(url, displayName);
+}
+
+export async function downloadMessageFileAsBlob(
+  message: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>,
   file: FileAttachmentMeta,
   transportMeta: Record<string, unknown> | undefined,
   userId: string | undefined,
-  token: string | null,
-  filename: string,
-): Promise<void> {
-  if (isE2eeMessage(message) && userId) {
-    const blob = await decryptMessageFile(userId, message, file, userId, token, transportMeta);
-    if (blob) downloadBlob(blob, filename);
-    return;
-  }
-  const url = buildFileUrl(file, token);
-  if (!url) return;
-  await downloadFileFromUrl(url, filename);
+  token: string | null | undefined,
+): Promise<Blob | null> {
+  const url = await resolveFileAccessUrl(message, file, transportMeta, userId, token);
+  if (!url) return null;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  return response.blob();
 }
+
+export { downloadBlob };

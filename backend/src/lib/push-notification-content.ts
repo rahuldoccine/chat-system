@@ -3,7 +3,6 @@ import type { MessageKind } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import {
   contentMetaRecord,
-  e2eeMessagePreviewBody,
   groupActivityPushPreview,
   plainMessagePreviewBody,
   truncatePushText,
@@ -31,17 +30,12 @@ const MAX_BODY_LEN = 180;
 /** Preview line shown in push notification body. */
 export function messagePreviewBody(
   message: Pick<NewMessageNotificationPayload, "kind" | "ciphertext" | "contentMeta">,
-  isE2eeDm: boolean,
 ): string {
   const meta = contentMetaRecord(message.contentMeta);
   const kind = message.kind as MessageKind;
   if (kind === "SYSTEM") {
     const activityPreview = groupActivityPushPreview(meta);
     if (activityPreview) return activityPreview;
-  }
-
-  if (isE2eeDm) {
-    return e2eeMessagePreviewBody(meta, kind);
   }
 
   return plainMessagePreviewBody(meta, kind, message.ciphertext);
@@ -65,16 +59,12 @@ export async function resolvePushNotificationContent(params: {
     }),
     prisma.chat.findUnique({
       where: { id: params.chatId },
-      select: { type: true, title: true, e2eeMode: true },
+      select: { type: true, title: true },
     }),
   ]);
 
   const senderName = sender?.displayName?.trim() || sender?.email?.trim() || "Someone";
-  const isE2ee =
-    (chat?.type === "DIRECT" && chat.e2eeMode === "DM_V1") ||
-    (chat?.type === "GROUP" &&
-      (chat.e2eeMode === "DM_V1" || chat.e2eeMode === "GROUP_V1"));
-  const preview = messagePreviewBody(params.message, isE2ee);
+  const preview = messagePreviewBody(params.message);
 
   if (chat?.type === "GROUP") {
     const groupTitle = chat.title?.trim() || "Group";

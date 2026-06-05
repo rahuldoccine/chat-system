@@ -32,19 +32,13 @@ export const useUpload = () => {
     async (
       file: File,
       chatId?: string,
-      options?: { voiceNote?: boolean; e2eeEncrypted?: boolean; originalMime?: string },
+      options?: { voiceNote?: boolean },
     ): Promise<UploadFileResponse> => {
       setState({ progress: 0, status: 'uploading', error: null });
 
       const formData = new FormData();
       if (chatId) {
         formData.append('chatId', chatId);
-      }
-      if (options?.e2eeEncrypted) {
-        formData.append('e2eeEncrypted', 'true');
-      }
-      if (options?.originalMime) {
-        formData.append('originalMime', options.originalMime);
       }
       if (options?.voiceNote) {
         formData.append('voiceNote', 'true');

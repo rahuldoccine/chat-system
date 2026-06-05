@@ -50,7 +50,7 @@ import {
   useMessageBodies,
   getMessageDisplayBody,
   getMessageLinkPreview,
-} from '../../e2ee/useMessageBodies';
+} from '../utils/messageBody';
 import TypingIndicator from './TypingIndicator';
 import { useMessageStreamTyping } from '../hooks/useMessageStreamTyping';
 import { useMessageStreamScroll } from '../hooks/useMessageStreamScroll';
@@ -86,7 +86,7 @@ const MessageStream: React.FC<MessageStreamProps> = ({
     inChatSearchMatchIds,
     inChatSearchActiveIndex,
   } = useChat();
-  const { user, e2eeKeysLocked } = useAuth();
+  const { user } = useAuth();
   const { socket, isConnected } = useSocket();
   const queryClient = useQueryClient();
   const updateLinkDisplay = useUpdateLinkDisplay();
@@ -131,7 +131,6 @@ const MessageStream: React.FC<MessageStreamProps> = ({
       data?: Array<{
         id: string;
         type: string;
-        e2eeMode?: string;
         title?: string;
         dmPeer?: {
           id: string;
@@ -145,8 +144,8 @@ const MessageStream: React.FC<MessageStreamProps> = ({
 
   const bodyOf = useCallback(
     (msg: Message) =>
-      getMessageDisplayBody(msg, decryptedBodies, user?.id ?? '', e2eeKeysLocked),
-    [decryptedBodies, user?.id, e2eeKeysLocked],
+      getMessageDisplayBody(msg, decryptedBodies, user?.id ?? ''),
+    [decryptedBodies, user?.id],
   );
 
   const searchQuery = inChatSearchOpen ? inChatSearchQuery.trim() : '';

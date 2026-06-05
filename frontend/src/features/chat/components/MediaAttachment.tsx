@@ -5,13 +5,11 @@ import VoiceAttachment from './VoiceAttachment';
 import VideoAttachment from './VideoAttachment';
 import AudioFileAttachment from './AudioFileAttachment';
 import SingleImageAttachment from './SingleImageAttachment';
-import type { ContentMeta, Message } from '../types';
+import type { Message } from '../types';
 
 interface MediaAttachmentProps {
   kind: string;
   contentMeta: Message['contentMeta'];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
   onMediaLoad?: () => void;
   embedded?: boolean;
   caption?: string;
@@ -27,8 +25,6 @@ interface MediaAttachmentProps {
 const MediaAttachment: React.FC<MediaAttachmentProps> = ({
   kind,
   contentMeta,
-  e2eeMessage,
-  transportMeta,
   onMediaLoad,
   embedded = false,
   caption,
@@ -41,8 +37,6 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
     return (
       <VoiceAttachment
         contentMeta={contentMeta}
-        e2eeMessage={e2eeMessage}
-        transportMeta={transportMeta}
         bubbleVariant={bubbleVariant}
         mediaTimestamp={mediaTimestamp}
       />
@@ -55,8 +49,6 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
     return (
       <VideoAttachment
         contentMeta={contentMeta}
-        e2eeMessage={e2eeMessage}
-        transportMeta={transportMeta}
         embedded={embedded}
         bubbleVariant={bubbleVariant}
         onMediaLoad={onMediaLoad}
@@ -69,8 +61,6 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
     return (
       <AudioFileAttachment
         contentMeta={contentMeta}
-        e2eeMessage={e2eeMessage}
-        transportMeta={transportMeta}
         bubbleVariant={bubbleVariant}
         mediaTimestamp={mediaTimestamp}
       />
@@ -81,8 +71,7 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
     return (
       <GroupedFileAttachments
         files={files}
-        e2eeMessage={e2eeMessage}
-        transportMeta={transportMeta}
+        contentMeta={contentMeta}
         embedded={embedded}
         caption={caption}
         bubbleVariant={bubbleVariant}
@@ -94,8 +83,6 @@ const MediaAttachment: React.FC<MediaAttachmentProps> = ({
   return (
     <SingleImageAttachment
       contentMeta={contentMeta}
-      e2eeMessage={e2eeMessage}
-      transportMeta={transportMeta}
       onMediaLoad={onMediaLoad}
       embedded={embedded}
       primaryFile={files?.[0]}

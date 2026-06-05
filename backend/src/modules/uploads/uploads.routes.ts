@@ -10,11 +10,9 @@ import { createUploadMiddleware } from "../../lib/multer-upload.js";
 import { requireActiveMember } from "../../lib/chat-access.js";
 import { getPrisma } from "../../lib/prisma.js";
 import {
-  isAllowedUploadMime,
   inferUploadKind,
+  isAllowedUploadMime,
   isVoiceCapableMime,
-  mimeFromExtension,
-  resolveDeclaredUploadMime,
   safeExtensionForMime,
 } from "../../lib/upload-allowlist.js";
 import { resolveUploadMime } from "../../lib/mime-compatibility.js";
@@ -55,34 +53,13 @@ export function createUploadsRouter(config: AppConfig, logger?: Logger): Router 
       const fields = parseUploadFormFields(req.body);
       const prisma = getPrisma();
 
-      let isE2eeDm = false;
-      let isE2eeDmVoice = false;
       if (fields.chatId) {
         await requireActiveMember(req.user!.sub, fields.chatId);
-        const chat = await prisma.chat.findUnique({
-          where: { id: fields.chatId },
-          select: { type: true, e2eeMode: true },
-        });
-        isE2eeDm = Boolean(
-          chat &&
-            ((chat.type === "DIRECT" && chat.e2eeMode === "DM_V1") ||
-              (chat.type === "GROUP" && chat.e2eeMode === "DM_V1")),
-        );
-        isE2eeDmVoice = isE2eeDm && fields.voiceNote;
       }
 
       const category = await resolveUploadCategory(fields.chatId);
 
-      if (fields.e2eeEncrypted && !isE2eeDm) {
-        await fs.unlink(path.join(config.uploadDir, req.file.filename)).catch(() => {});
-        throw new AppError(
-          400,
-          "E2EE_UPLOAD_INVALID",
-          "Encrypted uploads are only allowed in E2EE chats",
-        );
-      }
-
-      if (fields.voiceNote && !isE2eeDmVoice && !isVoiceCapableMime(req.file.mimetype)) {
+      if (fields.voiceNote && !isVoiceCapableMime(req.file.mimetype)) {
         await fs.unlink(path.join(config.uploadDir, req.file.filename)).catch(() => {});
         throw new AppError(400, "INVALID_VOICE", "voiceNote is only valid for audio uploads");
       }
@@ -91,36 +68,21 @@ export function createUploadsRouter(config: AppConfig, logger?: Logger): Router 
       let storedMime =
         req.file.mimetype.toLowerCase().split(";")[0]?.trim() ?? "";
 
-      const isE2eeEncryptedBlob = Boolean(fields.e2eeEncrypted && isE2eeDm);
-      if (isE2eeEncryptedBlob) {
-        const declared =
-          (fields.originalMime && resolveDeclaredUploadMime(req.file.originalname, fields.originalMime)) ||
-          mimeFromExtension(req.file.originalname) ||
-          storedMime;
-        if (!isAllowedUploadMime(declared)) {
-          await fs.unlink(absPath).catch(() => {});
-          throw new AppError(415, "UNSUPPORTED_MEDIA_TYPE", "File type not allowed");
-        }
-        storedMime = declared;
+      const sniff = await fileTypeFromFile(absPath).catch(() => undefined);
+      if (sniff && !isAllowedUploadMime(sniff.mime)) {
+        await fs.unlink(absPath).catch(() => {});
+        throw new AppError(415, "UNSUPPORTED_MEDIA_TYPE", "File content type not allowed");
       }
 
-      if (!isE2eeDmVoice && !isE2eeEncryptedBlob) {
-        const sniff = await fileTypeFromFile(absPath).catch(() => undefined);
-        if (sniff && !isAllowedUploadMime(sniff.mime)) {
-          await fs.unlink(absPath).catch(() => {});
-          throw new AppError(415, "UNSUPPORTED_MEDIA_TYPE", "File content type not allowed");
-        }
-
-        const resolved = resolveUploadMime(sniff?.mime, storedMime);
-        if (!resolved.compatible) {
-          logger?.warn(
-            `Upload MIME mismatch: declared=${storedMime} sniffed=${sniff?.mime ?? "unknown"} file=${req.file.originalname}`,
-          );
-          await fs.unlink(absPath).catch(() => {});
-          throw new AppError(400, "MIME_MISMATCH", "File content does not match declared type");
-        }
-        storedMime = resolved.mime;
+      const resolved = resolveUploadMime(sniff?.mime, storedMime);
+      if (!resolved.compatible) {
+        logger?.warn(
+          `Upload MIME mismatch: declared=${storedMime} sniffed=${sniff?.mime ?? "unknown"} file=${req.file.originalname}`,
+        );
+        await fs.unlink(absPath).catch(() => {});
+        throw new AppError(400, "MIME_MISMATCH", "File content does not match declared type");
       }
+      storedMime = resolved.mime;
 
       let tempName = req.file.filename;
       const correctExt = safeExtensionForMime(storedMime);

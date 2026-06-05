@@ -17,7 +17,7 @@ import { canModerateMessages } from '../utils/groupRoles';
 import {
   useMessageBodies,
   getMessageDisplayBody,
-} from '../../e2ee/useMessageBodies';
+} from '../utils/messageBody';
 import type { Message } from '../types';
 import MessageComposer from './MessageComposer';
 import ThreadMessageRow from './ThreadMessageRow';

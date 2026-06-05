@@ -19,12 +19,12 @@ import {
 import {
   getMessageLinkPreview,
   messageWithDecryptedMeta,
-} from '../../e2ee/useMessageBodies';
+} from '../utils/messageBody';
 import { buildBubbleClassName, getDirectReadReceiptStatus } from './messageStreamRow.helpers';
 import { MessageStreamRowContent } from './MessageStreamRowContent';
 import { MessageStreamRowActions } from './MessageStreamRowActions';
 import type { LinkDisplayMode, Message, ReplyPreview } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 import type { MessageMenuAction } from './MessageOptionsMenu';
 
 export { QUICK_REACTIONS } from './messageStreamRow.helpers';
@@ -168,7 +168,7 @@ const MessageStreamRow: React.FC<MessageStreamRowProps> = (props) => {
     onLinkDisplayChange,
   } = props;
 
-  const displayMsg = messageWithDecryptedMeta(msg, decryptedBodies);
+  const displayMsg = messageWithDecryptedMeta(msg);
   const isMe = msg.senderId === userId;
   const displayBody = bodyOf(msg);
   const kindFlags = getMessageKindFlags(msg);

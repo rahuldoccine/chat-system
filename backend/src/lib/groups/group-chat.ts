@@ -18,7 +18,6 @@ export type GroupChatDetails = {
   id: string;
   title: string | null;
   avatarUrl: string | null;
-  e2eeMode: string;
   groupVisibility: "PRIVATE" | "PUBLIC";
   memberCount: number;
   myRole: ChatMemberRole;
@@ -67,7 +66,6 @@ export async function getGroupChatDetails(
     id: chat.id,
     title: chat.title,
     avatarUrl: expandAvatarUrl(chat.avatarUrl),
-    e2eeMode: chat.e2eeMode,
     groupVisibility: chat.groupVisibility,
     memberCount: members.length,
     myRole: me.role,

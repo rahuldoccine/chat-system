@@ -2,16 +2,10 @@ import { useMemo } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { buildFileUrl } from '../utils/fileUrl';
 import { getMessageFiles } from '../utils/fileMeta';
-import { useDecryptedFileUrl } from '../../e2ee/useDecryptedFileUrl';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import type { ContentMeta, Message } from '../types';
-
-type E2eeMessagePick = Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
+import type { Message } from '../types';
 
 export function useMessageFileSource(
   contentMeta: Message['contentMeta'],
-  e2eeMessage: E2eeMessagePick | undefined,
-  transportMeta: ContentMeta | undefined,
   defaultLabel: string,
 ) {
   const { token } = useAuth();
@@ -28,7 +22,6 @@ export function useMessageFileSource(
       mimetype: meta.mimetype ?? primary?.mimetype,
       uploadId: meta.uploadId ?? primary?.uploadId,
       originalName: meta.originalName ?? primary?.originalName,
-      attachment: primary?.attachment,
     }),
     [
       meta.filename,
@@ -41,14 +34,10 @@ export function useMessageFileSource(
       primary?.mimetype,
       primary?.uploadId,
       primary?.originalName,
-      primary?.attachment,
     ],
   );
 
-  const decryptedUrl = useDecryptedFileUrl(e2eeMessage, fileRef, transportMeta);
-  const fullUrl =
-    e2eeMessage && isE2eeMessage(e2eeMessage) ? decryptedUrl : buildFileUrl(fileRef, token);
-  const isE2eeLoading = Boolean(e2eeMessage && isE2eeMessage(e2eeMessage) && !fullUrl);
+  const fullUrl = buildFileUrl(fileRef, token);
 
-  return { displayName, fileRef, fullUrl, isE2eeLoading };
+  return { displayName, fileRef, fullUrl };
 }

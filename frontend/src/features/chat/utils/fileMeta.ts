@@ -1,10 +1,5 @@
 import type { Message } from '../types';
 
-export type E2eeFileAttachmentKeys = {
-  fileKey: string;
-  iv: string;
-};
-
 export type FileAttachmentMeta = {
   url?: string;
   filename?: string;
@@ -14,8 +9,6 @@ export type FileAttachmentMeta = {
   uploadId?: string;
   width?: number;
   height?: number;
-  /** Present on E2EE uploads — required to decrypt the blob on the server. */
-  attachment?: E2eeFileAttachmentKeys;
 };
 
 export function isAudioMime(mimetype?: string): boolean {
@@ -104,11 +97,6 @@ export function getMessageFiles(message: Pick<Message, 'kind' | 'contentMeta'>):
   const bundled = meta.files;
   if (Array.isArray(bundled) && bundled.length > 0) {
     return bundled;
-  }
-
-  const refs = meta.attachmentRefs;
-  if (Array.isArray(refs?.files) && refs.files.length > 0) {
-    return refs.files as FileAttachmentMeta[];
   }
 
   if (message.kind && message.kind !== 'TEXT' && (meta.filename || meta.url)) {

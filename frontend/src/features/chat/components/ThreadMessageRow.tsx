@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import type { Message } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 import {
   getMessageDisplayBody,
   getMessageLinkPreview,
   messageWithDecryptedMeta,
-} from '../../e2ee/useMessageBodies';
+} from '../utils/messageBody';
 import { computeThreadMessageLayout } from './threadMessageRowLayout';
 import UserAvatar from './UserAvatar';
 import { useAppSettings } from '../../settings/hooks/useUserSettings';
@@ -47,7 +47,7 @@ const ThreadMessageRow: React.FC<ThreadMessageRowProps> = ({
 
   const text = getMessageDisplayBody(msg, bodies, viewerId ?? '');
   const preview = getMessageLinkPreview(msg, bodies);
-  const displayMsg = messageWithDecryptedMeta(msg, bodies);
+  const displayMsg = messageWithDecryptedMeta(msg);
   const layout = computeThreadMessageLayout(displayMsg, text);
   if (msg.deletedAt) {
     return (

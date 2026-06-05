@@ -19,18 +19,12 @@ import {
 import { flushOutbox, sendMessageUnified } from '../../sync/sendMessage';
 import { canAttemptDelivery as canAttemptDeliveryAsync } from '../../sync/connectivity';
 import { buildOptimisticMessage } from '../../sync/optimisticMessage';
-import { linkSentMessageId } from '../../e2ee/sentPlaintextCache';
-import { isDmE2eeChat, isE2eeChat } from '../../e2ee/chatE2ee';
-import { prepareOutboundMessage, prepareOutboundPoll } from '../../e2ee/prepareOutbound';
 import {
   applyFinalizedMessageToCaches,
   applyOptimisticMessageToCaches,
-  cacheOptimisticE2eeDraft,
   markSendingMessagesAsError,
   normalizeEditedAt,
   patchEditedMessageInCaches,
-  rememberEditedE2eeContent,
-  rememberOutboundE2eePlaintext,
   removeMessageFromAllCaches,
   resolvePreferPeerDeviceId,
 } from './useChatData.helpers';
@@ -175,7 +169,6 @@ export const useSendMessage = () => {
       chat,
       peerUserId,
       groupMemberIds,
-      preEncrypted,
     }: {
       chatId: string;
       text?: string;
@@ -187,14 +180,9 @@ export const useSendMessage = () => {
       chat?: Chat | null;
       peerUserId?: string;
       groupMemberIds?: string[];
-      preEncrypted?: { ciphertext: string; contentMeta: unknown };
     }) => {
       const clientMessageId = crypto.randomUUID();
       const preferPeerDeviceId = resolvePreferPeerDeviceId(queryClient, chatId, peerUserId);
-
-      if (user?.id && chat && isE2eeChat(chat)) {
-        cacheOptimisticE2eeDraft(user.id, chat, clientMessageId, text, contentMeta);
-      }
 
       if (user) {
         const optimistic = buildOptimisticMessage(
@@ -232,21 +220,7 @@ export const useSendMessage = () => {
         peerUserId,
         groupMemberIds,
         preferPeerDeviceId,
-        preEncrypted,
       });
-
-      if (user?.id && !result.queued) {
-        linkSentMessageId(user.id, clientMessageId, result.message.id);
-        if (chat && isE2eeChat(chat)) {
-          rememberOutboundE2eePlaintext(
-            user.id,
-            clientMessageId,
-            text,
-            contentMeta,
-            result.message.id,
-          );
-        }
-      }
 
       return { ...result, chatId, clientMessageId };
     },
@@ -269,9 +243,6 @@ export const useSendMessage = () => {
         return;
       }
 
-      if (user?.id) {
-        linkSentMessageId(user.id, data.clientMessageId, data.message.id);
-      }
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (_err, variables) => {
@@ -290,41 +261,7 @@ export const useCreatePoll = () => {
       question: string;
       closesAt?: string | null;
       options: string[];
-      userId?: string;
-      chat?: import('../types').Chat | null;
-      peerUserId?: string;
-      clientMessageId?: string;
     }) => {
-      if (isDmE2eeChat(input.chat ?? null) && input.userId) {
-        const clientMessageId = input.clientMessageId ?? crypto.randomUUID();
-        const preferPeerDeviceId = resolvePreferPeerDeviceId(
-          queryClient,
-          input.chatId,
-          input.peerUserId,
-        );
-        const prepared = await prepareOutboundPoll(input.userId, {
-          chat: input.chat,
-          peerUserId: input.peerUserId,
-          preferPeerDeviceId,
-          question: input.question,
-          closesAt: input.closesAt ?? null,
-          options: input.options,
-          clientMessageId,
-        });
-        const response = await api.post<{
-          poll: PollDetail;
-          message: Message;
-        }>(`/chats/${input.chatId}/polls`, {
-          question: input.question,
-          closesAt: input.closesAt ?? null,
-          options: input.options,
-          ciphertext: prepared.ciphertext,
-          contentMeta: prepared.contentMeta,
-          clientMessageId,
-        });
-        return response.data;
-      }
-
       const response = await api.post<{
         poll: PollDetail;
         message: Message;
@@ -335,10 +272,7 @@ export const useCreatePoll = () => {
       });
       return response.data;
     },
-    onSuccess: (data, variables) => {
-      if (variables.userId && variables.clientMessageId) {
-        linkSentMessageId(variables.userId, variables.clientMessageId, data.message.id);
-      }
+    onSuccess: (data) => {
       queryClient.setQueryData(['messages', data.message.chatId], (old) => {
         const merged = mergeMessageIntoInfiniteCache(old as Parameters<typeof mergeMessageIntoInfiniteCache>[0], {
           ...data.message,
@@ -354,13 +288,10 @@ export const useCreatePoll = () => {
 
 export const useEditMessage = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async ({
       messageId,
       text,
-      chat,
-      peerUserId,
     }: {
       chatId: string;
       messageId: string;
@@ -368,33 +299,15 @@ export const useEditMessage = () => {
       chat?: Chat | null;
       peerUserId?: string;
     }) => {
-      let ciphertext = text;
-      let contentMeta: unknown = undefined;
-      if (user?.id) {
-        const prepared = await prepareOutboundMessage(user.id, {
-          chatId: chat?.id ?? '',
-          text,
-          chat,
-          peerUserId,
-        });
-        ciphertext = prepared.ciphertext;
-        contentMeta = prepared.contentMeta;
-      }
       const response = await api.patch(`/messages/${messageId}`, {
-        ciphertext,
-        ...(contentMeta ? { contentMeta } : {}),
+        ciphertext: text,
       });
       return response.data as { message: Message };
     },
-    onSuccess: (data, { chatId, messageId, text, chat }) => {
+    onSuccess: (data, { chatId, messageId }) => {
       const updated = data?.message;
       if (!updated) return;
       const editedAt = normalizeEditedAt(updated.editedAt);
-
-      if (user?.id && isE2eeChat(chat ?? null)) {
-        const cacheKey = updated.clientMessageId ?? messageId;
-        rememberEditedE2eeContent(user.id, cacheKey, text, updated);
-      }
 
       patchEditedMessageInCaches(
         queryClient,

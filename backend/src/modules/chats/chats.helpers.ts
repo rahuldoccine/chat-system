@@ -1,4 +1,4 @@
-import { Prisma, type Message, type MessageKind, type Chat } from "@prisma/client";
+import { Prisma, type Message, type MessageKind } from "@prisma/client";
 
 import { AppError } from "../../errors/index.js";
 import { requireActiveMember } from "../../lib/chat-access.js";
@@ -90,26 +90,6 @@ export function mergeLinkPreviewIntoMeta(
   };
 }
 
-export function buildE2eePollContentMeta(
-  inputMeta: Record<string, unknown> | null | undefined,
-  pollId: string,
-  optionRows: Array<{ id: string; sortOrder: number }>,
-): Prisma.InputJsonValue {
-  return {
-    ...inputMeta,
-    pollId,
-    pollRefs: {
-      options: optionRows.map((o) => ({ id: o.id, sortOrder: o.sortOrder })),
-    },
-  } as Prisma.InputJsonValue;
-}
-
-export function isE2eeContentMeta(meta: unknown): boolean {
-  if (!isPlainObject(meta)) return false;
-  const v = meta.e2eeVersion;
-  return typeof v === "string" && v.length > 0;
-}
-
 /** Escape user search terms for SQL ILIKE patterns. */
 export function escapeIlikePattern(term: string): string {
   return term
@@ -136,55 +116,8 @@ export function buildMessagePatchUpdateData(data: {
   };
 }
 
-export function assertE2eeMessageInput(
-  chat: Pick<Chat, "type" | "e2eeMode">,
-  isE2ee: boolean,
-  ciphertext: string | null | undefined,
-  contentMeta: Record<string, unknown> | null = null,
-): void {
-  if (!isE2ee) return;
-  const ct = ciphertext ?? null;
-  if (!ct || ct.length < 1) {
-    throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only messages");
-  }
-  if (!isPlainObject(contentMeta)) {
-    throw new AppError(400, "E2EE_META_REQUIRED", "This chat requires E2EE contentMeta");
-  }
-  const v = contentMeta.e2eeVersion;
-  if (typeof v !== "string" || v.length < 1) {
-    throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE chats");
-  }
-  const { isE2eeGroup } = resolveChatE2eeFlags(chat);
-  if (isE2eeGroup) {
-    assertGroupDmE2eeMeta(contentMeta);
-  }
-}
-
-export function assertE2eePatchPayload(data: {
-  ciphertext?: string | null;
-  contentMeta?: Record<string, unknown> | null;
-}): void {
-  if (data.ciphertext !== undefined) {
-    const ct = data.ciphertext ?? null;
-    if (!ct || ct.length < 1) {
-      throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only messages");
-    }
-  }
-  if (data.contentMeta !== undefined) {
-    const meta = data.contentMeta ?? null;
-    if (!isPlainObject(meta)) {
-      throw new AppError(400, "E2EE_META_REQUIRED", "This chat requires E2EE contentMeta");
-    }
-    const v = meta.e2eeVersion;
-    if (typeof v !== "string" || v.length < 1) {
-      throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE DMs");
-    }
-  }
-}
-
 export function enrichTextMessageContentMeta(params: {
   kind: MessageKind;
-  isE2ee: boolean;
   linkPreviewEnabled: boolean;
   textBody: string;
   contentMeta: Record<string, unknown> | null | undefined;
@@ -198,7 +131,6 @@ export function enrichTextMessageContentMeta(params: {
 
   if (
     params.kind !== "TEXT" ||
-    params.isE2ee ||
     !params.linkPreviewEnabled ||
     params.textBody.length === 0 ||
     clientHasPreview
@@ -300,58 +232,6 @@ export async function requirePinMessageAccess(
     throw new AppError(403, "FORBIDDEN", `Only moderators can ${verb} messages in groups`);
   }
   return { prisma, msg };
-}
-
-export function resolveChatE2eeFlags(chat: Pick<Chat, "type" | "e2eeMode">): {
-  isE2eeDm: boolean;
-  isE2eeGroup: boolean;
-  /** @deprecated Legacy sender-key groups (read-only). */
-  isE2eeGroupLegacy: boolean;
-  isE2ee: boolean;
-} {
-  const isE2eeDm = chat.type === "DIRECT" && chat.e2eeMode === "DM_V1";
-  const isE2eeGroup = chat.type === "GROUP" && chat.e2eeMode === "DM_V1";
-  const isE2eeGroupLegacy = chat.type === "GROUP" && chat.e2eeMode === "GROUP_V1";
-  return {
-    isE2eeDm,
-    isE2eeGroup,
-    isE2eeGroupLegacy,
-    isE2ee: isE2eeDm || isE2eeGroup || isE2eeGroupLegacy,
-  };
-}
-
-const MAX_GROUP_RECIPIENT_CIPHERTEXTS = 64;
-
-function assertGroupDmE2eeMeta(contentMeta: Record<string, unknown>): void {
-  if (contentMeta.e2eeVersion !== "dm-v1") {
-    throw new AppError(
-      400,
-      "E2EE_META_INVALID",
-      "Group E2EE messages must use e2eeVersion dm-v1",
-    );
-  }
-  const wrapped = contentMeta.recipientCiphertexts;
-  if (!isPlainObject(wrapped)) {
-    throw new AppError(
-      400,
-      "E2EE_META_INVALID",
-      "contentMeta.recipientCiphertexts is required for encrypted groups",
-    );
-  }
-  let count = 0;
-  for (const value of Object.values(wrapped)) {
-    if (typeof value === "string" && value.length > 0) count += 1;
-  }
-  if (count < 1) {
-    throw new AppError(
-      400,
-      "E2EE_META_INVALID",
-      "recipientCiphertexts must include at least one envelope",
-    );
-  }
-  if (count > MAX_GROUP_RECIPIENT_CIPHERTEXTS) {
-    throw new AppError(400, "E2EE_META_INVALID", "recipientCiphertexts exceeds member limit");
-  }
 }
 
 /** Create delivery receipts for other members and bump chat last activity. */

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Smile, MoreHorizontal, Reply } from 'lucide-react';
 import type { Message } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 import MessageOptionsMenu, { type MessageMenuAction } from './MessageOptionsMenu';
 import { getMessageCopyText } from '../utils/messageCache';
 import styles from './ThreadMessageRow.module.css';

@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Message, LinkPreviewMeta } from '../types';
-import { isE2eeMessage } from '../../e2ee/directChat';
 import MediaAttachment from './MediaAttachment';
 import LiveUserName from './LiveUserName';
 import MessageMeta from './MessageMeta';
@@ -108,8 +107,6 @@ function ThreadBubbleMedia({
       <MediaAttachment
         kind={displayMsg.kind ?? 'FILE'}
         contentMeta={displayMsg.contentMeta}
-        e2eeMessage={isE2eeMessage(msg) ? msg : undefined}
-        transportMeta={displayMsg.contentMeta}
         embedded
         caption={groupedWithCaption ? text || undefined : undefined}
         bubbleVariant={isMe ? 'sent' : 'received'}

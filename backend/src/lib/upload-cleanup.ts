@@ -39,7 +39,7 @@ function addFileRef(target: UploadFileRefs, file: unknown): void {
   }
 }
 
-/** Extract storage keys and upload row ids from message contentMeta (single, bundled, or E2EE attachmentRefs). */
+/** Extract storage keys and upload row ids from message contentMeta (single, bundled, or attachmentRefs). */
 export function extractUploadRefsFromContentMeta(contentMeta: unknown): UploadFileRefs {
   const refs: UploadFileRefs = { storageKeys: [], uploadIds: [] };
   const meta = asRecord(contentMeta);
@@ -196,7 +196,7 @@ async function collectStorageKeysForMessage(
 }
 
 /**
- * Associate uploaded files with a message row (for purge when contentMeta lacks file manifest, e.g. legacy E2EE).
+ * Associate uploaded files with a message row (for purge when contentMeta lacks file manifest).
  */
 export async function bindUploadsToMessage(
   messageId: string,

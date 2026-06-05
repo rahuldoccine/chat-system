@@ -1,25 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, Pause, Play } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
 import MessageMeta from './MessageMeta';
+import { useAuth } from '../../../context/AuthContext';
 import { buildFileUrl } from '../utils/fileUrl';
 import { getMessageFiles, getVoiceDurationMs } from '../utils/fileMeta';
-import {
-  e2eeMessageDepKey,
-  fileAttachmentDepKey,
-  transportMetaDepKey,
-} from '../../e2ee/attachmentDeps';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import { decryptMessageFile } from '../../e2ee/attachmentCrypto';
-import type { ContentMeta, Message } from '../types';
+import type { Message } from '../types';
 import styles from './VoiceAttachment.module.css';
 import { VOICE_WAVE_BAR_COUNT, VOICE_WAVE_HEIGHTS } from '../utils/voiceWaveform';
 import { formatMediaTimeRange } from '../utils/formatMediaTime';
 
 type VoiceAttachmentProps = {
   contentMeta: Message['contentMeta'];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
   bubbleVariant?: 'sent' | 'received';
   mediaTimestamp?: {
     createdAt: string;
@@ -33,19 +24,16 @@ let activeVoiceAudio: HTMLAudioElement | null = null;
 
 const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
   contentMeta,
-  e2eeMessage,
-  transportMeta,
   bubbleVariant = 'received',
   mediaTimestamp,
 }) => {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveRef = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [loadedDurationMs, setLoadedDurationMs] = useState<number | undefined>();
-  const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
 
   const isSent = bubbleVariant === 'sent';
 
@@ -57,41 +45,8 @@ const VoiceAttachment: React.FC<VoiceAttachmentProps> = ({
     filename: meta.filename,
     mimetype: meta.mimetype,
     uploadId: meta.uploadId,
-    attachment: files?.[0]?.attachment,
   };
-  const remoteUrl = buildFileUrl(voiceFile, token);
-
-  const messageKey = e2eeMessageDepKey(e2eeMessage);
-  const fileKey = fileAttachmentDepKey(voiceFile);
-  const transportKey = transportMetaDepKey(transportMeta);
-
-  useEffect(() => {
-    if (!e2eeMessage || !isE2eeMessage(e2eeMessage) || !user?.id) {
-      setDecryptedUrl(null);
-      return;
-    }
-    let cancelled = false;
-    let revoke: string | null = null;
-    void (async () => {
-      const blob = await decryptMessageFile(
-        user.id,
-        e2eeMessage,
-        voiceFile,
-        user.id,
-        token,
-        transportMeta,
-      );
-      if (cancelled || !blob) return;
-      revoke = URL.createObjectURL(blob);
-      setDecryptedUrl(revoke);
-    })();
-    return () => {
-      cancelled = true;
-      if (revoke) URL.revokeObjectURL(revoke);
-    };
-  }, [messageKey, fileKey, transportKey, user?.id, token]);
-
-  const fullUrl = decryptedUrl ?? remoteUrl;
+  const fullUrl = buildFileUrl(voiceFile, token);
 
   const metaDurationMs = getVoiceDurationMs(meta);
   const totalDurationMs = metaDurationMs ?? loadedDurationMs ?? 0;

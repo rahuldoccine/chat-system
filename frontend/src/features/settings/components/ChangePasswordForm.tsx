@@ -7,8 +7,6 @@ import { toast } from 'sonner';
 import api from '../../../api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import { getApiErrorMessage } from '../hooks/useUserSettings';
-import { rewrapAccountKeyBackup } from '../../e2ee/accountSync';
-import { ensureE2eeReady } from '../../e2ee/bootstrap';
 import styles from './ChangePasswordForm.module.css';
 
 const schema = z
@@ -25,7 +23,7 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 const ChangePasswordForm: React.FC = () => {
-  const { user, markE2eeUnlocked } = useAuth();
+  const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const {
     register,
@@ -42,10 +40,7 @@ const ChangePasswordForm: React.FC = () => {
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
       });
-      await rewrapAccountKeyBackup(user.id, data.currentPassword, data.newPassword);
-      await ensureE2eeReady(user.id, { password: data.newPassword });
-      markE2eeUnlocked();
-      toast.success('Password updated and encryption backup refreshed');
+      toast.success('Password updated');
       reset();
     } catch (err: unknown) {
       toast.error(
@@ -101,8 +96,8 @@ const ChangePasswordForm: React.FC = () => {
           <p className={styles.error}>{errors.confirmPassword.message}</p>
         )}
       </div>
-      <button type="submit" className={styles.submit} disabled={busy}>
-        {busy ? <Loader2 size={18} className={styles.spinner} /> : null}
+      <button type="submit" className={styles.submitBtn} disabled={busy}>
+        {busy ? <Loader2 size={16} className={styles.spinner} /> : null}
         Update password
       </button>
     </form>

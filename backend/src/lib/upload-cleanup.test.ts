@@ -24,9 +24,8 @@ describe("upload-cleanup", () => {
     expect(refs.storageKeys).toEqual(["one.pdf", "two.docx"]);
   });
 
-  it("extracts E2EE attachmentRefs without encryption keys", () => {
+  it("extracts attachmentRefs files", () => {
     const refs = extractUploadRefsFromContentMeta({
-      e2eeVersion: "DM_V1",
       attachmentRefs: {
         files: [
           { uploadId: "u1", filename: "enc.bin", url: "/api/v1/files/enc.bin" },

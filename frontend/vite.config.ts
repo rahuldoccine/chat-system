@@ -51,11 +51,11 @@ export default defineConfig({
     /** Listen on 0.0.0.0 — available at http://localhost:5173 and http://<your-LAN-IP>:5173 */
     host: true,
     port: 5173,
-    allowedHosts: ['.up.railway.app', 'localhost', '127.0.0.1'],
+    allowedHosts: ['.trycloudflare.com','.up.railway.app', 'localhost', '127.0.0.1'],
   },
   preview: {
     host: true,
     port: process.env.PORT ? Number(process.env.PORT) : 4173,
-    allowedHosts: ['.up.railway.app', 'localhost', '127.0.0.1'],
+    allowedHosts: ['.trycloudflare.com','.up.railway.app', 'localhost', '127.0.0.1'],
   },
 })

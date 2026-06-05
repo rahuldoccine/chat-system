@@ -8,7 +8,6 @@ import {
   createdOrExistingResponses,
   cursorListResponse,
   deviceTokenListJsonResponse,
-  e2eeOp,
   emailPasswordRequestSchema,
   jsonRequestBody,
   refreshTokenOptionalBody,
@@ -82,7 +81,6 @@ export function buildOpenApiDocument(
       { name: "Files", description: "Authorized download by storage key" },
       { name: "Uploads", description: "Multipart uploads (authenticated)" },
       { name: "Devices", description: "FCM device token register and revoke (authenticated)" },
-      { name: "E2EE", description: "E2EE key directory, prekeys, and recovery (ciphertext-only; backend never decrypts)" },
       { name: "Calls", description: "Call history and signaling metadata" },
       { name: "Moderation", description: "Blocks and reports" },
     ],
@@ -479,84 +477,6 @@ export function buildOpenApiDocument(
             "404": { description: "Token not found for this user" },
           }),
         },
-      },
-      "/e2ee/identity": {
-        put: e2eeOp("Upsert your public identity key (E2EE)", {
-          requestBody: jsonRequestBody({
-            type: "object",
-            required: ["publicKey", "fingerprint"],
-            properties: { publicKey: { type: "string" }, fingerprint: { type: "string" } },
-          }),
-          responses: withUnauthorized({ "200": { description: "Upserted" } }),
-        }),
-      },
-      "/e2ee/identity/{userId}": {
-        get: e2eeOp("Fetch a user's public identity key (E2EE)", {
-          parameters: uuidPathParameter("userId"),
-          responses: withUnauthorized({
-            "200": { description: "OK" },
-            "404": { description: "Not found" },
-          }),
-        }),
-      },
-      "/e2ee/devices/{deviceId}": {
-        put: e2eeOp("Upsert your device public key (E2EE)", {
-          parameters: stringPathParameter("deviceId"),
-          requestBody: jsonRequestBody({
-            type: "object",
-            required: ["publicKey"],
-            properties: { publicKey: { type: "string" }, label: { type: "string" } },
-          }),
-          responses: withUnauthorized({ "200": { description: "Upserted" } }),
-        }),
-      },
-      "/e2ee/devices/{userId}": {
-        get: e2eeOp("List a user's active devices (E2EE)", {
-          parameters: uuidPathParameter("userId"),
-          responses: bearerJsonResponses("OK"),
-        }),
-      },
-      "/e2ee/prekeys/{deviceId}": {
-        post: e2eeOp("Publish signed + one-time prekeys for your device (E2EE)", {
-          parameters: stringPathParameter("deviceId"),
-          responses: withUnauthorized({ "201": { description: "Created" } }),
-        }),
-      },
-      "/e2ee/prekeys/{userId}/{deviceId}": {
-        get: e2eeOp("Fetch a prekey bundle (consumes one-time key if available)", {
-          parameters: [...uuidPathParameter("userId"), ...stringPathParameter("deviceId")],
-          responses: withUnauthorized({
-            "200": { description: "OK" },
-            "404": { description: "Not found" },
-          }),
-        }),
-      },
-      "/e2ee/backup": {
-        put: e2eeOp("Upsert wrapped key backup (server-blind)", {
-          responses: withUnauthorized({ "200": { description: "Upserted" } }),
-        }),
-        get: e2eeOp("Get wrapped key backup (requires step-up token)", {
-          responses: withUnauthorized({
-            "200": { description: "OK" },
-            "403": { description: "Step-up required" },
-          }),
-        }),
-      },
-      "/e2ee/recovery/challenge/email": {
-        post: e2eeOp("Send email verification code for recovery (step-up)", {
-          responses: withUnauthorized({
-            "200": { description: "Sent" },
-            "403": { description: "Email not verified" },
-          }),
-        }),
-      },
-      "/e2ee/recovery/verify/email": {
-        post: e2eeOp("Verify email code and obtain step-up token", {
-          responses: withUnauthorized({
-            "200": { description: "OK" },
-            "400": { description: "Invalid code" },
-          }),
-        }),
       },
       "/calls/history": {
         get: {

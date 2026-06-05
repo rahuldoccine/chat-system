@@ -2,8 +2,7 @@ import api from '../../api/axios';
 import { socketService } from '../../services/socket';
 import { friendlySocketAckMessage } from '../../utils/userFriendlyErrors';
 import type { Chat, Message } from '../chat/types';
-import { prepareOutboundMessage } from '../e2ee/prepareOutbound';
-import { canAttemptDelivery, shouldQueueLocallyAsync } from './connectivity';
+import { canAttemptDelivery } from './connectivity';
 import {
   enqueueOutbox,
   listPendingOutbox,
@@ -34,12 +33,10 @@ export type SendMessageInput = {
   contentMeta?: unknown;
   clientMessageId?: string;
   userId?: string;
-  chat?: Pick<Chat, 'type' | 'e2eeMode' | 'dmPeer'> | null;
+  chat?: Pick<Chat, 'type' | 'dmPeer'> | null;
   peerUserId?: string;
   groupMemberIds?: string[];
   preferPeerDeviceId?: string | null;
-  /** Skip encryption when ciphertext was prepared externally (e.g. encrypted attachments). */
-  preEncrypted?: { ciphertext: string; contentMeta: unknown };
 };
 
 export type SendMessageResult = {
@@ -213,57 +210,9 @@ export async function flushOutbox(): Promise<void> {
   return flushInFlight;
 }
 
-async function buildSendBody(
-  input: SendMessageInput,
-  clientMessageId: string,
-  offlineMode: boolean,
-): Promise<OutboxPayload> {
-  if (input.preEncrypted) {
-    return {
-      clientMessageId,
-      chatId: input.chatId,
-      ciphertext: input.preEncrypted.ciphertext,
-      kind: input.kind ?? 'TEXT',
-      replyToId: input.replyToId ?? null,
-      threadRootId: input.threadRootId ?? null,
-      broadcastToChannel: input.broadcastToChannel ?? false,
-      contentMeta: input.preEncrypted.contentMeta,
-    };
-  }
-  if (input.userId) {
-    const prepared = await prepareOutboundMessage(
-      input.userId,
-      {
-        chatId: input.chatId,
-        text: input.text,
-        kind: input.kind,
-        contentMeta: input.contentMeta,
-        clientMessageId,
-        chat: input.chat,
-        peerUserId: input.peerUserId,
-        groupMemberIds: input.groupMemberIds,
-        preferPeerDeviceId: input.preferPeerDeviceId,
-      },
-      offlineMode,
-    );
-    return {
-      clientMessageId,
-      chatId: input.chatId,
-      ciphertext: prepared.ciphertext,
-      kind: input.kind ?? 'TEXT',
-      replyToId: input.replyToId ?? null,
-      threadRootId: input.threadRootId ?? null,
-      broadcastToChannel: input.broadcastToChannel ?? false,
-      contentMeta: prepared.contentMeta,
-    };
-  }
-  return toOutboxPayload(input, clientMessageId);
-}
-
 export async function sendMessageUnified(input: SendMessageInput): Promise<SendMessageResult> {
   const clientMessageId = input.clientMessageId ?? crypto.randomUUID();
-  const offlineMode = await shouldQueueLocallyAsync();
-  const body = await buildSendBody(input, clientMessageId, offlineMode);
+  const body = toOutboxPayload(input, clientMessageId);
   await enqueueOutbox(body);
 
   if (!(await canAttemptDelivery())) {

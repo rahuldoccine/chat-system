@@ -20,7 +20,7 @@ Node.js **Express** API with **PostgreSQL** (Prisma), **Socket.IO** realtime, op
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma       # User, Chat, Message, E2EE, Calls, …
+│   ├── schema.prisma       # User, Chat, Message, Calls, …
 │   └── migrations/
 ├── scripts/                # Seed, cleanup uploads, clear chat data
 ├── src/
@@ -43,7 +43,6 @@ backend/
 │   │   ├── files/          # Authorized download (?token= for <img src>)
 │   │   ├── uploads/
 │   │   ├── devices/        # Web Push / FCM registration
-│   │   ├── e2ee/ + e2ee/recovery/
 │   │   ├── calls/
 │   │   └── moderation/
 │   └── sockets/
@@ -99,7 +98,7 @@ Routers are mounted in `src/routes/index.ts`.
 | `GET /api/v1/config/public` | Public config (e.g. VAPID key) |
 | `/api/v1/auth/*` | Register, login, refresh, logout, forgot/reset password |
 | `/api/v1/users/*` | Search, profiles |
-| `/api/v1/chats/*` | List/create, messages, mute, favorite, close, pin, E2EE mode, polls |
+| `/api/v1/chats/*` | List/create, messages, mute, favorite, close, pin, polls |
 | `/api/v1/messages/*` | Edit, delete, reactions |
 | `/api/v1/groups/*` | Group create (delegates to chats service), members, roles |
 | `/api/v1/friends/*` | Friend requests |
@@ -107,7 +106,6 @@ Routers are mounted in `src/routes/index.ts`.
 | `/api/v1/files/*` | Authorized file download (Bearer or `?token=`) |
 | `/api/v1/uploads/*` | Multipart upload pipeline |
 | `/api/v1/devices/*` | Push device tokens |
-| `/api/v1/e2ee/*` | Keys, backup, recovery |
 | `/api/v1/calls/history` | Call logs |
 | `/api/v1/moderation/*` | Block, report |
 
@@ -137,8 +135,7 @@ Implementation: `src/sockets/handlers.ts`, payloads in `src/sockets/schemas.ts`,
 
 - **Accounts:** email/password, JWT sessions, SMTP password reset (optional).
 - **Chats:** direct + group, roles, public/private visibility, favorites, close DM, pin, mute, unread counts.
-- **Messages:** E2EE ciphertext, attachments, replies, edits, soft delete, reactions, mentions.
-- **E2EE:** `DM_V1` (mandatory DMs), `GROUP_V1` (group sender-key); server stores keys/ciphertext only.
+- **Messages:** Plaintext body in `ciphertext`, attachments, replies, edits, soft delete, reactions, mentions.
 - **Groups:** create, members, roles, public join, system activity messages via `group-system-message.ts`.
 - **Friends:** request / accept / reject (API ready).
 - **Polls:** create, vote, tallies.
@@ -172,7 +169,7 @@ See **`.env.example`**. Important entries:
 | `UPLOAD_DIR`, `MAX_UPLOAD_MB` | File storage |
 | `REDIS_URL` | Optional Socket.IO scale-out + presence |
 | `VAPID_*` / FCM vars | Optional push |
-| `SMTP_*` | Optional email (forgot password, E2EE recovery) |
+| `SMTP_*` | Optional email (forgot password) |
 | `ENABLE_SWAGGER` | Expose `/api/docs` in production if set |
 
 ## NPM scripts
@@ -217,5 +214,4 @@ Some unit tests use Prisma mocks; a few suites may need mock updates when schema
 - [../docs/INTEGRATION.md](../docs/INTEGRATION.md) — Auth, proxy, socket contract
 - [../docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) — Full dev setup
 - [../docs/CODEBASE_FEATURE_ANALYSIS.md](../docs/CODEBASE_FEATURE_ANALYSIS.md) — Feature matrix
-- [src/docs/e2ee-boundary.md](src/docs/e2ee-boundary.md) — E2EE server boundaries
 - [../docs/coturn.md](../docs/coturn.md) — TURN for WebRTC

@@ -1,4 +1,4 @@
-import { Prisma, type ChatE2eeMode, type ChatType, type MessageKind } from "@prisma/client";
+import { Prisma, type ChatType, type MessageKind } from "@prisma/client";
 
 import { AppError } from "../../errors/index.js";
 import { requireActiveMember, requireActiveMemberMinRole } from "../../lib/chat-access.js";
@@ -31,12 +31,9 @@ import { getSocketIo } from "../../sockets/socket-holder.js";
 import { resolveUserDisplayName } from "../../lib/user-display-name.js";
 import { publishGroupActivityMessage } from "../../lib/groups/group-system-message.js";
 import {
-  assertE2eeMessageInput,
-  assertE2eePatchPayload,
   buildAscThreadCursorWhere,
   buildChatListCursorWhere,
   buildDescMessageCursorWhere,
-  buildE2eePollContentMeta,
   buildGroupChatPatchData,
   buildMessagePatchUpdateData,
   buildSearchMessageCursorFilter,
@@ -44,13 +41,11 @@ import {
   contentMetaToPrismaInput,
   enrichTextMessageContentMeta,
   escapeIlikePattern,
-  isE2eeContentMeta,
   mergeLinkPreviewIntoMeta,
   requireExistingMessageInChat,
   requireMessageInChat,
   requireMessageModifyAccess,
   requirePinMessageAccess,
-  resolveChatE2eeFlags,
   touchChatAfterOutboundMessage,
 } from "./chats.helpers.js";
 
@@ -345,7 +340,6 @@ type ChatMemberListRow = {
     type: ChatType;
     title: string | null;
     avatarUrl: string | null;
-    e2eeMode: ChatE2eeMode;
     groupVisibility: string | null;
     updatedAt: Date;
     lastMessageAt: Date | null;
@@ -357,8 +351,6 @@ type ChatMemberListRow = {
         displayName: string | null;
         username: string | null;
         avatarUrl: string | null;
-        publicKey: string | null;
-        keyVersion: number | null;
         isOnline: boolean;
         lastSeenAt: Date | null;
       };
@@ -434,7 +426,6 @@ function mapMemberChatListRow(
     type: chat.type,
     title: chat.title,
     avatarUrl: expandAvatarUrl(chat.avatarUrl),
-    e2eeMode: chat.e2eeMode,
     groupVisibility: chat.type === "GROUP" ? chat.groupVisibility : undefined,
     isMember: true,
     canJoin: false,
@@ -491,7 +482,6 @@ async function appendDiscoverablePublicGroups(
       type: chat.type,
       title: chat.title,
       avatarUrl: expandAvatarUrl(chat.avatarUrl),
-      e2eeMode: chat.e2eeMode,
       groupVisibility: chat.groupVisibility,
       isMember: false,
       canJoin: true,
@@ -540,8 +530,6 @@ export async function listChats(
                   displayName: true,
                   username: true,
                   avatarUrl: true,
-                  publicKey: true,
-                  keyVersion: true,
                   isOnline: true,
                   lastSeenAt: true,
                 },
@@ -638,31 +626,6 @@ export async function patchChatClose(userId: string, chatId: string, closed: boo
   });
 }
 
-export async function patchChatE2eeMode(userId: string, chatId: string, e2eeMode: ChatE2eeMode): Promise<void> {
-  await requireActiveMemberMinRole(userId, chatId, "ADMIN");
-  const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, e2eeMode: true } });
-  if (!chat) {
-    throw new AppError(404, "NOT_FOUND", "Chat not found");
-  }
-  if (chat.type === "DIRECT") {
-    if (e2eeMode === "NONE") {
-      throw new AppError(403, "E2EE_MANDATORY", "Direct chats always use mandatory E2EE");
-    }
-    if (e2eeMode !== "DM_V1") {
-      throw new AppError(400, "INVALID_CHAT", "Direct chats only support DM_V1");
-    }
-  } else if (chat.type === "GROUP") {
-    if (e2eeMode !== "NONE" && e2eeMode !== "DM_V1") {
-      throw new AppError(400, "INVALID_CHAT", "Groups support NONE or DM_V1");
-    }
-  }
-  await prisma.chat.update({
-    where: { id: chatId },
-    data: { e2eeMode },
-  });
-}
-
 export async function getChat(userId: string, chatId: string) {
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
@@ -679,8 +642,6 @@ export async function getChat(userId: string, chatId: string) {
               displayName: true,
               username: true,
               avatarUrl: true,
-              publicKey: true,
-              keyVersion: true,
               isOnline: true,
               lastSeenAt: true,
             },
@@ -720,14 +681,6 @@ async function createDirectChat(
       where: { chatId: existing.id, userId, leftAt: null },
       data: { closedAt: null },
     });
-    if (existing.e2eeMode === "NONE") {
-      const upgraded = await prisma.chat.update({
-        where: { id: existing.id },
-        data: { e2eeMode: "DM_V1" },
-        include: chatWithActiveMembersUserInclude,
-      });
-      return { chat: upgraded, created: false };
-    }
     return { chat: existing, created: false };
   }
   const chat = await prisma.$transaction(async (tx) => {
@@ -736,7 +689,6 @@ async function createDirectChat(
         type: "DIRECT",
         dmKey,
         createdById: userId,
-        e2eeMode: "DM_V1",
       },
     });
     await tx.chatMember.createMany({
@@ -759,7 +711,6 @@ async function createGroupChat(
   body: {
     title: string;
     memberIds?: string[];
-    e2eeMode?: "NONE" | "DM_V1" | "GROUP_V1";
     groupVisibility?: "PRIVATE" | "PUBLIC";
   },
 ) {
@@ -775,8 +726,6 @@ async function createGroupChat(
     }
   }
 
-  const groupE2ee =
-    body.e2eeMode === "DM_V1" || body.e2eeMode === "GROUP_V1" ? "DM_V1" : "NONE";
   const groupVisibility = body.groupVisibility ?? "PRIVATE";
 
   const chat = await prisma.$transaction(async (tx) => {
@@ -785,7 +734,6 @@ async function createGroupChat(
         type: "GROUP",
         title: body.title,
         createdById: userId,
-        e2eeMode: groupE2ee,
         groupVisibility,
       },
     });
@@ -833,7 +781,6 @@ export async function createChat(
         type: "GROUP";
         title: string;
         memberIds?: string[];
-        e2eeMode?: "NONE" | "DM_V1" | "GROUP_V1";
         groupVisibility?: "PRIVATE" | "PUBLIC";
       },
 ) {
@@ -924,18 +871,9 @@ export async function searchMessagesInChat(
 ): Promise<{
   data: SearchMessageHit[];
   nextCursor: string | null;
-  searchUnavailable?: boolean;
 }> {
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    select: { type: true, e2eeMode: true },
-  });
-  const isE2ee = chat ? resolveChatE2eeFlags(chat).isE2ee : false;
-  if (isE2ee) {
-    return { data: [], nextCursor: null, searchUnavailable: true };
-  }
 
   const pattern = `%${escapeIlikePattern(q)}%`;
   const cursorFilter = buildSearchMessageCursorFilter(opts.cursor);
@@ -1117,13 +1055,6 @@ export async function createMessage(
   const me = await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
 
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, e2eeMode: true } });
-  if (!chat) {
-    throw new AppError(404, "NOT_FOUND", "Chat not found");
-  }
-  const { isE2ee } = resolveChatE2eeFlags(chat);
-  assertE2eeMessageInput(chat, isE2ee, input.ciphertext, input.contentMeta);
-
   const idempotentHit = await loadIdempotentCreateMessageResult(
     prisma,
     userId,
@@ -1147,19 +1078,21 @@ export async function createMessage(
   }
 
   let contentMetaForInsert = input.contentMeta;
-  if (isPlainObject(contentMetaForInsert) && chat.type === "GROUP") {
-    contentMetaForInsert = await validateAndMergeMentions(
-      userId,
-      chatId,
-      me.role,
-      contentMetaForInsert,
-    );
+  if (isPlainObject(contentMetaForInsert)) {
+    const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+    if (chat?.type === "GROUP") {
+      contentMetaForInsert = await validateAndMergeMentions(
+        userId,
+        chatId,
+        me.role,
+        contentMetaForInsert,
+      );
+    }
   }
   const cfg = loadConfig();
   const textBody = input.ciphertext ?? "";
   const enriched = enrichTextMessageContentMeta({
     kind: input.kind,
-    isE2ee,
     linkPreviewEnabled: cfg.linkPreviewEnabled,
     textBody,
     contentMeta: contentMetaForInsert,
@@ -1273,15 +1206,11 @@ export async function patchMessage(
   messageId: string,
   data: { ciphertext?: string | null; contentMeta?: Record<string, unknown> | null },
 ) {
-  const { prisma, msg } = await requireMessageModifyAccess(
+  const { prisma } = await requireMessageModifyAccess(
     userId,
     messageId,
     "Cannot edit this message",
   );
-  const chat = await prisma.chat.findUnique({ where: { id: msg.chatId }, select: { type: true, e2eeMode: true } });
-  if (chat && resolveChatE2eeFlags(chat).isE2eeDm) {
-    assertE2eePatchPayload(data);
-  }
   const updated = await prisma.message.update({
     where: { id: messageId },
     data: buildMessagePatchUpdateData(data),
@@ -1401,8 +1330,6 @@ export async function createPollOnChat(
     question: string;
     closesAt?: Date | null;
     options: string[];
-    ciphertext?: string | null;
-    contentMeta?: Record<string, unknown> | null;
     clientMessageId?: string | null;
   },
 ): Promise<{
@@ -1411,32 +1338,12 @@ export async function createPollOnChat(
 }> {
   await requireActiveMember(userId, chatId);
   const prisma = getPrisma();
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    select: { type: true, e2eeMode: true },
-  });
-  if (!chat) {
-    throw new AppError(404, "NOT_FOUND", "Chat not found");
-  }
-  const { isE2eeDm } = resolveChatE2eeFlags(chat);
-  if (isE2eeDm) {
-    if (!input.ciphertext?.length) {
-      throw new AppError(400, "E2EE_REQUIRED", "This chat requires ciphertext-only poll messages");
-    }
-    const meta = input.contentMeta ?? null;
-    if (!meta || typeof meta !== "object") {
-      throw new AppError(400, "E2EE_META_REQUIRED", "This chat requires E2EE contentMeta");
-    }
-    if (!isE2eeContentMeta(meta)) {
-      throw new AppError(400, "E2EE_META_INVALID", "contentMeta.e2eeVersion is required for E2EE DMs");
-    }
-  }
 
   const { poll: createdPoll, message: rawMessage } = await prisma.$transaction(async (tx) => {
     const p = await tx.poll.create({
       data: {
         chatId,
-        question: isE2eeDm ? "" : input.question.trim(),
+        question: input.question.trim(),
         closesAt: input.closesAt ?? null,
         createdById: userId,
       },
@@ -1444,25 +1351,18 @@ export async function createPollOnChat(
     await tx.pollOption.createMany({
       data: input.options.map((_label, idx) => ({
         pollId: p.id,
-        label: isE2eeDm ? `·${idx}` : _label.trim(),
+        label: _label.trim(),
         sortOrder: idx,
       })),
     });
-    const optionRows = await tx.pollOption.findMany({
-      where: { pollId: p.id },
-      orderBy: { sortOrder: "asc" },
-      select: { id: true, sortOrder: true },
-    });
-    const contentMetaForInsert = isE2eeDm
-      ? buildE2eePollContentMeta(input.contentMeta, p.id, optionRows)
-      : ({ pollId: p.id } as Prisma.InputJsonValue);
+    const contentMetaForInsert = { pollId: p.id } as Prisma.InputJsonValue;
     const msg = await tx.message.create({
       data: {
         chatId,
         senderId: userId,
         clientMessageId: input.clientMessageId ?? `poll:${p.id}`,
         kind: "POLL",
-        ciphertext: isE2eeDm ? input.ciphertext! : null,
+        ciphertext: null,
         contentMeta: contentMetaForInsert,
         replyToId: null,
       },

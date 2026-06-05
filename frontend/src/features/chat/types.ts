@@ -3,7 +3,6 @@ export type GroupVisibility = 'PRIVATE' | 'PUBLIC';
 export type Chat = {
   id: string;
   type: 'DIRECT' | 'GROUP';
-  e2eeMode?: 'NONE' | 'DM_V1' | 'GROUP_V1';
   groupVisibility?: GroupVisibility;
   isMember?: boolean;
   canJoin?: boolean;
@@ -113,36 +112,11 @@ export type Message = {
     width?: number;
     height?: number;
     preview?: LinkPreviewMeta;
-    e2eeVersion?: string;
-    /** Group dm-v1: per-member encrypted envelopes (same format as DM ciphertext). */
-    recipientCiphertexts?: Record<string, string>;
     mentions?: { userIds?: string[]; all?: boolean };
     groupActivity?: Record<string, unknown>;
-    /** E2EE transport attachment manifest (no encryption keys). */
-    attachmentRefs?: {
-      files?: Array<{
-        uploadId?: string;
-        filename?: string;
-        originalName?: string;
-        url?: string;
-        mimetype?: string;
-        width?: number;
-        height?: number;
-      }>;
-    };
     pollRefs?: { options?: Array<{ id: string; sortOrder: number }> };
-    pushPreview?: string;
     epoch?: number;
     mediaBlob?: unknown;
-    senderFingerprint?: string;
-    peerDeviceId?: string;
-    senderDeviceId?: string;
-    /** Encrypted copy of outbound E2EE payload (readable on sender's other devices). */
-    senderCopy?: {
-      v: 1;
-      iv: string;
-      ct: string;
-    };
   };
 };
 
@@ -180,8 +154,6 @@ export type PollOption = {
 export type PollDetail = {
   id: string;
   chatId: string;
-  /** True when question/options are encrypted in the linked message. */
-  isE2ee?: boolean;
   question: string;
   closesAt: string | null;
   createdAt: string;

@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { Chat, Message } from '../types';
+import type { Message } from '../types';
 import { patchMessageInCache, removeMessageFromCache } from '../utils/messageCache';
 import {
   mergeMessageIntoInfiniteCache,
@@ -7,14 +7,9 @@ import {
   patchMessageInThreadCache,
   removeMessageFromThreadCache,
   threadMessagesQueryKey,
-  flattenMessagePages,
   type MessagePage,
   type ThreadMessagesCache,
 } from '../utils/messageQueryCache';
-import { isPlainObject } from '../../../utils/plainObject';
-import { isE2eeChat } from '../../e2ee/chatE2ee';
-import { rememberSentPlaintext, rememberSentPayloadMeta } from '../../e2ee/sentPlaintextCache';
-import { latestPeerSenderDeviceId } from '../../e2ee/peerDevice';
 
 export function normalizeEditedAt(editedAt: unknown): string {
   if (editedAt == null) return new Date().toISOString();
@@ -22,48 +17,12 @@ export function normalizeEditedAt(editedAt: unknown): string {
   return new Date(editedAt as string | number | Date).toISOString();
 }
 
-export function extractPlainContentMeta(contentMeta: unknown): Record<string, unknown> | undefined {
-  if (!contentMeta || typeof contentMeta !== 'object') return undefined;
-  return isPlainObject(contentMeta) ? contentMeta : undefined;
-}
-
 export function resolvePreferPeerDeviceId(
-  queryClient: QueryClient,
-  chatId: string,
-  peerUserId: string | undefined,
+  _queryClient: QueryClient,
+  _chatId: string,
+  _peerUserId: string | undefined,
 ): string | null {
-  if (!peerUserId) return null;
-  const cached = queryClient.getQueryData<{ pages: MessagePage[] }>(['messages', chatId]);
-  return latestPeerSenderDeviceId(flattenMessagePages(cached?.pages), peerUserId);
-}
-
-export function rememberOutboundE2eePlaintext(
-  userId: string,
-  clientMessageId: string,
-  text: string | undefined,
-  contentMeta: unknown,
-  serverMessageId?: string,
-): void {
-  rememberSentPlaintext(userId, clientMessageId, text ?? '', serverMessageId);
-  const plainMeta = extractPlainContentMeta(contentMeta);
-  if (plainMeta && Object.keys(plainMeta).length > 0) {
-    rememberSentPayloadMeta(userId, clientMessageId, plainMeta, serverMessageId);
-  }
-}
-
-export function cacheOptimisticE2eeDraft(
-  userId: string,
-  chat: Chat,
-  clientMessageId: string,
-  text: string | undefined,
-  contentMeta: unknown,
-): void {
-  if (!isE2eeChat(chat)) return;
-  rememberSentPlaintext(userId, clientMessageId, text ?? '');
-  const plainMeta = extractPlainContentMeta(contentMeta);
-  if (plainMeta && Object.keys(plainMeta).length > 0) {
-    rememberSentPayloadMeta(userId, clientMessageId, plainMeta);
-  }
+  return null;
 }
 
 type OptimisticCacheInput = {
@@ -168,21 +127,6 @@ export function markSendingMessagesAsError(
       })),
     };
   });
-}
-
-export function rememberEditedE2eeContent(
-  userId: string,
-  cacheKey: string,
-  text: string,
-  message: Message,
-): void {
-  rememberSentPlaintext(userId, cacheKey, text, message.id);
-  if (message.contentMeta && isPlainObject(message.contentMeta)) {
-    const { e2eeVersion: _e2eeVersion, preview: _preview, ...inner } = message.contentMeta;
-    if (Object.keys(inner).length) {
-      rememberSentPayloadMeta(userId, cacheKey, inner, message.id);
-    }
-  }
 }
 
 export function patchEditedMessageInCaches(

@@ -59,13 +59,6 @@
   margin: 0;
 }
 
-.e2eeHint {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-}
-
 .chatHeaderStatus {
   font-size: 0.75rem;
   font-weight: 600;
@@ -272,12 +265,6 @@
   }
 
   .chatHeaderTitleBlock h4 {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .e2eeHint {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

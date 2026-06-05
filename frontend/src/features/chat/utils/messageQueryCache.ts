@@ -93,7 +93,7 @@ export function mergeMessageIntoThreadCache(
   return { ...old, replies };
 }
 
-/** Keep attachment manifest from optimistic row when server E2EE meta replaces it. */
+/** Keep attachment manifest from optimistic row when server meta replaces it. */
 function mergeMessageContentMeta(
   existing: Message['contentMeta'],
   incoming: Message['contentMeta'],

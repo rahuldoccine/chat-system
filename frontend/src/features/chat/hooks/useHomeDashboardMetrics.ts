@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { Chat } from '../types';
-import { getServerAccountKeyStatus } from '../../e2ee/recovery';
 
 export function getDashboardGreeting(): string {
   const hour = new Date().getHours();
@@ -17,7 +16,6 @@ export function filterMemberChats(conversations: Chat[]): Chat[] {
 
 export type HomeDashboardMetrics = {
   greeting: string;
-  needsKeyBackup: boolean;
   memberChats: Chat[];
   channels: Chat[];
   dms: Chat[];
@@ -31,14 +29,6 @@ export function useHomeDashboardMetrics(
   conversations: Chat[],
   onlineUserIds: Set<string>,
 ): HomeDashboardMetrics {
-  const [needsKeyBackup, setNeedsKeyBackup] = useState(false);
-
-  useEffect(() => {
-    void getServerAccountKeyStatus()
-      .then((status) => setNeedsKeyBackup(status.hasIdentityKey && !status.hasBackup))
-      .catch(() => setNeedsKeyBackup(false));
-  }, []);
-
   const greeting = useMemo(() => getDashboardGreeting(), []);
 
   const memberChats = useMemo(() => filterMemberChats(conversations), [conversations]);
@@ -78,7 +68,6 @@ export function useHomeDashboardMetrics(
 
   return {
     greeting,
-    needsKeyBackup,
     memberChats,
     channels,
     dms,

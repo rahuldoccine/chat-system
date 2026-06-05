@@ -95,7 +95,7 @@ const envSchema = z
      * Safety cap for async reconnect flush loops spawned after initial connect pass.
      */
     CHAT_RECONNECT_DELIVERY_MAX_ASYNC_PASSES: z.coerce.number().int().min(1).max(200).default(20),
-    /** Server-side Open Graph link previews on send (non-E2EE). Set "false" to disable. */
+    /** Server-side Open Graph link previews on send. Set "false" to disable. */
     LINK_PREVIEW_ENABLED: z
       .string()
       .optional()

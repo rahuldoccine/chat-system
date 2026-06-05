@@ -1,6 +1,5 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import E2eeRecoveryPanel from './E2eeRecoveryPanel';
 import { isWebPushSupported } from '../../../services/push';
 import styles from '../../../pages/SettingsPage.module.css';
 import { handlerEvent } from '../../../utils/asyncHandler';
@@ -134,10 +133,6 @@ const PrivacySettingsSection: React.FC<PrivacySettingsSectionProps> = ({
           </div>
         </>
       )}
-    </section>
-
-    <section className={styles.card}>
-      <E2eeRecoveryPanel />
     </section>
   </>
 );

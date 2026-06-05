@@ -4,7 +4,6 @@ import { useChat } from '../../../context/ChatContext';
 import { useConversations } from '../hooks/useChatData';
 import { useSocket } from '../../../context/SocketContext';
 import type { Chat } from '../types';
-import { isDmE2eeChat } from '../../e2ee/chatE2ee';
 import { getConversationLastMessagePreview } from '../utils/messagePreview';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
@@ -85,10 +84,7 @@ const ConversationList: React.FC = () => {
                 </div>
                 <div className={styles.row}>
                   <p className={styles.lastMsg}>
-                    {getConversationLastMessagePreview(
-                      chat.lastMessage?.ciphertext,
-                      isDmE2eeChat(chat),
-                    )}
+                    {getConversationLastMessagePreview(chat.lastMessage?.ciphertext)}
                   </p>
                   {chat.unreadCount > 0 && <span className={styles.unreadBadge}>{chat.unreadCount}</span>}
                 </div>

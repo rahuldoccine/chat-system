@@ -3,13 +3,11 @@ import styles from './MediaAttachment.module.css';
 import SingleImageViewer from './SingleImageViewer';
 import { useSingleImageAttachment } from './useSingleImageAttachment';
 import { SingleImageAttachmentView } from './SingleImageAttachmentView';
-import type { ContentMeta, Message } from '../types';
+import type { Message } from '../types';
 import type { FileAttachmentMeta } from '../utils/fileMeta';
 
 export type SingleImageAttachmentProps = {
   contentMeta: Message['contentMeta'];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
   onMediaLoad?: () => void;
   embedded?: boolean;
   primaryFile?: FileAttachmentMeta;
@@ -24,8 +22,6 @@ export type SingleImageAttachmentProps = {
 const SingleImageAttachment: React.FC<SingleImageAttachmentProps> = (props) => {
   const {
     contentMeta,
-    e2eeMessage,
-    transportMeta,
     onMediaLoad,
     embedded = false,
     primaryFile,
@@ -34,8 +30,6 @@ const SingleImageAttachment: React.FC<SingleImageAttachmentProps> = (props) => {
 
   const state = useSingleImageAttachment({
     contentMeta,
-    e2eeMessage,
-    transportMeta,
     onMediaLoad,
     primaryFile,
   });

@@ -5,7 +5,7 @@ import MessageOptionsMenu, { type MessageMenuAction } from './MessageOptionsMenu
 import { getMessageCopyText } from '../utils/messageCache';
 import { QUICK_REACTIONS } from './messageStreamRow.helpers';
 import type { Message } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 
 export type MessageStreamRowActionsProps = Readonly<{
   msg: Message;

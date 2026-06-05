@@ -4,8 +4,9 @@ Historical sprint migrations were consolidated into:
 
 | Migration | Contents |
 |-----------|----------|
-| `20260417120000_baseline` | Full schema from `schema.prisma` (all tables, enums, indexes, FKs) |
-| `20260417200000_seed_direct_e2ee` | Set `Chat.e2eeMode = DM_V1` for all direct chats |
+| `20260417120000_baseline` | Full plaintext schema from `schema.prisma` (all tables, enums, indexes, FKs) |
+
+Legacy encryption migrations were removed during the plaintext cutover — chats store message text in `Message.ciphertext`.
 
 ## Fresh database
 
@@ -15,7 +16,7 @@ npm run db:migrate
 
 ## Existing database (already ran old migrations)
 
-Squashing changes migration history. For **local dev** (data can be lost):
+Squashing migration history requires a reset for **local dev** (data can be lost):
 
 ```bash
 npx prisma migrate reset

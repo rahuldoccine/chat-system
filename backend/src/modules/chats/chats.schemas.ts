@@ -9,7 +9,6 @@ export const createChatBodySchema = z.discriminatedUnion("type", [
     type: z.literal("GROUP"),
     title: z.string().min(1).max(120),
     memberIds: z.array(z.string().uuid()).max(200).optional(),
-    e2eeMode: z.enum(["NONE", "DM_V1", "GROUP_V1"]).optional(),
     groupVisibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
   }),
 ]);
@@ -63,17 +62,12 @@ export const listChatsQuerySchema = z
 
 export const createPollBodySchema = z
   .object({
-    question: z.string().max(500),
+    question: z.string().min(1).max(500),
     closesAt: z.coerce.date().optional().nullable(),
-    options: z.array(z.string().max(200)).min(2).max(20),
-    /** E2EE DM: encrypted poll payload (question/options live in ciphertext meta). */
-    ciphertext: z.string().min(1).max(512_000).optional(),
-    contentMeta: z.record(z.unknown()).optional(),
+    options: z.array(z.string().min(1).max(200)).min(2).max(20),
     clientMessageId: z.string().uuid().optional(),
   })
   .superRefine((body, ctx) => {
-    const isE2ee = Boolean(body.ciphertext && body.contentMeta);
-    if (isE2ee) return;
     if (!body.question.trim()) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Question is required", path: ["question"] });
     }
@@ -106,10 +100,6 @@ export const patchChatFavoriteBodySchema = z.object({
 
 export const patchChatCloseBodySchema = z.object({
   closed: z.boolean(),
-});
-
-export const patchChatE2eeBodySchema = z.object({
-  e2eeMode: z.enum(["NONE", "DM_V1"]),
 });
 
 export const markMessagesReadBodySchema = z.object({

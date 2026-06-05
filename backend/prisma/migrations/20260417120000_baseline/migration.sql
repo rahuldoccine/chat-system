@@ -1,5 +1,5 @@
 -- Squashed baseline: full schema (replaces 11 incremental migrations).
--- Sections: enums → User/auth → chat → E2EE → push/settings → indexes → foreign keys
+-- Sections: enums → User/auth → chat → push/settings → indexes → foreign keys
 
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
@@ -7,9 +7,6 @@ CREATE SCHEMA IF NOT EXISTS "public";
 -- ---------- Enums ----------
 -- CreateEnum
 CREATE TYPE "ChatType" AS ENUM ('DIRECT', 'GROUP');
-
--- CreateEnum
-CREATE TYPE "ChatE2eeMode" AS ENUM ('NONE', 'DM_V1');
 
 -- CreateEnum
 CREATE TYPE "ChatMemberRole" AS ENUM ('OWNER', 'ADMIN', 'MOD', 'MEMBER');
@@ -44,8 +41,6 @@ CREATE TABLE "User" (
     "displayName" TEXT,
     "username" TEXT,
     "avatarUrl" TEXT,
-    "publicKey" TEXT,
-    "keyVersion" INTEGER,
     "emailVerifiedAt" TIMESTAMP(3),
     "authVersion" INTEGER NOT NULL DEFAULT 0,
     "isAdmin" BOOLEAN NOT NULL DEFAULT false,
@@ -93,7 +88,6 @@ CREATE TABLE "Chat" (
     "dmKey" TEXT,
     "title" TEXT,
     "avatarUrl" TEXT,
-    "e2eeMode" "ChatE2eeMode" NOT NULL DEFAULT 'NONE',
     "createdById" TEXT NOT NULL,
     "lastMessageAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -242,98 +236,6 @@ CREATE TABLE "CallLog" (
     CONSTRAINT "CallLog_pkey" PRIMARY KEY ("id")
 );
 
--- ---------- E2EE key material ----------
--- CreateTable
-CREATE TABLE "UserIdentityKey" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "publicKey" TEXT NOT NULL,
-    "fingerprint" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "revokedAt" TIMESTAMP(3),
-
-    CONSTRAINT "UserIdentityKey_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "DeviceKey" (
-    "id" TEXT NOT NULL,
-    "deviceId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "publicKey" TEXT NOT NULL,
-    "label" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "revokedAt" TIMESTAMP(3),
-
-    CONSTRAINT "DeviceKey_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "SignedPreKey" (
-    "id" TEXT NOT NULL,
-    "deviceId" TEXT NOT NULL,
-    "keyId" TEXT NOT NULL,
-    "publicKey" TEXT NOT NULL,
-    "signature" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "revokedAt" TIMESTAMP(3),
-
-    CONSTRAINT "SignedPreKey_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "OneTimePreKey" (
-    "id" TEXT NOT NULL,
-    "deviceId" TEXT NOT NULL,
-    "keyId" TEXT NOT NULL,
-    "publicKey" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "consumedAt" TIMESTAMP(3),
-
-    CONSTRAINT "OneTimePreKey_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "KeyBackup" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "version" INTEGER NOT NULL DEFAULT 1,
-    "wrapAlg" TEXT NOT NULL,
-    "wrappedPrivateKeyMaterial" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "KeyBackup_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "StepUpToken" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "tokenHash" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "consumedAt" TIMESTAMP(3),
-
-    CONSTRAINT "StepUpToken_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "EmailChallenge" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "purpose" TEXT NOT NULL,
-    "codeHash" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "attempts" INTEGER NOT NULL DEFAULT 0,
-    "verifiedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "EmailChallenge_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateTable
 CREATE TABLE "DeviceToken" (
     "id" TEXT NOT NULL,
@@ -474,39 +376,6 @@ CREATE INDEX "CallLog_initiatorId_startedAt_idx" ON "CallLog"("initiatorId", "st
 CREATE INDEX "CallLog_chatId_startedAt_idx" ON "CallLog"("chatId", "startedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UserIdentityKey_userId_key" ON "UserIdentityKey"("userId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "DeviceKey_deviceId_key" ON "DeviceKey"("deviceId");
-
--- CreateIndex
-CREATE INDEX "DeviceKey_userId_idx" ON "DeviceKey"("userId");
-
--- CreateIndex
-CREATE INDEX "SignedPreKey_deviceId_revokedAt_idx" ON "SignedPreKey"("deviceId", "revokedAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "SignedPreKey_deviceId_keyId_key" ON "SignedPreKey"("deviceId", "keyId");
-
--- CreateIndex
-CREATE INDEX "OneTimePreKey_deviceId_consumedAt_idx" ON "OneTimePreKey"("deviceId", "consumedAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "OneTimePreKey_deviceId_keyId_key" ON "OneTimePreKey"("deviceId", "keyId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "KeyBackup_userId_key" ON "KeyBackup"("userId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "StepUpToken_tokenHash_key" ON "StepUpToken"("tokenHash");
-
--- CreateIndex
-CREATE INDEX "StepUpToken_userId_expiresAt_idx" ON "StepUpToken"("userId", "expiresAt");
-
--- CreateIndex
-CREATE INDEX "EmailChallenge_userId_purpose_expiresAt_idx" ON "EmailChallenge"("userId", "purpose", "expiresAt");
-
--- CreateIndex
 CREATE UNIQUE INDEX "DeviceToken_token_key" ON "DeviceToken"("token");
 
 -- CreateIndex
@@ -620,27 +489,6 @@ ALTER TABLE "CallLog" ADD CONSTRAINT "CallLog_initiatorId_fkey" FOREIGN KEY ("in
 
 -- AddForeignKey
 ALTER TABLE "CallLog" ADD CONSTRAINT "CallLog_peerId_fkey" FOREIGN KEY ("peerId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "UserIdentityKey" ADD CONSTRAINT "UserIdentityKey_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "DeviceKey" ADD CONSTRAINT "DeviceKey_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "SignedPreKey" ADD CONSTRAINT "SignedPreKey_deviceId_fkey" FOREIGN KEY ("deviceId") REFERENCES "DeviceKey"("deviceId") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "OneTimePreKey" ADD CONSTRAINT "OneTimePreKey_deviceId_fkey" FOREIGN KEY ("deviceId") REFERENCES "DeviceKey"("deviceId") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "KeyBackup" ADD CONSTRAINT "KeyBackup_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "StepUpToken" ADD CONSTRAINT "StepUpToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "EmailChallenge" ADD CONSTRAINT "EmailChallenge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DeviceToken" ADD CONSTRAINT "DeviceToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

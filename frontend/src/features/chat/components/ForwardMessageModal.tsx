@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { useMessageBodies } from '../../e2ee/useMessageBodies';
+import { useMessageBodies } from '../utils/messageBody';
 import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './ForwardMessageModal.module.css';
 import { X, Forward, Loader2 } from 'lucide-react';
@@ -36,7 +36,6 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
           id: string;
           type: string;
           title?: string;
-          e2eeMode?: string;
           dmPeer?: { id: string; displayName?: string; email?: string };
         }>;
       }

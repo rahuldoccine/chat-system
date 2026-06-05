@@ -296,13 +296,6 @@
   color: var(--sidebar-muted);
 }
 
-.e2eeNote {
-  margin: 0.25rem 0 0;
-  font-size: 0.68rem;
-  color: var(--text-muted-on-dark);
-  line-height: 1.4;
-}
-
 /* —— Members —— */
 .searchRow {
   display: flex;

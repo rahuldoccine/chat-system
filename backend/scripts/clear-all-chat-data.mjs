@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Remove ALL chat data (messages, files/media on disk, chats, receipts, polls, pins, call logs).
- * User accounts, auth sessions, friends, blocks, settings, E2EE keys, and profile photos (logos/) are kept.
+ * User accounts, auth sessions, friends, blocks, settings, and profile photos (logos/) are kept.
  *
  * Chat files live under uploads/groupchats/ and uploads/onetoonechats/ (not the upload root).
  *

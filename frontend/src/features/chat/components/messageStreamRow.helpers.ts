@@ -1,5 +1,5 @@
 import type { Message } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 import { getMessagePreviewText } from '../utils/messagePreview';
 import { messageTextWithoutLink } from '../utils/linkPreviewUtils';
 import type { MessageKindFlags } from '../utils/messageStream.helpers';

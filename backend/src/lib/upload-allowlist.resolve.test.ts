@@ -19,7 +19,7 @@ describe("resolveDeclaredUploadMime", () => {
     ).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   });
 
-  it("falls back to extension for E2EE ciphertext filenames", () => {
+  it("falls back to extension for application/octet-stream", () => {
     expect(resolveDeclaredUploadMime("clip.mp3", "application/octet-stream")).toBe("audio/mpeg");
     expect(resolveDeclaredUploadMime("pic.png", "application/octet-stream")).toBe("image/png");
   });

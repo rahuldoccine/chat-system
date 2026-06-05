@@ -14,8 +14,7 @@ import {
   useMessageBodies,
   messageWithDecryptedMeta,
   getMessageDisplayBody,
-  getDecryptedPollMeta,
-} from '../../e2ee/useMessageBodies';
+} from '../utils/messageBody';
 import { getMessagePreviewText } from '../utils/messagePreview';
 import MediaAttachment from './MediaAttachment';
 import PollMessage from './PollMessage';
@@ -81,16 +80,15 @@ const ChatPinsPanel: React.FC = () => {
             const m = pin.message;
             if (!m) return null;
 
-            const displayMsg = messageWithDecryptedMeta(m, decryptedBodies);
+            const displayMsg = messageWithDecryptedMeta(m);
             const displayBody = getMessageDisplayBody(m, decryptedBodies, user?.id ?? '');
             const isMe = m.senderId === user?.id;
             const isPoll = m.kind === 'POLL' && Boolean(m.contentMeta?.pollId);
             const messageFiles = getMessageFiles(displayMsg);
             const hasMedia = Boolean(messageFiles?.length) && !isPoll;
-            const isDecrypting = displayBody === '…';
-            const caption = isDecrypting ? '' : displayBody.trim();
+            const caption = displayBody.trim();
             const showCaption = Boolean(caption);
-            const showFallback = !hasMedia && !isPoll && !showCaption && !isDecrypting;
+            const showFallback = !hasMedia && !isPoll && !showCaption;
 
             const pinnedAt = formatChatTimestamp(pin.createdAt);
             const pinnedBy =
@@ -111,17 +109,9 @@ const ChatPinsPanel: React.FC = () => {
                   </div>
                 </header>
                 <div className={styles.cardBody}>
-                  {isDecrypting && (
-                    <p className={styles.textMuted}>Decrypting message…</p>
-                  )}
-
                   {isPoll && m.contentMeta?.pollId && (
                     <div className={styles.pollWrap}>
-                      <PollMessage
-                        pollId={m.contentMeta.pollId}
-                        isMe={isMe}
-                        decryptedPoll={getDecryptedPollMeta(m, decryptedBodies, user?.id ?? '')}
-                      />
+                      <PollMessage pollId={m.contentMeta.pollId} isMe={isMe} />
                     </div>
                   )}
 
@@ -134,10 +124,6 @@ const ChatPinsPanel: React.FC = () => {
                       <MediaAttachment
                         kind={displayMsg.kind}
                         contentMeta={displayMsg.contentMeta}
-                        e2eeMessage={m}
-                        transportMeta={
-                          displayMsg.contentMeta
-                        }
                         embedded
                         caption={
                           shouldUseGroupedFileLayout(displayMsg) && showCaption

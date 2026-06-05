@@ -1,4 +1,4 @@
--- Link uploads to messages for reliable purge on delete (E2EE uses attachmentRefs in contentMeta too).
+-- Link uploads to messages for reliable purge on delete.
 ALTER TABLE "UploadedFile" ADD COLUMN "messageId" TEXT;
 
 CREATE INDEX "UploadedFile_messageId_idx" ON "UploadedFile"("messageId");

@@ -15,7 +15,6 @@ async function resolveComposerLinkPreview(
   if (ctx.composerPreview) {
     return { preview: withLinkDisplay(ctx.composerPreview, ctx.linkDisplayAs) };
   }
-  if (ctx.isE2eeDm) return undefined;
   const url = extractFirstHttpUrl(trimmedText);
   if (!url) return undefined;
   const resolved = await resolveLinkPreviewForSend(url, deps.queryClient);

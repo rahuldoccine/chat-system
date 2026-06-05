@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import styles from './MessageOptionsMenu.module.css';
 import { Copy, Pencil, Trash2, Pin, PinOff, Forward } from 'lucide-react';
 import type { Message } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from '../utils/messageBody';
 import { canCopyMessage, canEditMessage, getMessageCopyText } from '../utils/messageCache';
 
 export type MessageMenuAction = 'copy' | 'edit' | 'delete' | 'pin' | 'unpin' | 'forward';
@@ -15,7 +15,7 @@ type MessageOptionsMenuProps = {
   userId?: string;
   canModerateDelete?: boolean;
   decryptedBodies?: Record<string, DecryptedBody>;
-  /** Decrypted/plain preview for copy (E2EE-safe). */
+  /** Plain preview text for copy. */
   copyText?: string;
   onAction: (action: MessageMenuAction) => void;
   onClose: () => void;

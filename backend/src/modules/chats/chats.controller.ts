@@ -11,7 +11,6 @@ import {
   listThreadMessagesQuerySchema,
   searchMessagesQuerySchema,
   linkPreviewQuerySchema,
-  patchChatE2eeBodySchema,
   patchChatMuteBodySchema,
   patchChatPinBodySchema,
   patchChatFavoriteBodySchema,
@@ -77,13 +76,6 @@ export async function patchChatClose(req: Request, res: Response): Promise<void>
   const body = parseBody(patchChatCloseBodySchema, req.body);
   const chatId = req.params.chatId as string;
   await chatsService.patchChatClose(req.user!.sub, chatId, body.closed);
-  res.status(204).end();
-}
-
-export async function patchChatE2ee(req: Request, res: Response): Promise<void> {
-  const body = parseBody(patchChatE2eeBodySchema, req.body);
-  const chatId = req.params.chatId as string;
-  await chatsService.patchChatE2eeMode(req.user!.sub, chatId, body.e2eeMode);
   res.status(204).end();
 }
 
@@ -226,8 +218,6 @@ export async function createPoll(req: Request, res: Response): Promise<void> {
     question: body.question,
     closesAt: body.closesAt ?? null,
     options: body.options,
-    ciphertext: body.ciphertext ?? null,
-    contentMeta: body.contentMeta ?? null,
     clientMessageId: body.clientMessageId ?? null,
   });
   const io = getSocketIo();

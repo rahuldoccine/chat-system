@@ -1,14 +1,7 @@
 import { expandAvatarUrl } from "../../lib/avatar-urls.js";
-import { isPlainObject } from "../../lib/plain-object.js";
 import { AppError } from "../../errors/index.js";
 import { requireActiveMember } from "../../lib/chat-access.js";
 import { getPrisma } from "../../lib/prisma.js";
-
-function isE2eePollMessage(contentMeta: unknown): boolean {
-  if (!isPlainObject(contentMeta)) return false;
-  const v = contentMeta.e2eeVersion;
-  return typeof v === "string" && v.length > 0;
-}
 
 export async function getPollForUser(userId: string, pollId: string) {
   const prisma = getPrisma();
@@ -16,7 +9,6 @@ export async function getPollForUser(userId: string, pollId: string) {
     where: { id: pollId },
     include: {
       options: { orderBy: { sortOrder: "asc" } },
-      message: { select: { contentMeta: true } },
     },
   });
   if (!poll) {
@@ -54,19 +46,17 @@ export async function getPollForUser(userId: string, pollId: string) {
     votersByOption.set(vote.pollOptionId, list);
   }
   const totalVotes = allVotes.length;
-  const isE2ee = isE2eePollMessage(poll.message?.contentMeta);
   return {
     id: poll.id,
     chatId: poll.chatId,
-    isE2ee,
-    question: isE2ee ? "" : poll.question,
+    question: poll.question,
     closesAt: poll.closesAt,
     createdAt: poll.createdAt,
     myVoteOptionId: mine?.pollOptionId ?? null,
     totalVotes,
     options: poll.options.map((o) => ({
       id: o.id,
-      label: isE2ee ? "" : o.label,
+      label: o.label,
       sortOrder: o.sortOrder,
       votes: countMap.get(o.id) ?? 0,
       voters: votersByOption.get(o.id) ?? [],

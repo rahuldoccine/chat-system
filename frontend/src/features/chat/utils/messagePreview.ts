@@ -9,8 +9,7 @@ import {
   getMessageDisplayBody,
   messageWithDecryptedMeta,
   type DecryptedBody,
-} from '../../e2ee/useMessageBodies';
-import { isE2eeMessage } from '../../e2ee/directChat';
+} from './messageBody';
 
 type PreviewMessage = Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId' | 'kind'>;
 
@@ -29,13 +28,6 @@ function mediaFallbackLabel(msg: PreviewMessage): string {
   return 'Message';
 }
 
-/** True when ciphertext looks like an E2EE envelope (base64 JSON), not human text. */
-export function isLikelyE2eeCiphertext(text: string): boolean {
-  const t = text.trim();
-  if (!t.startsWith('eyJ') || t.length < 48) return false;
-  return /^eyJ[A-Za-z0-9+/=_-]+$/.test(t);
-}
-
 /** Human-readable preview for replies, composer bar, copy, sidebar, etc. */
 export function getMessagePreviewText(
   msg: PreviewMessage,
@@ -45,19 +37,12 @@ export function getMessagePreviewText(
   if (bodies && userId) {
     const full = msg as Message;
     const text = getMessageDisplayBody(full, bodies, userId);
-    if (text === '…') return 'Decrypting…';
     if (text.trim()) return text;
-    return mediaFallbackLabel(messageWithDecryptedMeta(full, bodies));
-  }
-
-  if (isE2eeMessage(msg as Message)) {
-    return mediaFallbackLabel(msg as Message);
+    return mediaFallbackLabel(messageWithDecryptedMeta(full));
   }
 
   const raw = msg.ciphertext?.trim() ?? '';
-  if (raw && !isLikelyE2eeCiphertext(raw)) return raw;
-
-  if (raw) return mediaFallbackLabel(msg as Message);
+  if (raw) return raw;
 
   return mediaFallbackLabel(msg as Message);
 }
@@ -70,12 +55,8 @@ export function replyPreviewLabel(
   return getMessagePreviewText(reply, bodies, userId);
 }
 
-/** Sidebar last line when only encrypted ciphertext string is available from the API. */
-export function getConversationLastMessagePreview(
-  ciphertext: string | undefined,
-  chatE2ee?: boolean,
-): string {
+/** Sidebar last line when only ciphertext string is available from the API. */
+export function getConversationLastMessagePreview(ciphertext: string | undefined): string {
   if (!ciphertext?.trim()) return 'No messages yet';
-  if (chatE2ee || isLikelyE2eeCiphertext(ciphertext)) return 'Message';
   return ciphertext;
 }

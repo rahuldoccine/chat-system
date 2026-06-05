@@ -12,8 +12,6 @@ export type PublicUser = {
   displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
-  publicKey: string | null;
-  keyVersion: number | null;
   isAdmin: boolean;
   createdAt: Date;
 };
@@ -25,8 +23,6 @@ export function toPublicUser(user: User): PublicUser {
     displayName: user.displayName,
     username: user.username,
     avatarUrl: expandAvatarUrl(user.avatarUrl),
-    publicKey: user.publicKey,
-    keyVersion: user.keyVersion,
     isAdmin: user.isAdmin,
     createdAt: user.createdAt,
   };
@@ -45,8 +41,6 @@ export async function patchMe(userId: string, data: {
   displayName?: string;
   username?: string | null;
   avatarUrl?: string | null;
-  publicKey?: string | null;
-  keyVersion?: number | null;
 }): Promise<PublicUser> {
   const prisma = getPrisma();
   const previousAvatarUrl =
@@ -68,8 +62,6 @@ export async function patchMe(userId: string, data: {
         ...(data.avatarUrl === undefined
           ? {}
           : { avatarUrl: normalizeAvatarDbValue(data.avatarUrl) }),
-        ...(data.publicKey === undefined ? {} : { publicKey: data.publicKey }),
-        ...(data.keyVersion === undefined ? {} : { keyVersion: data.keyVersion }),
       },
     });
 

@@ -5,18 +5,14 @@ import { messagePreviewBody } from "./push-notification-content.js";
 describe("messagePreviewBody", () => {
   it("returns ciphertext for text messages", () => {
     expect(
-      messagePreviewBody(
-        { kind: "TEXT", ciphertext: "hi there", contentMeta: null },
-        false,
-      ),
+      messagePreviewBody({ kind: "TEXT", ciphertext: "hi there", contentMeta: null }),
     ).toBe("hi there");
   });
 
-  it("strips @mention tokens from non-E2EE text preview", () => {
+  it("strips @mention tokens from text preview", () => {
     expect(
       messagePreviewBody(
         { kind: "TEXT", ciphertext: "@all hi @demotwo please check", contentMeta: null },
-        false,
       ),
     ).toBe("hi please check");
   });
@@ -25,62 +21,13 @@ describe("messagePreviewBody", () => {
     expect(
       messagePreviewBody(
         { kind: "FILE", ciphertext: "", contentMeta: { voiceNote: true } },
-        false,
       ),
     ).toBe("Voice message");
   });
 
-  it("uses pushPreview for E2EE DMs when provided", () => {
-    expect(
-      messagePreviewBody(
-        {
-          kind: "TEXT",
-          ciphertext: "encrypted-blob",
-          contentMeta: { e2eeVersion: 1, pushPreview: "hello there" },
-        },
-        true,
-      ),
-    ).toBe("hello there");
-  });
-
-  it("strips @mention tokens from E2EE pushPreview", () => {
-    expect(
-      messagePreviewBody(
-        {
-          kind: "TEXT",
-          ciphertext: "encrypted-blob",
-          contentMeta: { e2eeVersion: 1, pushPreview: "@demoone hello @all" },
-        },
-        true,
-      ),
-    ).toBe("hello");
-  });
-
-  it("returns media label from pushPreview for E2EE", () => {
-    expect(
-      messagePreviewBody(
-        {
-          kind: "IMAGE",
-          ciphertext: "encrypted-blob",
-          contentMeta: { pushPreview: "Photo" },
-        },
-        true,
-      ),
-    ).toBe("Photo");
-  });
-
-  it("falls back for E2EE DMs without pushPreview", () => {
-    expect(
-      messagePreviewBody(
-        { kind: "TEXT", ciphertext: "encrypted-blob", contentMeta: { e2eeVersion: 1 } },
-        true,
-      ),
-    ).toBe("New message");
-  });
-
   it("returns Photo for image kind without caption", () => {
     expect(
-      messagePreviewBody({ kind: "IMAGE", ciphertext: null, contentMeta: null }, false),
+      messagePreviewBody({ kind: "IMAGE", ciphertext: null, contentMeta: null }),
     ).toBe("Photo");
   });
 });

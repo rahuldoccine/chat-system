@@ -19,31 +19,6 @@ export function contentMetaRecord(meta: unknown): Record<string, unknown> | null
   return isPlainObject(meta) ? meta : null;
 }
 
-export function e2eePushPreviewFromMeta(meta: Record<string, unknown> | null): string | null {
-  const line = meta?.pushPreview;
-  if (typeof line === "string" && line.trim()) {
-    const cleaned = stripMentionTags(line.trim());
-    return cleaned || "New message";
-  }
-  return null;
-}
-
-export function e2eePushPreviewFromAttachmentRefs(meta: Record<string, unknown> | null): string | null {
-  const refs = meta?.attachmentRefs;
-  if (!refs || typeof refs !== "object" || Array.isArray(refs)) return null;
-  const files = (refs as { files?: unknown }).files;
-  if (!Array.isArray(files) || files.length === 0) return null;
-  if (files.length === 1) {
-    const f = files[0];
-    if (f && typeof f === "object") {
-      const name = (f as { filename?: string }).filename?.trim();
-      if (name) return name;
-    }
-    return "File";
-  }
-  return `Sent ${files.length} files`;
-}
-
 export function groupActivityPushPreview(meta: Record<string, unknown> | null): string | null {
   const groupActivity = meta?.groupActivity;
   if (!isPlainObject(groupActivity)) {
@@ -77,17 +52,6 @@ export function kindFallbackPreview(kind: MessageKind): string {
   if (kind === "POLL") return "Poll";
   if (kind === "SYSTEM") return "System message";
   return "New message";
-}
-
-export function e2eeMessagePreviewBody(
-  meta: Record<string, unknown> | null,
-  kind: MessageKind,
-): string {
-  const fromClient = e2eePushPreviewFromMeta(meta);
-  if (fromClient) return fromClient;
-  const fromRefs = e2eePushPreviewFromAttachmentRefs(meta);
-  if (fromRefs) return fromRefs;
-  return kindFallbackPreview(kind);
 }
 
 export function plainMessagePreviewBody(

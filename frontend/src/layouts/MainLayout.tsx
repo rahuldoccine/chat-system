@@ -25,8 +25,6 @@ import GroupChannelIcon from '../features/chat/components/GroupChannelIcon';
 import UserAvatar from '../features/chat/components/UserAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConnectionStatus from '../features/chat/components/ConnectionStatus';
-import E2eeUnlockBanner from '../features/e2ee/E2eeUnlockBanner';
-import E2eeUnlockModal from '../features/e2ee/E2eeUnlockModal';
 import NewDmModal from '../features/chat/components/NewDmModal';
 import CreateGroupModal from '../features/chat/components/CreateGroupModal';
 import JumpToSearch from '../features/chat/components/JumpToSearch';
@@ -429,8 +427,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       {/* 3. Main Content */}
       <main className={styles.main}>
-        <E2eeUnlockBanner />
-        <E2eeUnlockModal />
         <div className={styles.content}>
           {children}
         </div>

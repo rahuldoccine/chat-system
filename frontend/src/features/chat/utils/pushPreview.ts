@@ -1,5 +1,5 @@
 /**
- * Cleartext line for Web Push (stored in transport contentMeta.pushPreview on E2EE DMs).
+ * Cleartext line for Web Push (stored in contentMeta.pushPreview when needed).
  * Lets the server show message text / media labels without decrypting ciphertext.
  */
 

@@ -23,9 +23,8 @@ import {
   isVoiceMessage,
   type FileAttachmentMeta,
 } from '../utils/fileMeta';
-import { useMessageBodies, messageWithDecryptedMeta } from '../../e2ee/useMessageBodies';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import { useDecryptedFileUrl } from '../../e2ee/useDecryptedFileUrl';
+import { messageWithDecryptedMeta } from '../utils/messageBody';
+import { buildFileUrl } from '../utils/fileUrl';
 import { downloadMessageFile, resolveFileAccessUrl } from '../utils/resolveFileAccess';
 
 type MediaListItem = {
@@ -36,15 +35,12 @@ type MediaListItem = {
   transportMeta?: ContentMeta;
 };
 
-function expandMessagesToMediaItems(
-  messages: Message[],
-  decryptedBodies: ReturnType<typeof useMessageBodies>,
-): MediaListItem[] {
+function expandMessagesToMediaItems(messages: Message[]): MediaListItem[] {
   const items: MediaListItem[] = [];
 
   for (const raw of messages) {
     if (raw.deletedAt) continue;
-    const message = messageWithDecryptedMeta(raw, decryptedBodies);
+    const message = messageWithDecryptedMeta(raw);
     const files = getMessageFiles(message);
     if (!files?.length) continue;
 
@@ -96,13 +92,11 @@ type FilesPanelImageCardProps = {
 };
 
 const FilesPanelImageCard: React.FC<FilesPanelImageCardProps> = ({
-  message,
   file,
-  transportMeta,
   onOpen,
 }) => {
-  const e2eeMessage = isE2eeMessage(message) ? message : undefined;
-  const url = useDecryptedFileUrl(e2eeMessage, file, transportMeta);
+  const { token } = useAuth();
+  const url = buildFileUrl(file, token);
   const alt = file.originalName || file.filename || 'Image';
   const [imgError, setImgError] = useState(false);
 
@@ -297,15 +291,13 @@ const ChatFilesPanel: React.FC = () => {
     isFetchingNextPage,
     fetchNextPage,
   } = useMessages(activeId);
-  const decryptedBodies = useMessageBodies(messages);
-
   useEffect(() => {
     if (!activeId || !hasNextPage || isFetchingNextPage) return;
     void fetchNextPage();
   }, [activeId, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const mediaItems = useMemo(() => {
-    const list = expandMessagesToMediaItems(messages ?? [], decryptedBodies);
+    const list = expandMessagesToMediaItems(messages ?? []);
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter(({ file, message }) => {
@@ -313,7 +305,7 @@ const ChatFilesPanel: React.FC = () => {
       const caption = message.ciphertext?.toLowerCase() ?? '';
       return name.includes(q) || caption.includes(q);
     });
-  }, [messages, query, decryptedBodies]);
+  }, [messages, query]);
 
   const images = mediaItems.filter((item) => item.category === 'image');
   const documents = mediaItems.filter((item) => item.category === 'document');

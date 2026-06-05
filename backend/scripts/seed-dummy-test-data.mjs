@@ -271,7 +271,6 @@ async function main() {
             type: "GROUP",
             title,
             createdById: ownerId,
-            e2eeMode: "NONE",
             groupVisibility: visibility,
             lastMessageAt: new Date(),
           },
@@ -330,7 +329,6 @@ async function main() {
             type: "DIRECT",
             dmKey,
             createdById: a,
-            e2eeMode: "DM_V1",
             members: {
               create: [
                 { userId: a, role: "OWNER" },

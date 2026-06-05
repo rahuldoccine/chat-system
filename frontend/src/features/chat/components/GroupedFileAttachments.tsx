@@ -4,11 +4,8 @@ import { handler } from '../../../utils/asyncHandler';
 import { ChevronDown, CloudDownload, Download, Eye, ImageIcon, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { buildFileUrl } from '../utils/fileUrl';
-import { downloadBlob, downloadFileFromUrl } from '../utils/downloadFile';
-import { decryptMessageFile } from '../../e2ee/attachmentCrypto';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import { useDecryptedFileUrl } from '../../e2ee/useDecryptedFileUrl';
-import type { ContentMeta, Message } from '../types';
+import { downloadFileFromUrl } from '../utils/downloadFile';
+import type { Message } from '../types';
 import { getDocumentViewerKind, type DocumentViewerKind } from '../utils/documentViewer';
 import { truncateFilenameMiddle } from '../utils/formatFilename';
 import {
@@ -28,8 +25,7 @@ import MessageMeta from './MessageMeta';
 
 type GroupedFileAttachmentsProps = Readonly<{
   files: FileAttachmentMeta[];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
+  contentMeta?: Message['contentMeta'];
   embedded?: boolean;
   caption?: string;
   bubbleVariant?: 'sent' | 'received';
@@ -41,20 +37,17 @@ type GroupedFileAttachmentsProps = Readonly<{
   };
 }>;
 
-function E2eeSingleImagePreview({
+function SingleImagePreview({
   file,
-  e2eeMessage,
-  transportMeta,
   name,
   onOpen,
 }: Readonly<{
   file: FileAttachmentMeta;
-  e2eeMessage?: GroupedFileAttachmentsProps['e2eeMessage'];
-  transportMeta?: ContentMeta;
   name: string;
   onOpen: () => void;
 }>) {
-  const src = useDecryptedFileUrl(e2eeMessage, file, transportMeta);
+  const { token } = useAuth();
+  const src = buildFileUrl(file, token);
   if (!src) {
     return (
       <div className={`${styles.singleImageBtn} ${imageStyles.imageError}`}>
@@ -193,14 +186,13 @@ function FileAttachmentCard({
 
 const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
   files,
-  e2eeMessage,
-  transportMeta,
+  contentMeta,
   embedded = false,
   caption,
   bubbleVariant = 'received',
   mediaTimestamp,
 }) => {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
@@ -211,23 +203,10 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
   const isSent = bubbleVariant === 'sent';
 
   const resolveViewUrl = useCallback(
-    async (file: FileAttachmentMeta): Promise<string | null> => {
-      if (e2eeMessage && isE2eeMessage(e2eeMessage) && user?.id) {
-        const blob = await decryptMessageFile(
-          user.id,
-          e2eeMessage,
-          file,
-          user.id,
-          token,
-          transportMeta,
-        );
-        if (blob) return URL.createObjectURL(blob);
-        return null;
-      }
-      const url = buildFileUrl(file, token);
-      return url || null;
+    (file: FileAttachmentMeta): string | null => {
+      return buildFileUrl(file, token) || null;
     },
-    [e2eeMessage, transportMeta, token, user?.id],
+    [token],
   );
 
   const handleDownloadAll = useCallback(async () => {
@@ -236,18 +215,6 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
     try {
       for (const file of files) {
         const name = file.originalName || file.filename || 'file';
-        if (e2eeMessage && isE2eeMessage(e2eeMessage) && user?.id) {
-          const blob = await decryptMessageFile(
-            user.id,
-            e2eeMessage,
-            file,
-            user.id,
-            token,
-            transportMeta,
-          );
-          if (blob) downloadBlob(blob, name);
-          continue;
-        }
         const url = buildFileUrl(file, token);
         if (!url) continue;
         await downloadFileFromUrl(url, name);
@@ -255,42 +222,37 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
     } finally {
       setDownloadingAll(false);
     }
-  }, [downloadingAll, e2eeMessage, files, token, transportMeta, user?.id]);
+  }, [downloadingAll, files, token]);
 
   const openFile = useCallback(
     (file: FileAttachmentMeta) => {
       const title = file.originalName || file.filename || 'File';
+      const url = resolveViewUrl(file);
+      if (!url) return;
 
-      void (async () => {
-        const url = await resolveViewUrl(file);
-        if (!url) return;
+      const isImage = isImageFile(file);
+      if (isImage) {
+        setViewer({ kind: 'image', src: url, title });
+        return;
+      }
 
-        const isImage = isImageFile(file);
-        if (isImage) {
-          setViewer({ kind: 'image', src: url, title });
-          return;
-        }
+      if (isVideoFile(file)) {
+        setViewer({ kind: 'video', src: url, title });
+        return;
+      }
 
-        if (isVideoFile(file)) {
-          setViewer({ kind: 'video', src: url, title });
-          return;
-        }
+      if (isAudioFile(file)) {
+        const durationMs = getVoiceDurationMs(contentMeta);
+        setViewer({ kind: 'audio', src: url, title, durationMs });
+        return;
+      }
 
-        if (isAudioFile(file)) {
-          const durationMs = getVoiceDurationMs(transportMeta);
-          setViewer({ kind: 'audio', src: url, title, durationMs });
-          return;
-        }
-
-        const docKind = getDocumentViewerKind(file.mimetype, title);
-        if (docKind) {
-          setViewer({ kind: 'document', src: url, title, docKind });
-        } else if (!e2eeMessage || !isE2eeMessage(e2eeMessage)) {
-          URL.revokeObjectURL(url);
-        }
-      })();
+      const docKind = getDocumentViewerKind(file.mimetype, title);
+      if (docKind) {
+        setViewer({ kind: 'document', src: url, title, docKind });
+      }
     },
-    [e2eeMessage, resolveViewUrl],
+    [contentMeta, resolveViewUrl],
   );
 
   const handleDownloadFile = useCallback(
@@ -300,18 +262,6 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
       const name = file.originalName || file.filename || 'file';
       setDownloadingKey(key);
       try {
-        if (e2eeMessage && isE2eeMessage(e2eeMessage) && user?.id) {
-          const blob = await decryptMessageFile(
-            user.id,
-            e2eeMessage,
-            file,
-            user.id,
-            token,
-            transportMeta,
-          );
-          if (blob) downloadBlob(blob, name);
-          return;
-        }
         const url = buildFileUrl(file, token);
         if (!url) return;
         await downloadFileFromUrl(url, name);
@@ -319,7 +269,7 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
         setDownloadingKey(null);
       }
     },
-    [downloadingKey, e2eeMessage, token, transportMeta, user?.id],
+    [downloadingKey, token],
   );
 
   if (files.length === 0) return null;
@@ -331,10 +281,8 @@ const GroupedFileAttachments: React.FC<GroupedFileAttachmentsProps> = ({
     if (isMulti && collapsed) return null;
     if (singleImage) {
       return (
-        <E2eeSingleImagePreview
+        <SingleImagePreview
           file={files[0]}
-          e2eeMessage={e2eeMessage}
-          transportMeta={transportMeta}
           name={singleImageName}
           onOpen={() => openFile(files[0])}
         />

@@ -3,8 +3,6 @@ import type { QueryClient } from '@tanstack/react-query';
 import { sendComposerMessage } from '../hooks/composerSend.helpers';
 import { canSendComposerMessage } from './messageComposer.helpers';
 import { gifToFile, type GifResult } from '../utils/gifPicker';
-import { E2eePeerNotReadyError } from '../../e2ee/directChat';
-import { E2eeKeysLockedError } from '../../e2ee/bootstrap';
 import { getApiErrorMessage } from '../../settings/hooks/useUserSettings';
 import type { LinkDisplayMode, LinkPreviewMeta } from '../types';
 import type { ComposerSendContext, ComposerSendDeps } from '../hooks/composerSend.types';
@@ -25,7 +23,6 @@ type SendActionParams = {
   replyingTo: string | null;
   composerPreview: LinkPreviewMeta | null;
   linkDisplayAs: LinkDisplayMode;
-  isE2eeDm: boolean;
   activeChat: ComposerSendContext['activeChat'];
   groupMembers: ComposerSendContext['groupMembers'];
   canUseAllMention: boolean;
@@ -83,7 +80,6 @@ export async function runComposerSendAction(p: SendActionParams): Promise<void> 
         replyingTo: p.replyingTo,
         composerPreview: p.composerPreview,
         linkDisplayAs: p.linkDisplayAs,
-        isE2eeDm: p.isE2eeDm,
         activeChat: p.activeChat,
         groupMembers: p.groupMembers,
         canUseAllMention: p.canUseAllMention,
@@ -160,10 +156,6 @@ export async function runComposerPollSubmit(p: PollSubmitParams): Promise<void> 
     p.setReplyingTo(null);
     p.scrollToBottom();
   } catch (err: unknown) {
-    if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
-      toast.error(err.message);
-      return;
-    }
     toast.error(getApiErrorMessage(err, "We couldn't create the poll. Please try again."));
   }
 }
@@ -194,7 +186,7 @@ export async function runComposerGifSelect(
   try {
     p.setUploadProgress({ current: 1, total: 1 });
     const file = await gifToFile(gif);
-    const { uploadResult, attachment } = await p.uploadForChat(file);
+    const { uploadResult } = await p.uploadForChat(file);
     if (!uploadResult.ok) {
       p.showAlert('Upload failed', uploadResult.message ?? 'Upload failed');
       return;
@@ -226,7 +218,6 @@ export async function runComposerGifSelect(
             url: uploaded.url,
             width: gif.width,
             height: gif.height,
-            ...(attachment ? { attachment } : {}),
           },
         ],
       },

@@ -1,29 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { buildFileUrl } from '../utils/fileUrl';
-import { useDecryptedFileUrl } from '../../e2ee/useDecryptedFileUrl';
-import { decryptMessageFile } from '../../e2ee/attachmentCrypto';
-import { isE2eeMessage } from '../../e2ee/directChat';
-import { downloadBlob, downloadFileFromUrl } from '../utils/downloadFile';
-import type { ContentMeta, Message } from '../types';
+import { downloadFileFromUrl } from '../utils/downloadFile';
+import type { Message } from '../types';
 import type { FileAttachmentMeta } from '../utils/fileMeta';
 
 export type UseSingleImageAttachmentParams = {
   contentMeta: Message['contentMeta'];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
   onMediaLoad?: () => void;
   primaryFile?: FileAttachmentMeta;
 };
 
 export function useSingleImageAttachment({
   contentMeta,
-  e2eeMessage,
-  transportMeta,
   onMediaLoad,
   primaryFile,
 }: UseSingleImageAttachmentParams) {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -41,7 +34,6 @@ export function useSingleImageAttachment({
       mimetype: meta.mimetype ?? primaryFile?.mimetype,
       uploadId: meta.uploadId ?? primaryFile?.uploadId,
       originalName: meta.originalName ?? primaryFile?.originalName,
-      attachment: primaryFile?.attachment,
     }),
     [
       meta.filename,
@@ -54,13 +46,10 @@ export function useSingleImageAttachment({
       primaryFile?.mimetype,
       primaryFile?.uploadId,
       primaryFile?.originalName,
-      primaryFile?.attachment,
     ],
   );
 
-  const decryptedUrl = useDecryptedFileUrl(e2eeMessage, fileRef, transportMeta);
-  const fullUrl =
-    e2eeMessage && isE2eeMessage(e2eeMessage) ? decryptedUrl : buildFileUrl(fileRef, token);
+  const fullUrl = buildFileUrl(fileRef, token);
 
   useEffect(() => {
     setImgLoaded(false);
@@ -103,25 +92,13 @@ export function useSingleImageAttachment({
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       try {
-        if (e2eeMessage && isE2eeMessage(e2eeMessage) && user?.id && primaryFile) {
-          const blob = await decryptMessageFile(
-            user.id,
-            e2eeMessage,
-            fileRef,
-            user.id,
-            token,
-            transportMeta,
-          );
-          if (blob) downloadBlob(blob, displayName);
-          return;
-        }
         if (!fullUrl) return;
         await downloadFileFromUrl(fullUrl, displayName);
       } catch {
         /* ignore */
       }
     },
-    [displayName, e2eeMessage, fileRef, fullUrl, primaryFile, token, transportMeta, user?.id],
+    [displayName, fullUrl],
   );
 
   const onImageLoad = useCallback(() => {

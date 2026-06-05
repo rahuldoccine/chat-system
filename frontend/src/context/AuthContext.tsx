@@ -7,26 +7,6 @@ import {
   setAccessToken,
 } from '../api/authSession';
 import { unregisterWebPush } from '../services/push';
-import { ensureE2eeReady, E2eeKeysLockedError } from '../features/e2ee/bootstrap';
-import {
-  clearSessionUnlock,
-  unlockKeyMaterialWithPassword,
-} from '../features/e2ee/accountSync';
-import {
-  ensureDecryptedPayloadHydrated,
-  clearDecryptedPayloadForUser,
-} from '../features/e2ee/decryptedPayloadCache';
-import {
-  ensureSentPlaintextHydrated,
-  clearSentPlaintextForUser,
-} from '../features/e2ee/sentPlaintextCache';
-import { emitE2eeKeysUnlocked } from '../features/e2ee/e2eeEvents';
-import {
-  clearLoginPasswordForBackup,
-  flushE2eeBackupSync,
-  rememberLoginPasswordForBackup,
-} from '../features/e2ee/e2eeBackupSync';
-import { hydrateGroupSenderKeysFromIdb } from '../features/e2ee/groupSenderKeys';
 
 interface User {
   id: string;
@@ -39,9 +19,6 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (user: unknown, token: string, password?: string) => Promise<void>;
-  e2eeKeysLocked: boolean;
-  markE2eeUnlocked: () => void;
-  unlockE2eeWithPassword: (password: string) => Promise<void>;
   applyProfile: (profile: {
     id: string;
     email: string;
@@ -79,18 +56,9 @@ async function fetchCurrentUser(): Promise<User> {
   return mapApiUser(response.data.user);
 }
 
-async function hydrateE2eeCaches(userId: string): Promise<void> {
-  await Promise.all([
-    ensureSentPlaintextHydrated(userId),
-    ensureDecryptedPayloadHydrated(userId),
-    hydrateGroupSenderKeysFromIdb(),
-  ]);
-}
-
 async function bootstrapAuthSession(): Promise<{
   token: string;
   user: User;
-  e2eeLocked: boolean;
 } | null> {
   let accessToken = getAccessToken();
   let loadedUser: User | null = null;
@@ -114,36 +82,18 @@ async function bootstrapAuthSession(): Promise<{
     return null;
   }
 
-  let e2eeLocked = false;
-  if (loadedUser.id) {
-    try {
-      await ensureE2eeReady(loadedUser.id);
-      void hydrateE2eeCaches(loadedUser.id);
-    } catch (err) {
-      if (err instanceof E2eeKeysLockedError) {
-        e2eeLocked = true;
-      } else {
-        console.warn('[e2ee] ensureE2eeReady on session start failed', err);
-      }
-    }
-  }
-
-  return { token: accessToken, user: loadedUser, e2eeLocked };
+  return { token: accessToken, user: loadedUser };
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => getAccessToken());
   const [isLoading, setIsLoading] = useState(true);
-  const [e2eeKeysLocked, setE2eeKeysLocked] = useState(false);
 
   const clearAuth = useCallback(() => {
-    clearLoginPasswordForBackup();
-    clearSessionUnlock();
     clearAccessToken();
     setToken(null);
     setUser(null);
-    setE2eeKeysLocked(false);
   }, []);
 
   useEffect(() => {
@@ -156,7 +106,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (cancelled || !session) return;
         setToken(session.token);
         setUser(session.user);
-        setE2eeKeysLocked(session.e2eeLocked);
       } catch {
         if (!cancelled) {
           clearAuth();
@@ -175,56 +124,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [clearAuth]);
 
-  const markE2eeUnlocked = useCallback(() => {
-    setE2eeKeysLocked(false);
-    if (user?.id) {
-      void hydrateE2eeCaches(user.id);
-      emitE2eeKeysUnlocked(user.id);
-    }
-  }, [user?.id]);
-
-  const unlockE2eeWithPassword = useCallback(
-    async (password: string) => {
-      if (!user?.id) {
-        throw new E2eeKeysLockedError();
-      }
-      await unlockKeyMaterialWithPassword(user.id, password);
-      rememberLoginPasswordForBackup(user.id, password);
-      await ensureE2eeReady(user.id, { password });
-      setE2eeKeysLocked(false);
-      await hydrateE2eeCaches(user.id);
-      emitE2eeKeysUnlocked(user.id);
-    },
-    [user?.id],
-  );
-
-  const login = useCallback(async (userData: unknown, newToken: string, password?: string) => {
+  const login = useCallback(async (userData: unknown, newToken: string, _password?: string) => {
     setAccessToken(newToken);
     setToken(newToken);
     const mapped = mapApiUser(userData as Parameters<typeof mapApiUser>[0]);
     setUser(mapped);
-    setE2eeKeysLocked(false);
-    if (mapped.id) {
-      try {
-        if (password) {
-          rememberLoginPasswordForBackup(mapped.id, password);
-        }
-        await ensureE2eeReady(mapped.id, { password });
-        setE2eeKeysLocked(false);
-        void hydrateE2eeCaches(mapped.id);
-        if (password) {
-          void flushE2eeBackupSync(mapped.id);
-        }
-        emitE2eeKeysUnlocked(mapped.id);
-      } catch (err) {
-        if (err instanceof E2eeKeysLockedError) {
-          setE2eeKeysLocked(true);
-          throw err;
-        }
-        console.warn('[e2ee] ensureE2eeReady on login failed', err);
-        throw err;
-      }
-    }
   }, []);
 
   const applyProfile = useCallback(
@@ -252,14 +156,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [applyProfile]);
 
   const logout = useCallback(async () => {
-    const uid = user?.id;
     try {
       await unregisterWebPush();
     } catch {
       /* best-effort */
-    }
-    if (uid) {
-      await flushE2eeBackupSync(uid);
     }
     try {
       await api.post('/auth/logout');
@@ -267,10 +167,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear local session even if server logout fails (e.g. expired token).
     }
     clearAuth();
-  }, [clearAuth, user?.id]);
+  }, [clearAuth]);
 
   const logoutAll = useCallback(async () => {
-    const uid = user?.id;
     try {
       await unregisterWebPush();
     } catch {
@@ -281,23 +180,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Still clear local state.
     }
-    if (uid) {
-      await Promise.all([
-        clearSentPlaintextForUser(uid),
-        clearDecryptedPayloadForUser(uid),
-      ]);
-    }
     clearAuth();
-  }, [clearAuth, user?.id]);
+  }, [clearAuth]);
 
   const value = useMemo(
     () => ({
       user,
       token,
       login,
-      e2eeKeysLocked,
-      markE2eeUnlocked,
-      unlockE2eeWithPassword,
       applyProfile,
       refreshProfile,
       logout,
@@ -305,19 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthenticated: !!token && !!user,
       isLoading,
     }),
-    [
-      user,
-      token,
-      login,
-      e2eeKeysLocked,
-      markE2eeUnlocked,
-      unlockE2eeWithPassword,
-      applyProfile,
-      refreshProfile,
-      logout,
-      logoutAll,
-      isLoading,
-    ],
+    [user, token, login, applyProfile, refreshProfile, logout, logoutAll, isLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

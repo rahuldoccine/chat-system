@@ -1,6 +1,6 @@
-# Chat Module — Secure E2EE Real-Time Messaging
+# Chat Module — Real-Time Messaging
 
-A **full-stack chat application** (React + Express + PostgreSQL + Socket.IO) with **mandatory E2EE for direct messages**, **group sender-key encryption**, **WebRTC calls**, **PWA**, and a **Slack-style sidebar** (Favorites, Channels, Direct Messages).
+A **full-stack chat application** (React + Express + PostgreSQL + Socket.IO) with **WebRTC calls**, **PWA**, and a **Slack-style sidebar** (Favorites, Channels, Direct Messages).
 
 | Resource | Description |
 |----------|-------------|
@@ -97,14 +97,13 @@ See package READMEs for full folder trees and scripts.
 - Group create (avatar, visibility, members), roles, public join
 
 ### Security & calls
-- **E2EE:** `DM_V1` (all DMs), `GROUP_V1` (new groups) — server stores ciphertext + keys only
 - **Calls:** 1:1 and group audio/video (WebRTC + socket signaling)
 - Block / report APIs; authorized file downloads
 
 ### Platform
 - **PWA:** Install prompt, service worker, update toast
 - **Push:** Web Push (VAPID) and/or FCM (optional)
-- **Email:** Password reset + E2EE recovery (SMTP optional in dev)
+- **Email:** Password reset (SMTP optional in dev)
 
 ---
 
@@ -153,7 +152,7 @@ Copy `backend/.env.example` and `frontend/.env.example` before running.
 - Real-time messaging, typing indicators, delivery/read receipts, unread counts
 - Edit, delete, reply, forward, reactions, pins, threads
 - Message search (in-chat), link previews
-- Voice notes (E2EE in DMs), GIFs (Giphy), file attachments
+- Voice notes, GIFs (Giphy), file attachments
 
 ### Calls
 - 1:1 and group audio/video (WebRTC)
@@ -167,7 +166,6 @@ Copy `backend/.env.example` and `frontend/.env.example` before running.
 
 ### Account & settings
 - Profile, avatar, privacy toggles, sessions (logout all devices)
-- E2EE key backup / recovery (Settings → Privacy)
 - Forgot / reset password
 
 ### PWA & reliability
@@ -176,15 +174,9 @@ Copy `backend/.env.example` and `frontend/.env.example` before running.
 
 ---
 
-## Privacy & encryption
+## Privacy
 
-**In this repo:** Direct chats use mandatory client-side E2EE (`DM_V1`). Keys are created on register/login (`frontend/src/features/e2ee/`). New DM content is encrypted before upload; the server stores ciphertext and public key material only.
-
-**Group chats:** New groups can use `GROUP_V1` sender-key encryption for message bodies and attachments.
-
-**Not E2EE:** WebRTC call media (signaling only on server). Legacy plaintext messages may still display until rotated.
-
-Server boundary details: [../backend/src/docs/e2ee-boundary.md](../backend/src/docs/e2ee-boundary.md).
+Message text is stored in `Message.ciphertext` as plaintext on the server. WebRTC call media is peer-to-peer; the server handles signaling only. File downloads require authentication and chat membership.
 
 ---
 
@@ -204,8 +196,8 @@ Server boundary details: [../backend/src/docs/e2ee-boundary.md](../backend/src/d
 
 ## Who can use this project
 
-- **Teams & startups** — Private team chat with E2EE DMs  
-- **Developers** — Reference for real-time + E2EE + WebRTC patterns  
+- **Teams & startups** — Private team chat with DMs and channels  
+- **Developers** — Reference for real-time + WebRTC patterns  
 - **Learners** — Full-stack TypeScript example  
 - **Personal use** — Self-hosted chat (configure your own infra)
 
@@ -225,8 +217,7 @@ The sections below were the initial implementation roadmap. **Most sprints are c
 5. **Friends & groups** — roles, members  
 6. **Uploads** — multer, secure file access  
 7. **Notifications** — push tokens, reconnect flush  
-8. **E2EE** — DM_V1, backup/recovery  
-9. **Calls & polish** — WebRTC, rate limits, responsive UI  
+8. **Calls & polish** — WebRTC, rate limits, responsive UI  
 
 </details>
 
@@ -237,12 +228,11 @@ REST lives under `/api/v1`. See [../backend/README.md](../backend/README.md) and
 
 **Auth:** register, login, refresh, logout, forgot/reset password  
 **Users:** me, search, profiles  
-**Chats:** list, create, messages, favorite, close, pin, mute, E2EE mode  
+**Chats:** list, create, messages, favorite, close, pin, mute  
 **Messages:** edit, delete, reactions  
 **Groups:** create, members, roles  
 **Friends:** request, accept, remove  
 **Uploads / files:** multipart upload, authorized download  
-**E2EE:** keys, backup, recovery  
 **Calls:** history  
 **Moderation:** block, report  
 
@@ -253,7 +243,7 @@ REST lives under `/api/v1`. See [../backend/README.md](../backend/README.md) and
 <details>
 <summary>Database models (Prisma)</summary>
 
-Core models include `User`, `Session`, `Chat`, `ChatMember`, `Message`, `Receipt`, `Reaction`, `Friend`, `Block`, `Report`, `Poll`, `CallLog`, `DeviceToken`, and E2EE-related tables. See `backend/prisma/schema.prisma`.
+Core models include `User`, `Session`, `Chat`, `ChatMember`, `Message`, `Receipt`, `Reaction`, `Friend`, `Block`, `Report`, `Poll`, `CallLog`, and `DeviceToken`. See `backend/prisma/schema.prisma`.
 
 </details>
 

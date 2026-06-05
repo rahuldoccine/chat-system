@@ -1,6 +1,6 @@
 # Chat System — Frontend
 
-Vite + **React 19** SPA for real-time messaging, group channels, WebRTC calls, client-side E2EE, and installable PWA support.
+Vite + **React 19** SPA for real-time messaging, group channels, WebRTC calls, and installable PWA support.
 
 ## Stack
 
@@ -59,7 +59,6 @@ frontend/src/
 │   ├── auth/               # Login, register, password reset
 │   ├── calls/              # 1:1 + group WebRTC, call-layout tokens
 │   ├── chat/               # Messages, composer, groups, threads, search
-│   ├── e2ee/               # DM_V1 + GROUP_V1
 │   ├── pwa/                # Install prompt
 │   ├── settings/           # Profile, privacy, push, appearance
 │   └── sync/               # Offline outbox (partial)
@@ -77,7 +76,7 @@ frontend/src/
 | Path | Page |
 |------|------|
 | `/` | Home — chat shell (`MainLayout` + `HomePage` / `ActiveChatView`) |
-| `/settings` | Account, appearance (theme), privacy, E2EE recovery, push |
+| `/settings` | Account, appearance (theme), privacy, push |
 | `/login`, `/register`, `/forgot-password` | Auth |
 | `*` | `NotFoundPage` |
 
@@ -113,7 +112,7 @@ Per-row **⋯** menu: favorite, close DM (DMs), leave group (channels).
 - In-chat search, link previews, `@mentions`, `@all` (group admins)
 
 ### Groups
-- Create group (avatar, visibility, members, optional GROUP_V1)
+- Create group (avatar, visibility, members)
 - Join public channels/groups modal
 - Group info panel, roles, public join
 
@@ -121,10 +120,6 @@ Per-row **⋯** menu: favorite, close DM (DMs), leave group (channels).
 - 1:1 and group audio/video (WebRTC + socket signaling)
 - Incoming/outgoing modals with theme-aware text on mobile full-screen overlay
 - Call history panels, responsive `CallOverlay`
-
-### E2EE
-- Mandatory DM encryption (`DM_V1`); `GROUP_V1` on new groups
-- Key backup / recovery under Settings → Privacy
 
 ### PWA & responsive
 - Install prompt, update toast, offline shell
@@ -137,7 +132,7 @@ Per-row **⋯** menu: favorite, close DM (DMs), leave group (channels).
 | `npm run dev` | Vite dev server (port 5173) |
 | `npm run build` | `tsc -b` + production build |
 | `npm run preview` | Preview production build |
-| `npm test` | Vitest (`src/features/e2ee/*.test.ts`, etc.) |
+| `npm test` | Vitest |
 | `npm run lint` | ESLint |
 
 ## Related docs

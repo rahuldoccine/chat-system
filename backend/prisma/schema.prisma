@@ -19,10 +19,6 @@ model User {
   username    String? @unique
   avatarUrl   String?
 
-  /// E2EE: optional public key material + version for rotation (no plaintext message storage)
-  publicKey  String? @db.Text
-  keyVersion Int?
-
   emailVerifiedAt DateTime?
   /// Bumped on logout-all / password reset; must match JWT `authVer` claim.
   authVersion Int @default(0)
@@ -53,11 +49,6 @@ model User {
   callLogsAsInitiator CallLog[]            @relation("CallInitiator")
   callLogsAsPeer      CallLog[]            @relation("CallPeer")
   deviceTokens        DeviceToken[]
-  identityKey         UserIdentityKey?
-  deviceKeys          DeviceKey[]
-  keyBackup           KeyBackup?
-  stepUpTokens        StepUpToken[]
-  emailChallenges     EmailChallenge[]
   userSettings        UserSettings?
   pinnedMessages      PinnedMessage[]      @relation("PinnedByUser")
   uploadedFiles       UploadedFile[]
@@ -97,12 +88,6 @@ enum ChatType {
   GROUP
 }
 
-enum ChatE2eeMode {
-  NONE
-  DM_V1
-  GROUP_V1
-}
-
 enum ChatMemberRole {
   OWNER
   ADMIN
@@ -122,7 +107,6 @@ model Chat {
   dmKey     String?  @unique
   title     String?
   avatarUrl String?
-  e2eeMode         ChatE2eeMode     @default(NONE)
   groupVisibility  GroupVisibility  @default(PRIVATE)
 
   createdById String
@@ -164,20 +148,6 @@ model ChatMember {
   @@index([userId, leftAt])
 }
 
-/// Opaque sender-key distribution blobs for GROUP_V1 (server-blind).
-model GroupSenderKey {
-  id           String   @id @default(uuid())
-  chatId       String
-  senderId     String
-  epoch        Int      @default(0)
-  distribution String   @db.Text
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([chatId, senderId, epoch])
-  @@index([chatId, senderId])
-}
-
 enum MessageKind {
   TEXT
   IMAGE
@@ -198,7 +168,6 @@ model Message {
   clientMessageId String
   kind            MessageKind @default(TEXT)
 
-  /// Encrypted payload or envelope (E2EE). Plaintext should not be stored for user content.
   ciphertext  String? @db.Text
   contentMeta Json?
 
@@ -411,105 +380,6 @@ enum DevicePlatform {
   ANDROID
   WEB
   UNKNOWN
-}
-
-// --- E2EE key directory + recovery (Sprint 8) ---
-
-model UserIdentityKey {
-  id          String @id @default(uuid())
-  userId      String @unique
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  publicKey   String @db.Text
-  fingerprint String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  revokedAt DateTime?
-}
-
-model DeviceKey {
-  id        String @id @default(uuid())
-  deviceId  String @unique
-  userId    String
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  publicKey String @db.Text
-  label     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  revokedAt DateTime?
-
-  signedPreKeys  SignedPreKey[]
-  oneTimePreKeys OneTimePreKey[]
-
-  @@index([userId])
-}
-
-model SignedPreKey {
-  id        String @id @default(uuid())
-  deviceId  String
-  device    DeviceKey @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
-  keyId     String
-  publicKey String @db.Text
-  signature String @db.Text
-
-  createdAt DateTime @default(now())
-  revokedAt DateTime?
-
-  @@unique([deviceId, keyId])
-  @@index([deviceId, revokedAt])
-}
-
-model OneTimePreKey {
-  id        String @id @default(uuid())
-  deviceId  String
-  device    DeviceKey @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
-  keyId     String
-  publicKey String @db.Text
-
-  createdAt  DateTime @default(now())
-  consumedAt DateTime?
-
-  @@unique([deviceId, keyId])
-  @@index([deviceId, consumedAt])
-}
-
-model KeyBackup {
-  id                       String @id @default(uuid())
-  userId                   String @unique
-  user                     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  version                  Int    @default(1)
-  wrapAlg                  String
-  wrappedPrivateKeyMaterial String @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model StepUpToken {
-  id        String @id @default(uuid())
-  userId    String
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  consumedAt DateTime?
-
-  @@index([userId, expiresAt])
-}
-
-model EmailChallenge {
-  id        String @id @default(uuid())
-  userId    String
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  purpose   String
-  codeHash  String
-  expiresAt DateTime
-  attempts  Int    @default(0)
-  verifiedAt DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([userId, purpose, expiresAt])
 }
 
 model DeviceToken {

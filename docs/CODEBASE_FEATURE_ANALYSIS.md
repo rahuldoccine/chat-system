@@ -9,7 +9,7 @@
 
 | Layer | Status |
 |--------|--------|
-| Backend API & sockets | Mature — auth, chats, messages, groups, friends, uploads, DM + group E2EE, call signaling, group calls, push, link preview, in-chat search, mentions |
+| Backend API & sockets | Mature — auth, chats, messages, groups, friends, uploads, call signaling, group calls, push, link preview, in-chat search, mentions |
 | Frontend chat UI | Strong — messaging, media, pins, receipts, typing, presence, polls, voice notes, 1:1 + group calls, settings, link previews, in-chat search, groups, mentions, threads, PWA |
 | Main gaps | **Friends UI**, full offline outbox, CI/E2E, OAuth |
 
@@ -51,13 +51,11 @@
 - **Role-based UI** — Owner/Admin edit basic info & visibility; Moderator/Member read-only; add-people input Owner/Admin only
 - **Public join** — discoverable public groups, join flow, system message + push preview
 - **List refresh** — group removed from sidebar immediately after leave
-- **GROUP_V1 E2EE** — new groups default to encrypted sender-key mode
-
 ### Mentions & notifications (done)
 - **`@user`** — composer autocomplete, stream highlight, push to mentioned user only (bypasses active-view suppression)
 - **`@all`** — Owner/Admin only; notifies all members except sender
 - **Normal messages** — all members (respects mute); no `@` tags in push preview body
-- E2EE groups carry `mentions` in encrypted `contentMeta` for correct server-side routing
+- Groups carry `mentions` in `contentMeta` for correct server-side routing
 
 ### Real-time & receipts
 - Socket: subscribe, typing, presence, delivered/read receipts (HTTP + socket)
@@ -82,11 +80,6 @@
 | In-chat search | `GET /chats/:chatId/messages/search` | `ChatSearchDialog`, Cmd/Ctrl+K |
 | Link preview OG | SSRF-safe fetch + cache | `LinkPreviewBlock`, composer + stream |
 
-### E2EE
-- **DM_V1:** mandatory for all direct chats; Web Crypto P-256 + AES-GCM; no UI toggle
-- **GROUP_V1:** sender-key envelopes for group text/attachments; optional group call media key distribution
-- Recovery in Settings → Privacy; legacy plaintext messages still render
-
 ### PWA (Phase 10.1 — done)
 - `vite-plugin-pwa` + custom `frontend/src/sw.ts` (Workbox precache, offline strategies, push)
 - Manifest, icons, install prompt (`PwaInstallPrompt`), “Update available” toast via `registerSW`
@@ -99,8 +92,7 @@
 - **Friends** — `/friends/*` ready; no frontend friends list or request flow
 
 ### Tests & CI
-- Backend: auth, sockets, uploads, E2EE, search, link-preview, notifications (~18+ test files)
-- Frontend: `features/e2ee/crypto.test.ts`
+- Backend: auth, sockets, uploads, search, link-preview, notifications (~18+ test files)
 - **CI:** no `.github/workflows` yet
 
 ---
@@ -130,10 +122,9 @@
 | **4** Web Push | SW + device registration + mention routing | **Done** (needs VAPID in prod) |
 | **5** Voice notes | Record → upload → play | **Done** |
 | **6** WebRTC calls | 1:1 + group signaling + in-call UI | **Done** |
-| **7** Client E2EE | DM_V1 + GROUP_V1 | **Done** |
-| **8** Offline outbox | Queue, socket ack, multi-tab | **Partial** |
-| **9** Search & link previews | In-chat search + OG cards | **Done** |
-| **10** PWA, CI, scale | Manifest, SW, Actions, Redis adapter | **PWA done**; CI pending |
+| **7** Offline outbox | Queue, socket ack, multi-tab | **Partial** |
+| **8** Search & link previews | In-chat search + OG cards | **Done** |
+| **9** PWA, CI, scale | Manifest, SW, Actions, Redis adapter | **PWA done**; CI pending |
 
 ---
 
@@ -150,7 +141,6 @@
 | Group info / roles | `frontend/src/features/chat/components/GroupInfoPanel.tsx` |
 | Group calls | `frontend/src/features/calls/GroupCallProvider.tsx` |
 | PWA / SW | `frontend/src/sw.ts`, `frontend/vite.config.ts`, `frontend/src/features/pwa/` |
-| E2EE | `frontend/src/features/e2ee/` |
 | Integration guide | `docs/INTEGRATION.md` |
 | Development setup | `docs/DEVELOPMENT.md` |
 | Sidebar menu | `frontend/src/features/chat/components/ChatSidebarMenu.tsx` |
@@ -179,12 +169,11 @@ Features that would move the product toward production-grade / enterprise chat:
 | **Group invite links** | Shareable URL with expiry / approval queue | Medium |
 | **Read receipts in groups** | Per-member seen state (privacy toggle) | Medium |
 | **Message pinning limits + admin controls** | Cap pins, restrict who can pin | Low |
-| **Full-text search (Meilisearch)** | Faster search, better ranking; E2EE chats stay client-side or metadata-only | High |
+| **Full-text search (Meilisearch)** | Faster search, better ranking | High |
 | **OAuth (Google / GitHub)** | Faster onboarding | Medium |
 | **Admin audit log** | Who removed/banned/promoted whom | Medium |
 | **Rate limiting dashboard** | Ops visibility for abuse | Low |
 | **Multi-region / Redis cluster** | Horizontal socket scaling at scale | High |
-| **End-to-end encrypted backups** | Cross-device history restore for groups | High |
 | **Disappearing messages** | TTL per chat or per message | Medium |
 | **Reactions summary / poll analytics** | Group engagement insights | Low |
 | **Bot / webhook API** | Integrations (Slack-style) | High |
@@ -226,8 +215,6 @@ Based on current CSS Modules layout and recent group/call work:
 | Tenor GIFs | Giphy |
 | Message search | In-chat **yes**; global jump **no** |
 | Group chats + roles | **Implemented** |
-| E2EE private chats | **DM_V1 implemented** |
-| Group E2EE | **GROUP_V1 implemented** (default on create) |
 | PWA | **Implemented** |
 | Friends system | Backend only |
 | Voice / calls / polls / mentions | **Implemented** |
@@ -241,4 +228,3 @@ Based on current CSS Modules layout and recent group/call work:
 - `backend/README.md` — API, sockets, env
 - `docs/INTEGRATION.md` — auth, proxy, socket contract
 - `docs/coturn.md` — TURN setup for calls
-- `backend/src/docs/e2ee-boundary.md` — E2EE server boundaries

@@ -15,7 +15,7 @@ export async function sendComposerMedia(
     const file = filesToSend[i];
     deps.setUploadProgress({ current: i + 1, total: filesToSend.length });
 
-    const { uploadResult, attachment } = await deps.uploadForChat(file);
+    const { uploadResult } = await deps.uploadForChat(file);
     if (!uploadResult.ok) {
       deps.setUploadProgress(null);
       deps.resetUpload();
@@ -31,7 +31,6 @@ export async function sendComposerMedia(
       mimetype: mime,
       size: uploaded.size,
       url: uploaded.url,
-      ...(attachment ? { attachment } : {}),
     });
   }
 

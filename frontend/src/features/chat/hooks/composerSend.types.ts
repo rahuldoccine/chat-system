@@ -1,6 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { Chat, LinkDisplayMode, LinkPreviewMeta } from '../types';
-import type { E2eeFileAttachmentKeys } from '../../e2ee/attachmentCrypto';
 import type { GroupMember } from '../api/groupsApi';
 import type { UploadFileResponse } from './useUpload';
 
@@ -11,7 +10,6 @@ export type UploadedEntry = {
   mimetype: string;
   size: number;
   url: string;
-  attachment?: E2eeFileAttachmentKeys;
 };
 
 export type ComposerSendContext = {
@@ -29,7 +27,6 @@ export type ComposerSendContext = {
   replyingTo: string | null;
   composerPreview: LinkPreviewMeta | null;
   linkDisplayAs: LinkDisplayMode;
-  isE2eeDm: boolean;
   activeChat?: Chat;
   groupMembers?: GroupMember[];
   canUseAllMention: boolean;
@@ -44,7 +41,7 @@ export type ComposerSendDeps = {
   uploadForChat: (
     file: File,
     options?: { voiceNote?: boolean },
-  ) => Promise<{ uploadResult: UploadFileResponse; attachment: E2eeFileAttachmentKeys | null }>;
+  ) => Promise<{ uploadResult: UploadFileResponse }>;
   queryClient: QueryClient;
   scrollToBottom: () => void;
   showAlert: (title: string, description: string) => void;

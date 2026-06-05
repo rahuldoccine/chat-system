@@ -25,8 +25,7 @@ Project context:
 - OAuth is not part of the current scope
 - File and media uploads must use local server storage, not Cloudinary or S3
 - Push notifications should use Firebase
-- End-to-end encryption (E2EE) is required only for private text messages and private voice notes
-- Group chats, calls, and general media files are not E2EE
+- Messages are stored as plaintext in the database (`Message.ciphertext` field)
 - WebRTC should be used for audio/video calling, with Socket.IO used only for signaling
 
 Functional requirements:
@@ -63,13 +62,12 @@ Please provide:
 5. Prisma schema planning
 6. REST API planning
 7. Socket.IO event planning
-8. E2EE boundary design
-9. Local upload architecture
-10. Security checklist
-11. Testing strategy
-12. Sprint-wise build roadmap
-13. MVP scope vs later scope
-14. Known risks and technical trade-offs
+8. Local upload architecture
+9. Security checklist
+10. Testing strategy
+11. Sprint-wise build roadmap
+12. MVP scope vs later scope
+13. Known risks and technical trade-offs
 
 Important instructions:
 - Do not switch the frontend to Next.js
@@ -343,33 +341,7 @@ Return:
 6. Implementation order
 ```
 
-### Backend Sprint 8: E2EE Boundaries and Recovery Support
-
-```text
-Act as a security architect. I need backend support for E2EE private chats without breaking the security model.
-
-Requirements:
-- Private text messages and private voice notes must be end-to-end encrypted
-- Backend must never store plaintext private content
-- Backend may store encrypted payloads and metadata only
-- Group chats are not E2EE in current scope
-- Key recovery must exist using MFA/email verification
-
-Important:
-- Do not design the backend to decrypt private user content
-- Explain exactly what the backend is allowed to know
-- Explain how recovery can be supported without violating the security model
-
-Return:
-1. Security boundary definition
-2. Backend responsibilities vs frontend responsibilities
-3. Safe data model guidance
-4. Recovery workflow concept
-5. Things the backend must never do
-6. Risks, assumptions, and warnings
-```
-
-### Backend Sprint 9: Calling, Moderation, and Production Hardening
+### Backend Sprint 8: Calling, Moderation, and Production Hardening
 
 ```text
 Act as a senior backend lead. Design the advanced backend phase for the chat system.
@@ -600,33 +572,7 @@ Return:
 4. Recommended visual feedback patterns
 ```
 
-### Frontend Sprint 8: E2EE UX and Client-Side Crypto Flow
-
-```text
-Act as a frontend security-minded architect. Design the client-side flow for E2EE private chats in React.js.
-
-Requirements:
-- Generate keys client-side
-- Encrypt private messages before sending
-- Decrypt after receiving
-- Display privacy indicators to the user
-- Support encrypted private voice notes
-- Provide key recovery UI
-
-Expectations:
-- Explain what should happen during first-time key generation
-- Explain what the user sees when encryption state is unavailable
-- Explain how to avoid exposing confusing crypto details to normal users
-
-Return:
-1. Frontend E2EE flow
-2. UX state map
-3. Recovery flow
-4. Security notes
-5. Failure-state handling
-```
-
-### Frontend Sprint 9: Calling, Polish, Accessibility, and Final QA
+### Frontend Sprint 8: Calling, Polish, Accessibility, and Final QA
 
 ```text
 Act as a senior frontend lead. Design the final frontend milestone for the chat app.
@@ -729,19 +675,17 @@ Please provide:
 7. Security notes
 ```
 
-### Phase 4: Security and E2EE Prompt
+### Phase 4: Security and Moderation Prompt
 
 ```text
-Act as a senior security architect. Extend the chat app with advanced privacy and security features.
+Act as a senior security architect. Extend the chat app with security and moderation features.
 
 Features:
-- E2EE for private messages
-- Encrypted private voice notes
-- Key recovery
 - Block/report flows
 - Validation
 - Rate limiting
 - Audit-aware moderation
+- Authorized file access
 
 Please provide:
 1. Secure architecture boundaries

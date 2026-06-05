@@ -2,20 +2,16 @@ import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { ChevronDown, ChevronUp, Loader2, Search, X } from 'lucide-react';
 import styles from './ChatInMessageSearch.module.css';
 import { useChat } from '../../../context/ChatContext';
-import { useChatMessageSearch, useE2eeChatMessageSearch } from '../hooks/useChatMessageSearch';
+import { useChatMessageSearch } from '../hooks/useChatMessageSearch';
 import { formatInChatSearchStatus } from './chatInMessageSearchStatus';
 
 const SEARCH_LIMIT = 50;
 
 type ChatInMessageSearchProps = {
   chatId: string;
-  e2eeSearch?: boolean;
 };
 
-const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
-  chatId,
-  e2eeSearch = false,
-}) => {
+const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({ chatId }) => {
   const searchInputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const {
@@ -29,25 +25,18 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
     requestScrollToMessage,
   } = useChat();
 
-  const serverSearch = useChatMessageSearch(
+  const { data, isLoading, isFetching } = useChatMessageSearch(
     chatId,
     inChatSearchQuery,
-    inChatSearchOpen && !e2eeSearch,
+    inChatSearchOpen,
     SEARCH_LIMIT,
   );
-  const clientSearch = useE2eeChatMessageSearch(
-    chatId,
-    inChatSearchQuery,
-    inChatSearchOpen && e2eeSearch,
-    SEARCH_LIMIT,
-  );
-  const { data, isLoading, isFetching } = e2eeSearch ? clientSearch : serverSearch;
 
   const hits = data?.data ?? [];
   const matchIds = hits.map((h) => h.messageId);
   const total = matchIds.length;
   const query = inChatSearchQuery.trim();
-  const serverUnavailable = !e2eeSearch && data?.searchUnavailable === true;
+  const serverUnavailable = data?.searchUnavailable === true;
   const showLoading = (isLoading || isFetching) && query.length > 0;
 
   const close = useCallback(() => {
@@ -115,7 +104,6 @@ const ChatInMessageSearch: React.FC<ChatInMessageSearchProps> = ({
     }
     if (!query || !total) return;
 
-    /* Index 0 = newest (bottom). ↑ = older (scroll up), ↓ = newer (scroll down). */
     if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) {
       e.preventDefault();
       goToIndex(inChatSearchActiveIndex + 1);

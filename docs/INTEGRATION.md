@@ -75,7 +75,6 @@ See `backend/.env.example` for the full list.
 | Messages | `PATCH/DELETE /messages/:id`, reactions |
 | Groups | `/groups/*` — CRUD, members, roles, join |
 | Uploads | `POST /uploads`, `GET /files/:key` |
-| E2EE | `/e2ee/*` — identity, devices, backup, recovery |
 | Calls | `/calls/history` |
 | Devices | `/devices/web` — Web Push subscription |
 

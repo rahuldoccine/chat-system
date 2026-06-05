@@ -1,5 +1,5 @@
 import type { Message, ReplyPreview } from '../types';
-import type { DecryptedBody } from '../../e2ee/useMessageBodies';
+import type { DecryptedBody } from './messageBody';
 import { replyPreviewLabel as previewLabel } from './messagePreview';
 
 export function toReplyPreview(message: Message): ReplyPreview {

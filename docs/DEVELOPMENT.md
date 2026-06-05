@@ -7,7 +7,7 @@ Practical setup and day-to-day commands for the **chat-module** monorepo (`front
 - **Node.js** ≥ 20
 - **PostgreSQL** (local or Docker)
 - Optional: **Redis** (`REDIS_URL`) for multi-instance Socket.IO
-- Optional: **SMTP** for password reset / E2EE recovery email
+- Optional: **SMTP** for password reset email
 - Optional: **VAPID** / **FCM** for Web Push
 - Optional: **coturn** for WebRTC on strict NAT — see [coturn.md](./coturn.md)
 
@@ -97,7 +97,7 @@ Stored on `ChatMember`:
 | `npm run dev` | Vite dev server |
 | `npm run build` | Typecheck + production build (includes PWA service worker) |
 | `npm run preview` | Preview production build |
-| `npm test` | Vitest (e.g. E2EE crypto tests) |
+| `npm test` | Vitest |
 
 ## Project layout (actual)
 
@@ -128,4 +128,3 @@ chat-module/
 - [CODEBASE_FEATURE_ANALYSIS.md](./CODEBASE_FEATURE_ANALYSIS.md) — Implemented vs pending features
 - [../backend/README.md](../backend/README.md) — API modules, sockets, env
 - [../frontend/README.md](../frontend/README.md) — UI features, structure
-- [../backend/src/docs/e2ee-boundary.md](../backend/src/docs/e2ee-boundary.md) — E2EE server boundaries

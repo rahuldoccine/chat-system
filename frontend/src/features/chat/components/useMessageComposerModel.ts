@@ -11,10 +11,8 @@ import {
   useConversations,
 } from '../hooks/useChatData';
 import { useAuth } from '../../../context/AuthContext';
-import { isDmE2eeChat } from '../../e2ee/chatE2ee';
 import { fetchGroup } from '../api/groupsApi';
-import { encryptFileBlob, type E2eeFileAttachmentKeys } from '../../e2ee/attachmentCrypto';
-import { useMessageBodies } from '../../e2ee/useMessageBodies';
+import { useMessageBodies } from '../utils/messageBody';
 import { getMessagePreviewText } from '../utils/messagePreview';
 import { useUpload } from '../hooks/useUpload';
 import { useSocket } from '../../../context/SocketContext';
@@ -184,7 +182,6 @@ export function useMessageComposerModel({
   const { data: conversationsData } = useConversations();
   const activeChat = conversationsData?.data?.find((c) => c.id === activeId);
   const dmPeerId = activeChat?.type === 'DIRECT' ? activeChat.dmPeer?.id : undefined;
-  const isE2eeDm = isDmE2eeChat(activeChat);
   const { data: groupDetails } = useQuery({
     queryKey: ['group', activeId],
     queryFn: () => {
@@ -205,29 +202,11 @@ export function useMessageComposerModel({
   const { uploadFile, progress, status: uploadStatus, reset: resetUpload } = useUpload();
 
   const uploadForChat = useCallback(
-    async (
-      file: File,
-      options?: { voiceNote?: boolean },
-    ): Promise<{
-      uploadResult: Awaited<ReturnType<typeof uploadFile>>;
-      attachment: E2eeFileAttachmentKeys | null;
-    }> => {
-      if (isE2eeDm && user?.id) {
-        const { encryptedBlob, attachment } = await encryptFileBlob(await file.arrayBuffer());
-        const encFile = new globalThis.File([encryptedBlob], file.name, {
-          type: 'application/octet-stream',
-        });
-        const uploadResult = await uploadFile(encFile, activeId ?? undefined, {
-          ...options,
-          e2eeEncrypted: true,
-          originalMime: file.type || undefined,
-        });
-        return { uploadResult, attachment };
-      }
+    async (file: File, options?: { voiceNote?: boolean }) => {
       const uploadResult = await uploadFile(file, activeId ?? undefined, options);
-      return { uploadResult, attachment: null };
+      return { uploadResult };
     },
-    [activeId, isE2eeDm, uploadFile, user?.id],
+    [activeId, uploadFile],
   );
   const { data: messages } = useMessages(activeId);
   const { data: threadData } = useThreadMessages(
@@ -266,7 +245,7 @@ export function useMessageComposerModel({
     attachments.length === 0 &&
     !voice.isRecording &&
     Boolean(urlInText) &&
-    !isE2eeDm;
+    true;
   const { data: linkPreviewData, isFetching: isLinkPreviewFetching } = useLinkPreview(
     urlInText,
     linkPreviewEnabled,
@@ -306,7 +285,6 @@ export function useMessageComposerModel({
       replyingTo,
       composerPreview,
       linkDisplayAs,
-      isE2eeDm,
       activeChat,
       groupMembers: groupDetails?.members,
       canUseAllMention,

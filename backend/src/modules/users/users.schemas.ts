@@ -11,8 +11,6 @@ export const patchMeBodySchema = z.object({
     .nullable(),
   /** File name (e.g. uuid.jpg), storage key (logos/uuid.jpg), or legacy full URL — normalized on save. */
   avatarUrl: z.string().min(1).max(512).optional().nullable(),
-  publicKey: z.string().max(16_384).optional().nullable(),
-  keyVersion: z.coerce.number().int().min(0).max(1_000_000).optional().nullable(),
 });
 
 export const userSearchQuerySchema = z.object({

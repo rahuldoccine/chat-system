@@ -19,7 +19,6 @@ import {
   getChatHeaderStatusClassName,
   getChatHeaderStatusText,
   getSectionBackLabel,
-  isE2eeChat,
 } from './homePage.helpers';
 import styles from './HomePage.module.css';
 
@@ -158,9 +157,6 @@ const ActiveChatView: React.FC<ActiveChatViewProps> = ({
           {renderChatHeaderAvatar(activeChat, chatName)}
           <div className={styles.chatHeaderTitleBlock}>
             <h4>{chatName}</h4>
-            {isE2eeChat(activeChat) ? (
-              <span className={styles.e2eeHint}>Messages are end-to-end encrypted</span>
-            ) : null}
             <span
               className={`${styles.chatHeaderStatus} ${getChatHeaderStatusClassName(statusInput, {
                 statusBlocked: styles.statusBlocked,
@@ -281,10 +277,7 @@ const ActiveChatView: React.FC<ActiveChatViewProps> = ({
         </div>
       )}
 
-      <ChatInMessageSearch
-        chatId={activeId}
-        e2eeSearch={activeChat?.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1'}
-      />
+      <ChatInMessageSearch chatId={activeId} />
 
       <div className={styles.chatMainColumn}>
         <div

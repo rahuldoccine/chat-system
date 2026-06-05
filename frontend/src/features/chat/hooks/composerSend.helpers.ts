@@ -1,23 +1,8 @@
-import { toast } from 'sonner';
-import { E2eePeerNotReadyError } from '../../e2ee/directChat';
-import { E2eeKeysLockedError } from '../../e2ee/bootstrap';
 import { sendComposerMedia } from './composerSendMedia';
 import { sendComposerText } from './composerSendText';
 import type { ComposerSendContext, ComposerSendDeps } from './composerSend.types';
 
 export type { ComposerSendContext, ComposerSendDeps } from './composerSend.types';
-
-function handleComposerSendError(err: unknown): boolean {
-  if (err instanceof E2eePeerNotReadyError || err instanceof E2eeKeysLockedError) {
-    toast.error(err.message);
-    return true;
-  }
-  if (err instanceof Error && /E2EE keys not initialized/i.test(err.message)) {
-    toast.error('Encryption is not ready. Sign out and sign in again with your password.');
-    return true;
-  }
-  return false;
-}
 
 export async function sendComposerMessage(
   ctx: ComposerSendContext,
@@ -53,9 +38,6 @@ export async function sendComposerMessage(
         ? await sendComposerMedia(ctx, deps, trimmedText)
         : await sendComposerText(ctx, deps, trimmedText);
     if (outcome !== 'sent') return;
-  } catch (err) {
-    if (handleComposerSendError(err)) return;
-    throw err;
   } finally {
     deps.setUploadProgress(null);
   }

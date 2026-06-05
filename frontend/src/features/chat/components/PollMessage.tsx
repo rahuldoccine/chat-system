@@ -8,13 +8,11 @@ import { getApiErrorMessage } from '../../settings/hooks/useUserSettings';
 import { toast } from 'sonner';
 import UserAvatar from './UserAvatar';
 import PollVotesModal from './PollVotesModal';
-import { mergePollWithDecrypted, type E2eePollPayload } from '../../e2ee/pollMeta';
 import styles from './PollMessage.module.css';
 
 type PollMessageProps = Readonly<{
   pollId: string;
   isMe: boolean;
-  decryptedPoll?: E2eePollPayload | null;
 }>;
 
 const AVATAR_PREVIEW_LIMIT = 2;
@@ -41,12 +39,12 @@ function VoterAvatarStack({ voters }: Readonly<{ voters: PollVoter[] }>) {
   );
 }
 
-const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe, decryptedPoll }) => {
+const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe }) => {
   const queryClient = useQueryClient();
   const [showVotesModal, setShowVotesModal] = useState(false);
   const [modalPollSnapshot, setModalPollSnapshot] = useState<PollDetail | null>(null);
 
-  const { data: serverPoll, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['poll', pollId],
     queryFn: async () => {
       const res = await api.get<{ poll: PollDetail }>(`/polls/${pollId}`);
@@ -54,12 +52,6 @@ const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe, decryptedPoll }
     },
     staleTime: 15_000,
   });
-
-  const data = useMemo(() => {
-    if (!serverPoll) return null;
-    if (!serverPoll.isE2ee) return serverPoll;
-    return mergePollWithDecrypted(serverPoll, decryptedPoll ?? null);
-  }, [serverPoll, decryptedPoll]);
 
   const closed = useMemo(() => {
     if (!data?.closesAt) return false;
@@ -73,7 +65,6 @@ const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe, decryptedPoll }
 
   const hasVoted = Boolean(data?.myVoteOptionId);
   const showResults = hasVoted || closed || totalVotes > 0;
-  const awaitingDecrypt = Boolean(serverPoll?.isE2ee && !decryptedPoll);
 
   const openVotesModal = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -99,10 +90,7 @@ const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe, decryptedPoll }
       return res.data;
     },
     onSuccess: (out) => {
-      const merged = out.poll.isE2ee
-        ? mergePollWithDecrypted(out.poll, decryptedPoll ?? null)
-        : out.poll;
-      queryClient.setQueryData(['poll', pollId], merged);
+      queryClient.setQueryData(['poll', pollId], out.poll);
     },
     onError: (err) => {
       toast.error(getApiErrorMessage(err, "Your vote couldn't be saved. Please try again."));
@@ -125,15 +113,6 @@ const PollMessage: React.FC<PollMessageProps> = ({ pollId, isMe, decryptedPoll }
         <button type="button" className={styles.retry} onClick={handler(() => { void refetch(); })}>
           Retry
         </button>
-      </div>
-    );
-  }
-
-  if (awaitingDecrypt) {
-    return (
-      <div className={styles.loading}>
-        <Loader2 className={styles.spinner} size={18} />
-        <span>Decrypting poll…</span>
       </div>
     );
   }

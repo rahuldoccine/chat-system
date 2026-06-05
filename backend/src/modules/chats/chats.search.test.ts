@@ -7,9 +7,6 @@ vi.mock("../../lib/chat-access.js", () => ({
 }));
 
 const prisma = {
-  chat: {
-    findUnique: vi.fn(),
-  },
   $queryRaw: vi.fn(),
 };
 
@@ -18,18 +15,7 @@ vi.mock("../../lib/prisma.js", () => ({
 }));
 
 describe("searchMessagesInChat", () => {
-  it("returns searchUnavailable for E2EE DMs", async () => {
-    prisma.chat.findUnique.mockResolvedValueOnce({ type: "DIRECT", e2eeMode: "DM_V1" });
-
-    const out = await searchMessagesInChat("u1", "c1", "hello", { limit: 20 });
-
-    expect(out.data).toEqual([]);
-    expect(out.searchUnavailable).toBe(true);
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
-  });
-
-  it("queries messages for non-E2EE chats", async () => {
-    prisma.chat.findUnique.mockResolvedValueOnce({ type: "GROUP", e2eeMode: "NONE" });
+  it("queries messages and returns snippets", async () => {
     prisma.$queryRaw.mockResolvedValueOnce([
       {
         id: "m1",
@@ -45,7 +31,6 @@ describe("searchMessagesInChat", () => {
 
     const out = await searchMessagesInChat("u1", "c1", "world", { limit: 20 });
 
-    expect(out.searchUnavailable).toBeUndefined();
     expect(out.data).toHaveLength(1);
     expect(out.data[0]?.messageId).toBe("m1");
     expect(out.data[0]?.snippet).toContain("world");

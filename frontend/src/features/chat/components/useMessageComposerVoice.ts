@@ -21,7 +21,6 @@ export type VoiceComposerParams = {
     options?: { voiceNote?: boolean },
   ) => Promise<{
     uploadResult: { ok: boolean; message?: string; data?: { id: string; filename: string; size: number; url: string } };
-    attachment: unknown;
   }>;
   sendMessageAsync: (args: unknown) => Promise<unknown>;
   scrollToBottom: () => void;
@@ -47,7 +46,7 @@ export function useMessageComposerVoice(p: VoiceComposerParams) {
       const file = p.voice.toVoiceFile(result);
       try {
         p.setUploadProgress({ current: 1, total: 1 });
-        const { uploadResult, attachment } = await p.uploadForChat(file, { voiceNote: true });
+        const { uploadResult } = await p.uploadForChat(file, { voiceNote: true });
         if (!uploadResult.ok || !uploadResult.data) {
           toast.error(uploadResult.message ?? 'Upload failed');
           return;
@@ -60,7 +59,6 @@ export function useMessageComposerVoice(p: VoiceComposerParams) {
           mimetype: result.mimeType || 'audio/webm',
           size: uploaded.size,
           url: uploaded.url,
-          ...(attachment ? { attachment } : {}),
         };
 
         await p.sendMessageAsync({

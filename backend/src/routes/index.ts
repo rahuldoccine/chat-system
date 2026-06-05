@@ -7,7 +7,6 @@ import { createAuthRouter } from "../modules/auth/auth.routes.js";
 import { createChatsRouter } from "../modules/chats/chats.routes.js";
 import { createCallsRouter } from "../modules/calls/calls.routes.js";
 import { createDevicesRouter } from "../modules/devices/devices.routes.js";
-import { createE2eeRouter } from "../modules/e2ee/e2ee.routes.js";
 import { createFilesRouter } from "../modules/files/files.routes.js";
 import { createFriendsRouter } from "../modules/friends/friends.routes.js";
 import { createGroupsRouter } from "../modules/groups/groups.routes.js";
@@ -44,7 +43,6 @@ export function createApiRouter(config: AppConfig, logger: Logger): Router {
   api.use("/files", createFilesRouter(config));
   api.use("/uploads", createUploadsRouter(config, logger));
   api.use("/devices", createDevicesRouter(config));
-  api.use("/e2ee", createE2eeRouter(config, logger));
   api.use("/calls", createCallsRouter(config));
   api.use("/moderation", createModerationRouter(config));
   return api;

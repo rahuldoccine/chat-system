@@ -118,16 +118,3 @@ export const deviceTokenListJsonResponse = {
     },
   },
 } as const;
-
-/** Shared fields for authenticated E2EE path operations. */
-export function e2eeOp(
-  summary: string,
-  extra: Record<string, unknown> = {},
-): Record<string, unknown> {
-  return {
-    tags: ["E2EE"],
-    summary,
-    security: bearerAuthSecurity,
-    ...extra,
-  };
-}

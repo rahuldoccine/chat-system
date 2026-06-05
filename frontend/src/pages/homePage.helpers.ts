@@ -101,10 +101,3 @@ export function getSectionBackLabel(section: string): string {
   return 'Messages';
 }
 
-export function isE2eeChat(activeChat: Chat | undefined): boolean {
-  if (!activeChat) return false;
-  if (activeChat.type === 'DIRECT' && activeChat.e2eeMode === 'DM_V1') return true;
-  if (activeChat.type === 'GROUP' && activeChat.e2eeMode === 'DM_V1') return true;
-  if (activeChat.type === 'GROUP' && activeChat.e2eeMode === 'GROUP_V1') return true;
-  return false;
-}

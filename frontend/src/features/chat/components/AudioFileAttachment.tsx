@@ -4,14 +4,12 @@ import { Music, Pause, Play } from 'lucide-react';
 import MessageMeta from './MessageMeta';
 import { truncateFilenameMiddle } from '../utils/formatFilename';
 import { useMessageFileSource } from '../hooks/useMessageFileSource';
-import type { ContentMeta, Message } from '../types';
+import type { Message } from '../types';
 import styles from './AudioFileAttachment.module.css';
 import { formatMediaTimeRange } from '../utils/formatMediaTime';
 
 type AudioFileAttachmentProps = {
   contentMeta: Message['contentMeta'];
-  e2eeMessage?: Pick<Message, 'id' | 'ciphertext' | 'contentMeta' | 'senderId'>;
-  transportMeta?: ContentMeta;
   bubbleVariant?: 'sent' | 'received';
   mediaTimestamp?: {
     createdAt: string;
@@ -25,8 +23,6 @@ let activeAudioEl: HTMLAudioElement | null = null;
 
 const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
   contentMeta,
-  e2eeMessage,
-  transportMeta,
   bubbleVariant = 'received',
   mediaTimestamp,
 }) => {
@@ -36,15 +32,9 @@ const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
   const [elapsedSec, setElapsedSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
 
-  const { displayName, fullUrl, isE2eeLoading } = useMessageFileSource(
-    contentMeta,
-    e2eeMessage,
-    transportMeta,
-    'Audio',
-  );
+  const { displayName, fullUrl } = useMessageFileSource(contentMeta, 'Audio');
 
   const isSent = bubbleVariant === 'sent';
-  const isLoading = isE2eeLoading;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -106,12 +96,11 @@ const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
   }, [fullUrl, playing]);
 
   const timeLabel = useMemo(() => {
-    if (isLoading) return 'Loading…';
     if (!durationSec) return '0:00 / 0:00';
     return formatMediaTimeRange(elapsedSec, durationSec);
-  }, [isLoading, durationSec, elapsedSec]);
+  }, [durationSec, elapsedSec]);
 
-  if (!fullUrl && !isLoading) {
+  if (!fullUrl) {
     return <div className={styles.unavailable}>Audio unavailable</div>;
   }
 
@@ -152,11 +141,9 @@ const AudioFileAttachment: React.FC<AudioFileAttachmentProps> = ({
           )}
         </div>
       </div>
-      {fullUrl ? (
-        <audio ref={audioRef} src={fullUrl} preload="metadata" className={styles.hiddenAudio}>
-          <track kind="captions" />
-        </audio>
-      ) : null}
+      <audio ref={audioRef} src={fullUrl} preload="metadata" className={styles.hiddenAudio}>
+        <track kind="captions" />
+      </audio>
     </div>
   );
 };

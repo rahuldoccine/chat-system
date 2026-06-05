@@ -4,7 +4,6 @@ import { ModalDialog } from '../../../components/ModalDialog';
 import styles from './ChatSearchDialog.module.css';
 import {
   useChatMessageSearch,
-  useE2eeChatMessageSearch,
   type SearchMessageHit,
 } from '../hooks/useChatMessageSearch';
 import { formatChatTimestamp } from '../../../utils/timeFormat';
@@ -14,8 +13,6 @@ type ChatSearchDialogProps = Readonly<{
   open: boolean;
   onClose: () => void;
   onSelectMessage: (messageId: string) => void;
-  /** When true, search runs on decrypted messages loaded in this chat (E2EE). */
-  e2eeSearch?: boolean;
 }>;
 
 function senderLabel(hit: SearchMessageHit): string {
@@ -27,8 +24,6 @@ function ChatSearchBody({
   serverUnavailable,
   showLoading,
   hits,
-  e2eeSearch,
-  isFetching,
   onSelectMessage,
   onClose,
 }: Readonly<{
@@ -36,8 +31,6 @@ function ChatSearchBody({
   serverUnavailable: boolean;
   showLoading: boolean;
   hits: SearchMessageHit[];
-  e2eeSearch: boolean;
-  isFetching: boolean;
   onSelectMessage: (messageId: string) => void;
   onClose: () => void;
 }>): React.ReactNode {
@@ -47,7 +40,7 @@ function ChatSearchBody({
   if (serverUnavailable) {
     return (
       <p className={styles.unavailable}>
-        Search isn&apos;t available in encrypted chats. Messages are stored securely on your devices only.
+        Search isn&apos;t available for this chat right now.
       </p>
     );
   }
@@ -60,9 +53,7 @@ function ChatSearchBody({
     );
   }
   if (hits.length === 0) {
-    const emptyMessage =
-      e2eeSearch && isFetching ? 'Loading older messages…' : 'No messages match your search.';
-    return <p className={styles.empty}>{emptyMessage}</p>;
+    return <p className={styles.empty}>No messages match your search.</p>;
   }
   return (
     <ul className={styles.list}>
@@ -93,13 +84,10 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
   open,
   onClose,
   onSelectMessage,
-  e2eeSearch = false,
 }) => {
   const [query, setQuery] = React.useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const serverSearch = useChatMessageSearch(chatId, query, open && !e2eeSearch);
-  const clientSearch = useE2eeChatMessageSearch(chatId, query, open && e2eeSearch);
-  const { data, isLoading, isFetching } = e2eeSearch ? clientSearch : serverSearch;
+  const { data, isLoading, isFetching } = useChatMessageSearch(chatId, query, open);
 
   useEffect(() => {
     if (!open) {
@@ -123,7 +111,7 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
 
   const hits = data?.data ?? [];
   const showLoading = (isLoading || isFetching) && query.trim().length > 0;
-  const serverUnavailable = !e2eeSearch && data?.searchUnavailable === true;
+  const serverUnavailable = data?.searchUnavailable === true;
 
   return (
     <ModalDialog className={styles.overlay} aria-labelledby="chat-search-title" onClose={onClose}>
@@ -157,8 +145,6 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
             serverUnavailable={serverUnavailable}
             showLoading={showLoading}
             hits={hits}
-            e2eeSearch={e2eeSearch}
-            isFetching={isFetching}
             onSelectMessage={onSelectMessage}
             onClose={onClose}
           />

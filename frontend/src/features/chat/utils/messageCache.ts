@@ -1,5 +1,5 @@
 import type { Message } from '../types';
-import { getMessageDisplayBody, type DecryptedBody } from '../../e2ee/useMessageBodies';
+import { getMessageDisplayBody, type DecryptedBody } from './messageBody';
 import { isVoiceMessage } from './fileMeta';
 import { getMessagePreviewText } from './messagePreview';
 
