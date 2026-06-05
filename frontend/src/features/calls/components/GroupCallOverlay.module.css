@@ -97,6 +97,7 @@
   display: flex;
   width: 100%;
   max-width: 100%;
+  align-items: stretch;
 }
 
 .main {
@@ -106,8 +107,9 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  padding: 0.65rem max(0.75rem, var(--safe-left)) 0.65rem max(0.75rem, var(--safe-right));
+  padding: 0.65rem max(0.75rem, var(--safe-left)) 0 max(0.75rem, var(--safe-right));
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .videoStage,
@@ -116,71 +118,33 @@
   min-height: 0;
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: stretch;
   width: 100%;
   max-width: var(--call-stage-max-width);
   margin: 0 auto;
+  overflow: hidden;
+}
+
+.videoStage > :first-child {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 .audioStage {
   align-items: center;
-}
-
-.pip {
-  position: absolute;
-  right: var(--call-pip-inset);
-  bottom: var(--call-pip-bottom);
-  width: var(--call-pip-width);
-  z-index: 3;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 2px solid rgba(148, 163, 184, 0.35);
-  background: #020617;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  transition: border-color 0.2s ease;
-}
-
-.pipSpeaking {
-  border-color: rgba(34, 197, 94, 0.85);
-}
-
-.pipMedia {
-  width: 100%;
-  padding-top: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #020617;
-}
-
-.pipVideo {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.pipAvatar {
-  width: 56%;
-  height: 56%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-}
-
-.pipLabel {
-  display: block;
-  text-align: center;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.35rem;
-  background: rgba(2, 6, 23, 0.8);
-  color: #f1f5f9;
+  padding-bottom: 5px;
 }
 
 .sidebarWrap {
   display: flex;
   flex-shrink: 0;
+  width: 260px;
   min-height: 0;
+  align-self: stretch;
+  overflow: hidden;
 }
 
 .captions {
@@ -209,10 +173,10 @@
 
 .controls {
   flex-shrink: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(15, 23, 42, 0.92);
+  width: 100%;
   padding: var(--call-controls-pad-y) max(1rem, var(--safe-left)) var(--call-controls-pad-bottom)
     max(1rem, var(--safe-right));
+  margin-top: auto;
 }
 
 .controlRow {
@@ -221,6 +185,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--call-ctrl-gap);
+  width: 100%;
   max-width: 640px;
   margin: 0 auto;
 }
@@ -296,12 +261,9 @@
   }
 
   .main {
-    padding: 0.4rem max(0.5rem, var(--safe-left)) 0.4rem max(0.5rem, var(--safe-right));
+    padding: 0.4rem max(0.5rem, var(--safe-left)) 0 max(0.5rem, var(--safe-right));
   }
 
-  .pip {
-    bottom: calc(5.5rem + var(--safe-bottom));
-  }
 }
 
 @media (min-width: 1025px) {
@@ -309,3 +271,4 @@
     background: radial-gradient(ellipse at top, #1e293b 0%, #0f172a 42%, #020617 100%);
   }
 }
+

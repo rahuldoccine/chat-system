@@ -21,7 +21,7 @@ import { useAudioSpeaking } from '../useAudioSpeaking';
 import type { CallConnectionUiState } from '../CallManager';
 import type { CallPhase } from '../types';
 import type { CameraFacing } from '../cameraSwitch';
-import LocalCallVideo from './LocalCallVideo';
+import CallLocalPip from './CallLocalPip';
 import styles from './CallOverlay.module.css';
 import { handler } from '../../../utils/asyncHandler';
 
@@ -229,6 +229,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   onEndTranscript,
 }) => {
   const remoteRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [speakerOn, setSpeakerOn] = useState(true);
   const { user } = useAuth();
   const muted = !localStream?.getAudioTracks()[0]?.enabled;
@@ -286,7 +287,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   const connLabel = connectionLabel(connectionUi);
   const connGood = connectionUi === 'good';
 
-  return createPortal(
+  const content = (
     <div className={styles.backdrop}>
       {connectionUi === 'reconnecting' && (
         <output className={styles.reconnectBanner}>
@@ -325,7 +326,10 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         </div>
       </div>
 
-      <div className={styles.stage}>
+      <div
+        ref={stageRef}
+        className={`${styles.stage} ${showVideo ? styles.stageVideo : ''}`}
+      >
         {showVideo && remoteStream ? (
           <video ref={remoteRef} className={styles.remoteVideo} autoPlay playsInline>
             <track kind="captions" />
@@ -348,13 +352,18 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
           </div>
         )}
         {showVideo && localStream && (
-          <div className={styles.localPip}>
-            <LocalCallVideo
-              stream={localStream}
-              className={styles.localVideo}
-              mirrored={cameraFacing === 'user'}
-            />
-          </div>
+          <CallLocalPip
+            variant="dm"
+            stream={localStream}
+            cameraOff={cameraOff}
+            speaking={localSpeaking}
+            cameraFacing={cameraFacing}
+            stageRef={stageRef}
+            label={myLabel}
+            userId={user?.id}
+            displayName={user?.name}
+            email={user?.email}
+          />
         )}
         {localSpeaking && !muted && (
           <div className={styles.localSpeakingBadge} aria-live="polite">
@@ -381,9 +390,10 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         onToggleSpeaker={toggleSpeaker}
         onHangUp={onHangUp}
       />
-    </div>,
-    document.body,
+    </div>
   );
+
+  return createPortal(content, document.body);
 };
 
 export default CallOverlay;

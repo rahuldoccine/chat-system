@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -18,7 +18,7 @@ import { useCallTranscript } from '../useCallTranscript';
 import { useAudioSpeaking } from '../useAudioSpeaking';
 import GroupCallParticipantGrid from './GroupCallParticipantGrid';
 import GroupCallParticipantPanel from './GroupCallParticipantPanel';
-import GroupCallLocalPip from './GroupCallLocalPip';
+import CallLocalPip from './CallLocalPip';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
 import { fetchGroup } from '../../chat/api/groupsApi';
@@ -74,6 +74,7 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
 }) => {
   const { user } = useAuth();
   const { isConnected } = useSocket();
+  const videoStageRef = useRef<HTMLDivElement>(null);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   const muted = !localStream?.getAudioTracks()[0]?.enabled;
@@ -112,9 +113,11 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
   const isVideo = kind === 'VIDEO';
   const useLocalPip = isVideo && Boolean(localStream);
 
+  const showReconnectBanner = !isConnected;
+
   const overlay = (
     <div className={styles.overlay} data-session-id={sessionId}>
-      {!isConnected && (
+      {showReconnectBanner && (
         <div className={styles.reconnectBanner}>
           <WifiOff size={14} />
           Reconnecting…
@@ -145,7 +148,10 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
       <div className={styles.body}>
         <div className={styles.main}>
           {isVideo ? (
-            <div className={styles.videoStage}>
+            <div
+              ref={videoStageRef}
+              className={`${styles.videoStage} ${useLocalPip ? styles.videoStageHasPip : ''}`}
+            >
               <GroupCallParticipantGrid
                 chatId={chatId}
                 participantIds={participantIds}
@@ -156,11 +162,13 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
                 isVideoCall
               />
               {useLocalPip && (
-                <GroupCallLocalPip
+                <CallLocalPip
+                  variant="group"
                   stream={localStream}
                   cameraOff={cameraOff}
                   speaking={localSpeaking}
                   cameraFacing={cameraFacing}
+                  stageRef={videoStageRef}
                   userId={user?.id}
                   avatarUrl={localMember?.avatarUrl}
                   displayName={localMember?.displayName}
@@ -195,6 +203,54 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
               ) : null}
             </div>
           )}
+
+          <div className={styles.controls}>
+            <div className={styles.controlRow}>
+              <button
+                type="button"
+                className={`${styles.ctrlBtn} ${muted ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
+                onClick={onToggleMute}
+                aria-label={muted ? 'Unmute' : 'Mute'}
+              >
+                {muted ? <MicOff size={22} /> : <Mic size={22} />}
+              </button>
+              {isVideo && (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.ctrlBtn} ${cameraOff ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
+                    onClick={onToggleCamera}
+                    aria-label={cameraOff ? 'Camera on' : 'Camera off'}
+                  >
+                    {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ctrlBtn}
+                    onClick={handler(() => {
+                      void onSwitchCamera();
+                    })}
+                    aria-label="Switch camera"
+                  >
+                    <SwitchCamera size={22} />
+                  </button>
+                </>
+              )}
+              {transcript.supported && (
+                <button
+                  type="button"
+                  className={`${styles.ctrlBtn} ${transcript.enabled ? styles.ctrlBtnCaptionsOn : ''}`}
+                  onClick={transcript.toggle}
+                  aria-label={transcript.enabled ? 'Captions on' : 'Captions off'}
+                >
+                  <Subtitles size={22} />
+                </button>
+              )}
+              <button type="button" className={`${styles.ctrlBtn} ${styles.endBtn}`} onClick={onLeave}>
+                <PhoneOff size={22} />
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className={`${styles.sidebarWrap} ${mobilePanelOpen ? styles.sidebarOpen : ''}`}>
@@ -207,54 +263,6 @@ const GroupCallOverlay: React.FC<GroupCallOverlayProps> = ({
             kind={kind}
             activeSpeakerId={activeSpeakerId}
           />
-        </div>
-      </div>
-
-      <div className={styles.controls}>
-        <div className={styles.controlRow}>
-          <button
-            type="button"
-            className={`${styles.ctrlBtn} ${muted ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
-            onClick={onToggleMute}
-            aria-label={muted ? 'Unmute' : 'Mute'}
-          >
-            {muted ? <MicOff size={22} /> : <Mic size={22} />}
-          </button>
-          {isVideo && (
-            <>
-              <button
-                type="button"
-                className={`${styles.ctrlBtn} ${cameraOff ? styles.ctrlBtnOff : styles.ctrlBtnActive}`}
-                onClick={onToggleCamera}
-                aria-label={cameraOff ? 'Camera on' : 'Camera off'}
-              >
-                {cameraOff ? <VideoOff size={22} /> : <Video size={22} />}
-              </button>
-              <button
-                type="button"
-                className={styles.ctrlBtn}
-                onClick={handler(() => {
-                  void onSwitchCamera();
-                })}
-                aria-label="Switch camera"
-              >
-                <SwitchCamera size={22} />
-              </button>
-            </>
-          )}
-          {transcript.supported && (
-            <button
-              type="button"
-              className={`${styles.ctrlBtn} ${transcript.enabled ? styles.ctrlBtnCaptionsOn : ''}`}
-              onClick={transcript.toggle}
-              aria-label={transcript.enabled ? 'Captions on' : 'Captions off'}
-            >
-              <Subtitles size={22} />
-            </button>
-          )}
-          <button type="button" className={`${styles.ctrlBtn} ${styles.endBtn}`} onClick={onLeave}>
-            <PhoneOff size={22} />
-          </button>
         </div>
       </div>
     </div>

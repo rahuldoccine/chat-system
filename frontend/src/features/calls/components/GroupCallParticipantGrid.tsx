@@ -98,7 +98,11 @@ const GroupCallParticipantGrid: React.FC<GroupCallParticipantGridProps> = ({
   if (visible.length === 0) {
     return (
       <div className={styles.emptyStage}>
-        <p>Waiting for others to join…</p>
+        <p>
+          {excludeLocalFromGrid
+            ? "You're the only one here — waiting for others to join…"
+            : 'Waiting for others to join…'}
+        </p>
       </div>
     );
   }

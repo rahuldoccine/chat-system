@@ -118,7 +118,7 @@
   .card {
     right: 1.5rem;
     bottom: 1.5rem;
-    width: min(380px, calc(100vw - 3rem));
+    width: min(282px, calc(100vw - 3rem));
     padding: 1rem 1.1rem;
   }
 

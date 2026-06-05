@@ -19,7 +19,7 @@ const OutgoingCallModal: React.FC<OutgoingCallModalProps> = ({
   statusLabel,
   onCancel,
 }) => {
-  return createPortal(
+  const content = (
     <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="Outgoing call">
       <div className={styles.card}>
         <h2 className={styles.title}>{peerName}</h2>
@@ -43,9 +43,10 @@ const OutgoingCallModal: React.FC<OutgoingCallModalProps> = ({
           <PhoneOff size={26} strokeWidth={2.25} />
         </button>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
+
+  return createPortal(content, document.body);
 };
 
 export default OutgoingCallModal;
