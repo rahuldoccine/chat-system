@@ -1,24 +1,13 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 1rem;
-  overscroll-behavior: contain;
-  box-sizing: border-box;
-}
-
 .modal {
   width: 100%;
   max-width: 420px;
   min-width: 0;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--surface-elevated, #fff);
+  color: var(--foreground, #0f172a);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  box-shadow: var(--shadow-lg, 0 20px 50px rgba(15, 23, 42, 0.2));
   max-height: min(90vh, 100%);
   overflow: auto;
 }
@@ -29,14 +18,14 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border, #e2e8f0);
 }
 
 .title {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--foreground, #0f172a);
   min-width: 0;
 }
 
@@ -52,8 +41,8 @@
 }
 
 .iconBtn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--foreground, #0f172a);
 }
 
 .form {
@@ -71,14 +60,14 @@
   gap: 0.35rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--muted-foreground, #475569);
   min-width: 0;
 }
 
 .labelText {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--muted-foreground, #475569);
 }
 
 .input {
@@ -86,10 +75,12 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
+  background: var(--surface-muted, #f8fafc);
+  color: var(--foreground, #0f172a);
 }
 
 .inputDatetime {
@@ -160,13 +151,13 @@
 }
 
 .btnSecondary {
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface-elevated, #fff);
   padding: 0.5rem 1rem;
   border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
-  color: #475569;
+  color: var(--muted-foreground, #475569);
 }
 
 .btnPrimary {
@@ -199,11 +190,6 @@
 }
 
 @media (max-width: 480px) {
-  .overlay {
-    padding: 0.75rem;
-    align-items: flex-end;
-  }
-
   .modal {
     max-height: 92vh;
     border-bottom-left-radius: 0;

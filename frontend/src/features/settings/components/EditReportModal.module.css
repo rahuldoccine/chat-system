@@ -1,20 +1,9 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
 .modal {
   width: 100%;
   max-width: 480px;
   max-height: min(90vh, 640px);
   overflow: auto;
-  background: white;
+  background: var(--surface-elevated, #fff);
   border-radius: 14px;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
 }
@@ -27,7 +16,7 @@
   border-bottom: 1px solid var(--border, #e2e8f0);
   position: sticky;
   top: 0;
-  background: white;
+  background: var(--surface-elevated, #fff);
   z-index: 1;
 }
 
@@ -115,7 +104,7 @@
   border-radius: 8px;
   font-size: 0.9rem;
   font-family: inherit;
-  background: white;
+  background: var(--surface-elevated, #fff);
 }
 
 .select:focus {

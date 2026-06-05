@@ -1,4 +1,6 @@
 import React from 'react';
+import { Globe, Lock } from 'lucide-react';
+import a11yStyles from '../../../styles/a11y.module.css';
 import styles from './GroupVisibilitySection.module.css';
 
 export type GroupVisibility = 'PUBLIC' | 'PRIVATE';
@@ -14,59 +16,57 @@ const GroupVisibilitySection: React.FC<GroupVisibilitySectionProps> = ({
   value,
   onChange,
   disabled = false,
-  theme = 'dark',
+  theme = 'light',
 }) => {
   return (
-    <div className={`${styles.section} ${theme === 'light' ? styles.sectionLight : ''}`}>
-      <div className={styles.options} role="radiogroup" aria-label="Group visibility">
+    <fieldset
+      className={`${styles.section} ${theme === 'dark' ? styles.sectionDark : styles.sectionLight}`}
+      disabled={disabled}
+    >
+      <legend className={a11yStyles.srOnly}>Group visibility</legend>
+      <div className={styles.grid} role="radiogroup" aria-label="Group visibility">
         <label
-          htmlFor="group-visibility-public"
-          className={`${styles.option} ${disabled ? styles.optionDisabled : ''}`}
+          className={`${styles.card} ${value === 'PUBLIC' ? styles.cardSelected : ''} ${
+            disabled ? styles.cardDisabled : ''
+          }`}
         >
-          <span id="group-visibility-public-label" className={styles.optionLabel}>
-            Public
-          </span>
           <input
-            id="group-visibility-public"
             type="radio"
             name="groupVisibility"
             value="PUBLIC"
+            className={a11yStyles.srOnly}
             checked={value === 'PUBLIC'}
             disabled={disabled}
             onChange={() => onChange('PUBLIC')}
-            aria-labelledby="group-visibility-public-label group-visibility-public-hint"
           />
-          <span className={styles.optionBody}>
-            <span className={styles.optionHint} id="group-visibility-public-hint">
-              Open access. Any user can discover and join the group.
-            </span>
+          <span className={styles.cardIcon} aria-hidden>
+            <Globe size={16} />
           </span>
+          <span className={styles.cardTitle}>Public</span>
+          <span className={styles.cardDesc}>Anyone can discover and join</span>
         </label>
         <label
-          htmlFor="group-visibility-private"
-          className={`${styles.option} ${disabled ? styles.optionDisabled : ''}`}
+          className={`${styles.card} ${value === 'PRIVATE' ? styles.cardSelected : ''} ${
+            disabled ? styles.cardDisabled : ''
+          }`}
         >
-          <span id="group-visibility-private-label" className={styles.optionLabel}>
-            Private
-          </span>
           <input
-            id="group-visibility-private"
             type="radio"
             name="groupVisibility"
             value="PRIVATE"
+            className={a11yStyles.srOnly}
             checked={value === 'PRIVATE'}
             disabled={disabled}
             onChange={() => onChange('PRIVATE')}
-            aria-labelledby="group-visibility-private-label group-visibility-private-hint"
           />
-          <span className={styles.optionBody}>
-            <span className={styles.optionHint} id="group-visibility-private-hint">
-              Restricted access. Only Owners and Moderators can add or manage members. Regular members cannot join directly
-            </span>
+          <span className={styles.cardIcon} aria-hidden>
+            <Lock size={16} />
           </span>
+          <span className={styles.cardTitle}>Private</span>
+          <span className={styles.cardDesc}>Invite only — Owner / Mod adds members</span>
         </label>
       </div>
-    </div>
+    </fieldset>
   );
 };
 

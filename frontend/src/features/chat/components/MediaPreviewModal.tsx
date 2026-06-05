@@ -296,7 +296,7 @@ const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
   if (!open) return null;
 
   return createPortal(
-    <ModalDialog className={styles.overlay} aria-label={title} onClose={onClose}>
+    <ModalDialog aria-label={title} onClose={onClose}>
       <div className={styles.panel}>
         <div
           className={`${styles.stage} ${mediaStyles.stage} ${

@@ -78,11 +78,7 @@ const CreatePollModal: React.FC<CreatePollModalProps> = ({ open, onClose, isSubm
   };
 
   return createPortal(
-    <ModalDialog
-      className={styles.overlay}
-      aria-labelledby="poll-modal-title"
-      onClose={onClose}
-    >
+    <ModalDialog aria-labelledby="poll-modal-title" onClose={onClose}>
       <div className={styles.modal}>
         <div className={styles.header}>
           <h2 id="poll-modal-title" className={styles.title}>

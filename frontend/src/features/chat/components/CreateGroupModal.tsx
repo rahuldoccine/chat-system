@@ -1,7 +1,6 @@
 import React from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { motion } from 'framer-motion';
 import { Camera, Check, Globe, Loader2, Lock, Rocket, Search, Users, X } from 'lucide-react';
+import { ModalDialog } from '../../../components/ModalDialog';
 import { useSocket } from '../../../context/SocketContext';
 import type { DiscoverableUser } from '../hooks/useChatData';
 import UserAvatar from './UserAvatar';
@@ -23,58 +22,52 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ onClose, onChatCrea
   const state = useCreateGroupModalState(onClose, onChatCreated);
 
   return (
-    <Dialog.Root open onOpenChange={(open) => !open && !state.busy && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content className={styles.panelWrap} aria-describedby={undefined}>
-          <motion.div
-            className={styles.panel}
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+    <ModalDialog
+      aria-labelledby="create-group-title"
+      onClose={() => {
+        if (!state.busy) onClose();
+      }}
+    >
+      <div className={styles.panel}>
+        <header className={styles.header}>
+          <h2 id="create-group-title" className={styles.headerTitle}>
+            Create Group
+          </h2>
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Close"
+            disabled={state.busy}
           >
-            <header className={styles.header}>
-              <Dialog.Title id="create-group-title" className={styles.headerTitle}>
+            <X size={18} />
+          </button>
+        </header>
+
+        <CreateGroupModalBody onlineUsers={onlineUsers} getUserLabel={getUserLabel} state={state} />
+
+        <footer className={styles.footer}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            disabled={state.busy || !state.canCreate}
+            onClick={handler(state.handleCreate)}
+          >
+            {state.busy ? (
+              <>
+                <Loader2 size={18} className={styles.spinner} />
+                {state.uploadingAvatar ? 'Uploading image…' : 'Creating…'}
+              </>
+            ) : (
+              <>
+                <Rocket size={18} aria-hidden />
                 Create Group
-              </Dialog.Title>
-              <button
-                type="button"
-                className={styles.closeBtn}
-                onClick={onClose}
-                aria-label="Close"
-                disabled={state.busy}
-              >
-                <X size={18} />
-              </button>
-            </header>
-
-            <CreateGroupModalBody onlineUsers={onlineUsers} getUserLabel={getUserLabel} state={state} />
-
-            <footer className={styles.footer}>
-              <button
-                type="button"
-                className={styles.createBtn}
-                disabled={state.busy || !state.canCreate}
-                onClick={handler(state.handleCreate)}
-              >
-                {state.busy ? (
-                  <>
-                    <Loader2 size={18} className={styles.spinner} />
-                    {state.uploadingAvatar ? 'Uploading image…' : 'Creating…'}
-                  </>
-                ) : (
-                  <>
-                    <Rocket size={18} aria-hidden />
-                    Create Group
-                  </>
-                )}
-              </button>
-            </footer>
-          </motion.div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+              </>
+            )}
+          </button>
+        </footer>
+      </div>
+    </ModalDialog>
   );
 };
 

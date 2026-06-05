@@ -114,7 +114,7 @@ const ChatSearchDialog: React.FC<ChatSearchDialogProps> = ({
   const serverUnavailable = data?.searchUnavailable === true;
 
   return (
-    <ModalDialog className={styles.overlay} aria-labelledby="chat-search-title" onClose={onClose}>
+    <ModalDialog aria-labelledby="chat-search-title" onClose={onClose}>
       <div className={styles.modal}>
         <header className={styles.header}>
           <h3 id="chat-search-title">

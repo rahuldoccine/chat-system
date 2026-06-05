@@ -23,7 +23,6 @@ const PollVotesModal: React.FC<PollVotesModalProps> = ({ open, poll, onClose }) 
 
   return createPortal(
     <ModalDialog
-      className={styles.overlay}
       aria-labelledby="poll-votes-title"
       onClose={onClose}
     >

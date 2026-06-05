@@ -114,7 +114,7 @@ const AccountSettingsSection: React.FC<AccountSettingsSectionProps> = ({
     <section className={styles.card}>
       <h3 className={styles.cardTitle}>Password</h3>
       <p className={styles.mainDescription} style={{ marginTop: 0 }}>
-        Changing your password also updates your encrypted key backup on the server.
+        Use a strong password you do not reuse on other sites.
       </p>
       <ChangePasswordForm />
     </section>

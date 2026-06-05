@@ -67,7 +67,6 @@ const ReportUserModal: React.FC<ReportUserModalProps> = ({
 
   return (
     <ModalDialog
-      className={styles.overlay}
       aria-labelledby="report-modal-title"
       onClose={() => {
         if (!isPending) onClose();

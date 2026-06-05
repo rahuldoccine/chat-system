@@ -75,7 +75,6 @@ const EditReportModal: React.FC<EditReportModalProps> = ({
 
   return (
     <ModalDialog
-      className={styles.overlay}
       aria-labelledby="edit-report-title"
       onClose={() => {
         if (!isPending) onClose();

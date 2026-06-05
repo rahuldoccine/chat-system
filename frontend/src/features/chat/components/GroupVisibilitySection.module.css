@@ -1,53 +1,87 @@
-.heading {
-  margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--foreground);
+.section {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
 }
 
-.options {
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.card {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-}
-
-.option {
-  display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.45rem 0.5rem;
-  border-radius: 6px;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
   cursor: pointer;
   color: var(--foreground);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.option:hover:not(.optionDisabled) {
-  background: var(--surface-muted);
+.sectionLight .card {
+  background: var(--surface-elevated, #fff);
 }
 
-.optionDisabled {
-  opacity: 0.45;
+.sectionDark .card {
+  background: #1e1f22;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.card:hover:not(.cardDisabled) {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.cardSelected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-elevated, #fff));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.sectionDark .cardSelected {
+  background: color-mix(in srgb, var(--primary) 18%, #1e1f22);
+}
+
+.cardDisabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.option input {
-  margin-top: 0.2rem;
-  accent-color: var(--primary);
+.cardIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
 }
 
-.optionBody {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+.cardSelected .cardIcon {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
-.optionLabel {
+.cardTitle {
   font-size: 0.85rem;
-  line-height: 1.35;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
-.optionHint {
+.cardDesc {
   font-size: 0.72rem;
-  color: var(--muted-foreground);
   line-height: 1.35;
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }

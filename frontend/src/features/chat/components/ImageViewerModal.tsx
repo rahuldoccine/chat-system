@@ -32,7 +32,7 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ open, src, alt = 'I
   if (!open) return null;
 
   return createPortal(
-    <ModalDialog className={styles.overlay} aria-label={alt} onClose={onClose}>
+    <ModalDialog aria-label={alt} onClose={onClose}>
       <div className={styles.panel}>
         <div className={styles.stage}>
           <div className={styles.toolbar}>

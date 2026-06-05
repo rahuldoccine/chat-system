@@ -105,7 +105,7 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({
   };
 
   return (
-    <ModalDialog className={styles.overlay} aria-label="Forward message" onClose={onClose}>
+    <ModalDialog aria-label="Forward message" onClose={onClose}>
       <div className={styles.modal}>
         <div className={styles.header}>
           <h3>

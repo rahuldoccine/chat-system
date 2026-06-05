@@ -33,7 +33,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     }}
   >
     <Dialog.Portal>
-      <Dialog.Overlay className={`${styles.overlay} modalSheetOverlay`} />
+      <Dialog.Overlay className="modalSheetOverlay" />
       <Dialog.Content className={`${styles.modal} modalSheetPanel modalSheetPanelFixed`} aria-describedby="confirm-modal-desc">
         <Dialog.Title id="confirm-modal-title" className={styles.title}>
           {title}

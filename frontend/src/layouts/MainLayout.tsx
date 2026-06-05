@@ -453,7 +453,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           className={styles.groupActionBtn}
           onClick={() => {
             setShowGroupActions(false);
-            setShowNewGroup(true);
+            requestAnimationFrame(() => setShowNewGroup(true));
           }}
         >
           <Users size={16} />
@@ -506,14 +506,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         )}
       </GroupActionsModal>
-      <AnimatePresence>
-        {showNewGroup && (
-          <CreateGroupModal
-            onClose={() => setShowNewGroup(false)}
-            onChatCreated={(chatId) => setActiveId(chatId)}
-          />
-        )}
-      </AnimatePresence>
+      {showNewGroup && (
+        <CreateGroupModal
+          onClose={() => setShowNewGroup(false)}
+          onChatCreated={(chatId) => setActiveId(chatId)}
+        />
+      )}
 
       <JumpToSearch
         open={showJumpTo}

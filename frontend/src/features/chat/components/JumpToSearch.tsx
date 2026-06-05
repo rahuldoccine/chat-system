@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Hash, Loader2, MessageCircle, Search, User, X } from 'lucide-react';
+import { Hash, Loader2, Search, User, X } from 'lucide-react';
 import {
   useConversations,
   useCreateDirectChat,
@@ -231,7 +231,7 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
   const showUserLoading = userSearchEnabled && (usersLoading || usersFetching) && matchingUsers.length === 0;
 
   return (
-    <ModalDialog className={styles.overlay} aria-labelledby="jump-to-title" onClose={onClose}>
+    <ModalDialog aria-labelledby="jump-to-title" onClose={onClose}>
       <div className={styles.modal}>
         <header className={styles.header}>
           <h3 id="jump-to-title">
@@ -307,9 +307,7 @@ const JumpToSearch: React.FC<JumpToSearchProps> = ({ open, onClose, onSelectChat
                                   <Hash size={12} /> Channel
                                 </>
                               ) : (
-                                <>
-                                  <MessageCircle size={12} /> DM
-                                </>
+                                'Direct'
                               )}
                             </span>
                           </button>

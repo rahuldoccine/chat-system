@@ -87,7 +87,7 @@ const NewDmModal: React.FC<NewDmModalProps> = ({ onClose, onChatCreated }) => {
   };
 
   return (
-    <ModalDialog className={styles.overlay} aria-label="Start a direct message" onClose={onClose}>
+    <ModalDialog aria-label="Start a direct message" onClose={onClose}>
       <div className={styles.panel}>
         <div className={styles.header}>
           <h3>Start a direct message</h3>

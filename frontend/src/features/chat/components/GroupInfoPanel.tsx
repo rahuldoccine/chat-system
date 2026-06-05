@@ -302,6 +302,7 @@ const GroupInfoPanel: React.FC<GroupInfoPanelProps> = ({ chat, chatName, onLeave
               value={visibility}
               onChange={handlerArg(handleVisibilityChange)}
               disabled={!canEditInfoAndVisibility}
+              theme="light"
             />
             {canEditInfoAndVisibility ? null : (
               <div className={styles.readOnlyHint}>

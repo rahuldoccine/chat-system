@@ -23,7 +23,6 @@ const AlertModal: React.FC<AlertModalProps> = ({
 
   return (
     <ModalDialog
-      className={styles.overlay}
       aria-labelledby="alert-modal-title"
       aria-describedby="alert-modal-desc"
       onClose={onClose}

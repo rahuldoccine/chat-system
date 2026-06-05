@@ -132,7 +132,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
     isSpreadsheetViewerKind(kind) && spreadsheetSheets && !loading && !error;
 
   return createPortal(
-    <ModalDialog className={styles.overlay} aria-label={title} onClose={onClose}>
+    <ModalDialog aria-label={title} onClose={onClose}>
       <div className={styles.panel}>
         <div className={docStyles.documentPanel}>
           <header className={docStyles.documentChrome}>

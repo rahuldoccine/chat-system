@@ -1,19 +1,8 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  z-index: 1100;
-  padding: 10vh 1rem 1rem;
-}
-
 .modal {
   width: 100%;
   max-width: 520px;
   max-height: min(70vh, 560px);
-  background: white;
+  background: var(--surface-elevated, #fff);
   border-radius: 14px;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
   display: flex;
