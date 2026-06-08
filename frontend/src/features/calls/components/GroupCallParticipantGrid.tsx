@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import UserAvatar from '../../chat/components/UserAvatar';
 import { useAudioSpeaking } from '../useAudioSpeaking';
 import GroupCallRemoteVideo from './GroupCallRemoteVideo';
+import RemoteMediaPlayback from './RemoteMediaPlayback';
 import styles from './GroupCallParticipantGrid.module.css';
 import {
   gridLayoutClass,
@@ -37,6 +38,9 @@ function RemoteTile({
     showVideo &&
     remoteStream != null &&
     remoteStream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live');
+  const audioOn =
+    remoteStream != null &&
+    remoteStream.getAudioTracks().some((t) => t.enabled && t.readyState === 'live');
 
   return (
     <div
@@ -46,14 +50,19 @@ function RemoteTile({
         {videoOn && remoteStream ? (
           <GroupCallRemoteVideo stream={remoteStream} className={styles.tileVideo} />
         ) : (
-          <UserAvatar
-            userId={profile.userId}
-            avatarUrl={profile.avatarUrl}
-            displayName={profile.displayName}
-            email={profile.email}
-            className={styles.tileAvatar}
-            fallbackFontSize="2rem"
-          />
+          <>
+            {!videoOn && audioOn && remoteStream ? (
+              <RemoteMediaPlayback stream={remoteStream} mode="audio" />
+            ) : null}
+            <UserAvatar
+              userId={profile.userId}
+              avatarUrl={profile.avatarUrl}
+              displayName={profile.displayName}
+              email={profile.email}
+              className={styles.tileAvatar}
+              fallbackFontSize="2rem"
+            />
+          </>
         )}
         {speaking && <span className={styles.speakingRing} aria-hidden />}
       </div>

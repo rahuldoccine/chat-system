@@ -22,6 +22,7 @@ import type { CallConnectionUiState } from '../CallManager';
 import type { CallPhase } from '../types';
 import type { CameraFacing } from '../cameraSwitch';
 import CallLocalPip from './CallLocalPip';
+import RemoteMediaPlayback from './RemoteMediaPlayback';
 import styles from './CallOverlay.module.css';
 import { handler } from '../../../utils/asyncHandler';
 
@@ -228,7 +229,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   cameraFacing,
   onEndTranscript,
 }) => {
-  const remoteRef = useRef<HTMLVideoElement>(null);
+  const remoteRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [speakerOn, setSpeakerOn] = useState(true);
   const { user } = useAuth();
@@ -248,10 +249,6 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
   const showVideo = isVideo && (localStream || remoteStream);
   const isRingingOut = phase === 'ringing_out';
   const endLabel = isRingingOut ? 'Cancel call' : 'End call';
-
-  useEffect(() => {
-    if (remoteRef.current) remoteRef.current.srcObject = remoteStream;
-  }, [remoteStream]);
 
   useEffect(() => {
     const activeCallId = callId;
@@ -331,11 +328,17 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         className={`${styles.stage} ${showVideo ? styles.stageVideo : ''}`}
       >
         {showVideo && remoteStream ? (
-          <video ref={remoteRef} className={styles.remoteVideo} autoPlay playsInline>
-            <track kind="captions" />
-          </video>
+          <RemoteMediaPlayback
+            stream={remoteStream}
+            mode="video"
+            className={styles.remoteVideo}
+            mediaRef={remoteRef}
+          />
         ) : (
           <div className={styles.audioOnly}>
+            {remoteStream ? (
+              <RemoteMediaPlayback stream={remoteStream} mode="audio" mediaRef={remoteRef} />
+            ) : null}
             <div className={styles.avatarWrap}>
               <UserAvatar
                 userId={peerUserId}
